@@ -47,6 +47,7 @@ module.exports = {
         
         items: [
             // Coffee
+            { id: 'X0', name: 'Test', category: 'coffee', price: 1, available: true },
             { id: 'C001', name: 'Espresso', category: 'coffee', price: 15000, available: true },
             { id: 'C002', name: 'Americano', category: 'coffee', price: 18000, available: true },
             { id: 'C003', name: 'Cappuccino', category: 'coffee', price: 22000, available: true },
