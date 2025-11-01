@@ -1,4 +1,5 @@
 const WhatsAppBot = require('./src/bot');
+const PaymentGateway = require('./src/services/paymentGateway');
 
 /**
  * Main Entry Point
@@ -10,8 +11,15 @@ async function main() {
     console.log('');
 
     try {
+        // Start payment gateway dashboard
+        PaymentGateway.startServer();
+        
+        // Start WhatsApp bot
         const bot = new WhatsAppBot();
         await bot.start();
+        
+        // Connect payment gateway to bot
+        PaymentGateway.setBotInstance(bot);
 
         // Handle process termination
         process.on('SIGINT', () => {

@@ -11,20 +11,24 @@ module.exports = {
         name: 'My Coffee Shop',
         address: 'Jl. Kopi No. 123, Jakarta',
         openHours: '08:00 - 22:00',
-        contact: '08123456789',
+        contact: '6281345028895',
         
         // QRIS Static (Base QRIS dari merchant)
         qrisStatic: '00020101021126610014COM.GO-JEK.WWW01189360091433658182180210G3658182180303UMI51440014ID.CO.QRIS.WWW0215ID10254499802480303UMI5204581253033605802ID5914Pangko Coffee 6009SAMARINDA61057524262070703A0163047707', // Ganti dengan QRIS asli kamu
         
-        // Barista WhatsApp Numbers (untuk notifikasi)
+        // Barista WhatsApp Numbers (untuk notifikasi & akses command barista)
+        // ⚠️ PENTING: Hanya masukkan nomor barista/kasir ASLI disini
+        // Customer TIDAK boleh ada di list ini!
         baristaNumbers: [
-            '6281345028895@s.whatsapp.net', // Ganti dengan nomor barista
+            '6281345028895@s.whatsapp.net', // Nomor barista 1
+            // '6281234567890@s.whatsapp.net', // Nomor barista 2 (jika ada)
             // Tambahkan nomor barista lain jika perlu
         ],
 
-        // Admin Numbers (untuk akses penuh)
+        // Admin Numbers (untuk akses penuh ke semua command)
+        // Admin otomatis dapat akses barista commands juga
         adminNumbers: [
-            '6281345028895@s.whatsapp.net', // Ganti dengan nomor admin
+            '6281345028895@s.whatsapp.net', // Nomor admin
         ]
     },
 
