@@ -1,6 +1,6 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino = require('pino');
+const qrcode = require('qrcode-terminal');
 const messageHandler = require('./handlers/messageHandler');
 const config = require('./config/config');
 const orderManager = require('./services/orderManager');
@@ -21,6 +21,14 @@ class WhatsAppBot {
         try {
             console.log('🚀 Starting WhatsApp Bot...');
 
+            // Dynamically import Baileys (it's an ES module). This avoids the
+            // CommonJS -> ESM require() experimental warning.
+            const baileys = await import('@whiskeysockets/baileys');
+            const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = baileys;
+            // expose DisconnectReason to instance so other methods (handleConnection)
+            // can access it outside start()
+            this.DisconnectReason = DisconnectReason;
+
             // Get latest baileys version
             const { version, isLatest } = await fetchLatestBaileysVersion();
             console.log(`📦 Using Baileys v${version.join('.')} ${isLatest ? '(latest)' : ''}`);
@@ -29,9 +37,10 @@ class WhatsAppBot {
             const { state, saveCreds } = await useMultiFileAuthState('./sessions');
 
             // Create socket
+            // Note: `printQRInTerminal` is deprecated in newer Baileys releases.
+            // We handle QR display ourselves in the `connection.update` event.
             this.sock = makeWASocket({
                 auth: state,
-                printQRInTerminal: true,
                 logger: pino({ level: 'silent' }), // 'silent', 'fatal', 'error', 'warn', 'info', 'debug', 'trace'
                 browser: [config.shop.name + ' Bot', 'Chrome', '1.0.0'],
                 version
@@ -66,12 +75,19 @@ class WhatsAppBot {
         if (qr) {
             this.qr = qr;
             console.log('📱 Scan QR code di terminal untuk login!');
+            try {
+                // Print ASCII QR in terminal for easy scanning
+                qrcode.generate(qr, { small: true });
+            } catch (err) {
+                // fallback - print the raw QR string (not ideal but visible)
+                console.log('QR data:', qr);
+            }
         }
 
         if (connection === 'close') {
             const shouldReconnect = 
                 lastDisconnect?.error instanceof Boom &&
-                lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut;
+                lastDisconnect.error.output.statusCode !== this.DisconnectReason?.loggedOut;
 
             console.log('❌ Connection closed. Reconnecting:', shouldReconnect);
 

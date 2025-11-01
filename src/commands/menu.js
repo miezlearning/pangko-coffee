@@ -39,7 +39,7 @@ module.exports = {
                 const available = item.available ? '' : ' ❌ (Habis)';
                 menuText += `${index + 1}. *${item.name}*${available}\n`;
                 menuText += `   💰 Rp ${this.formatNumber(item.price)}\n`;
-                menuText += `   ID: \`${item.id}\`\n\n`;
+                menuText += `   📝 Pesan: \`!order ${item.id} 1\`\n\n`;
             });
         } else {
             // Show all categories
@@ -52,6 +52,7 @@ module.exports = {
                     items.forEach((item) => {
                         const available = item.available ? '' : ' ❌';
                         menuText += `• ${item.name}${available} - Rp ${this.formatNumber(item.price)}\n`;
+                        menuText += `  Pesan: \`!order ${item.id} 1\`\n`;
                     });
                     
                     menuText += `\n`;
@@ -59,11 +60,16 @@ module.exports = {
             });
         }
 
-        menuText += `━━━━━━━━━━━━━━━━━━━━\n`;
-        menuText += `\n💡 *Tips:*\n`;
-        menuText += `• Ketik *!menu coffee* untuk lihat menu kopi\n`;
-        menuText += `• Ketik *!order* untuk mulai pesan\n`;
-        menuText += `• Ketik *!cart* untuk lihat keranjang\n`;
+        menuText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+        menuText += `💡 *Cara Pesan:*\n`;
+        menuText += `Ketik: \`!order [ID] [JUMLAH]\`\n\n`;
+        menuText += `📌 *Contoh:*\n`;
+        menuText += `• \`!order C001 2\` - Pesan 2 Espresso\n`;
+        menuText += `• \`!order C003 1\` - Pesan 1 Cappuccino\n\n`;
+        menuText += `🛒 *Lihat kategori:*\n`;
+        menuText += `• \`!menu coffee\` - Menu kopi\n`;
+        menuText += `• \`!menu food\` - Menu makanan\n\n`;
+        menuText += `📋 Ketik \`!cart\` untuk lihat keranjang`;
 
         await sock.sendMessage(from, { text: menuText });
     },
