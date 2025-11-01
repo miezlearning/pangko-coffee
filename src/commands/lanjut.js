@@ -1,0 +1,61 @@
+const orderManager = require('../services/orderManager');
+const moment = require('moment-timezone');
+
+module.exports = {
+  name: 'lanjut',
+  description: 'Buka kembali pesanan tunai yang dibatalkan dalam 60 menit',
+  aliases: ['reopen','continue'],
+
+  async execute(sock, msg, args) {
+    const from = msg.key.remoteJid;
+    const orderId = (args[0] || '').trim();
+
+    if (!orderId) {
+      await sock.sendMessage(from, { text: '⚠️ Format: *!lanjut <OrderID>*\nContoh: !lanjut CF12345678' });
+      return;
+    }
+
+    const order = orderManager.getOrder(orderId);
+    if (!order) {
+      await sock.sendMessage(from, { text: `❌ Order tidak ditemukan: *${orderId}*` });
+      return;
+    }
+
+    if (order.userId !== from) {
+      await sock.sendMessage(from, { text: '❌ Anda tidak berhak membuka pesanan ini.' });
+      return;
+    }
+
+    if (order.paymentMethod !== 'CASH') {
+      await sock.sendMessage(from, { text: '❌ Hanya berlaku untuk pesanan *Tunai*.' });
+      return;
+    }
+
+    if (order.status !== orderManager.STATUS.CANCELLED) {
+      await sock.sendMessage(from, { text: `❌ Status saat ini: *${order.status}*. Perintah ini hanya untuk pesanan tunai yang dibatalkan.` });
+      return;
+    }
+
+    if (!order.canReopenUntil || moment().isAfter(order.canReopenUntil)) {
+      await sock.sendMessage(from, { text: '❌ Waktu untuk membuka kembali sudah habis. Silakan buat pesanan baru.' });
+      return;
+    }
+
+    try {
+      const reopened = orderManager.reopenCash(orderId);
+      const expiryTime = moment(reopened.cashExpiresAt).format('HH:mm');
+      const minutesLeft = Math.max(0, moment(reopened.cashExpiresAt).diff(moment(), 'minutes'));
+
+      let text = `✅ *Pesanan Tunai Dibuka Kembali!*\n\n`;
+      text += `📋 Order ID: *${reopened.orderId}*\n`;
+      text += `👤 Atas Nama: *${reopened.customerName}*\n`;
+      text += `⏰ Batas ke kasir: ${expiryTime} WIB (${minutesLeft} menit)\n\n`;
+      text += `📍 Segera menuju kasir dan sebutkan: *Order ${reopened.orderId} atas nama ${reopened.customerName}*.\n`;
+      text += `Kasir akan konfirmasi penerimaan tunai untuk mulai proses barista.`;
+
+      await sock.sendMessage(from, { text });
+    } catch (error) {
+      await sock.sendMessage(from, { text: `❌ Gagal membuka kembali: ${error.message}` });
+    }
+  }
+};

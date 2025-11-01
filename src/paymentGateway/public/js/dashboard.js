@@ -4,8 +4,12 @@ let autoRefresh;
 let previousPaymentCount = 0;
 let soundEnabled = true;
 let knownPaymentIds = new Set();
+let knownProcessingIds = new Set();
+let knownPendingCashIds = new Set();
 let paymentsInitialized = false;
 let statsInitialized = false;
+let processingInitialized = false;
+let pendingCashInitialized = false;
 let audioUnlocked = false;
 
 const soundOptions = [
@@ -284,6 +288,20 @@ async function loadProcessingOrders() {
     const list = document.getElementById('processing-list');
     if (!list) return;
 
+    // Notify on truly new processing orders (e.g., Tunai langsung PROCESSSING, atau QRIS sesudah dikonfirmasi)
+    if (!processingInitialized) {
+      knownProcessingIds = new Set(data.orders.map(o => o.orderId));
+      processingInitialized = true;
+    } else {
+      data.orders.forEach(order => {
+        if (!knownProcessingIds.has(order.orderId)) {
+          knownProcessingIds.add(order.orderId);
+          const methodLabel = order.paymentMethod === 'CASH' ? 'Tunai' : 'QRIS';
+          showNotification(`Pesanan baru (${methodLabel}): ${order.orderId} • ${order.customerName}`);
+        }
+      });
+    }
+
     if (data.orders.length === 0) {
       list.innerHTML = `
         <div class="rounded-3xl border border-dashed border-peach/40 bg-peach/20 px-6 py-10 text-center text-sm">
@@ -335,6 +353,130 @@ async function loadProcessingOrders() {
     }
   } catch (error) {
     console.error('Failed to load processing orders:', error);
+  }
+}
+
+// Load pending cash orders
+async function loadPendingCash() {
+  try {
+    const res = await fetch('/api/orders/pending-cash');
+    const data = await res.json();
+
+    const list = document.getElementById('pending-cash-list');
+    if (!list) return;
+
+    // Notify on new pending cash
+    if (!pendingCashInitialized) {
+      knownPendingCashIds = new Set(data.orders.map(o => o.orderId));
+      pendingCashInitialized = true;
+    } else {
+      data.orders.forEach(order => {
+        if (!knownPendingCashIds.has(order.orderId)) {
+          knownPendingCashIds.add(order.orderId);
+          showNotification(`Tunai menunggu kasir: ${order.orderId} • ${order.customerName}`);
+        }
+      });
+    }
+
+    if (data.orders.length === 0) {
+      list.innerHTML = `
+        <div class="rounded-3xl border border-dashed border-charcoal/15 bg-white px-6 py-10 text-center text-sm">
+          <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-cream text-3xl shadow-inner">💤</div>
+          <h3 class="mt-5 text-lg font-semibold">Tidak ada pesanan tunai menunggu</h3>
+          <p class="mt-2 text-charcoal/60">Kasir akan melihat pesanan tunai baru di sini.</p>
+        </div>
+      `;
+    } else {
+      list.innerHTML = data.orders.map((order) => {
+        const minutesLeft = order.cashExpiresAt ? Math.max(0, Math.floor((new Date(order.cashExpiresAt) - Date.now()) / 60000)) : '-';
+        return `
+          <div class="rounded-3xl border border-white/60 bg-white/95 p-6 shadow-[0_20px_45px_-38px_rgba(51,51,51,0.4)] transition hover:-translate-y-1">
+            <div class="flex flex-col gap-4 border-b border-charcoal/5 pb-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p class="text-xs uppercase tracking-[0.3em] text-charcoal/45">Cash Pending</p>
+                <h4 class="mt-2 text-xl font-semibold">📋 ${order.orderId}</h4>
+                <p class="text-sm text-matcha font-semibold">👤 ${order.customerName}</p>
+                <p class="mt-1 inline-flex items-center gap-2 text-xs font-semibold text-charcoal/60">
+                  <span class="rounded-full border border-charcoal/10 bg-charcoal/5 px-2 py-0.5">💵 Tunai</span>
+                </p>
+                <p class="text-xs text-charcoal/55">📱 ${order.userId}</p>
+              </div>
+              <div class="rounded-2xl bg-cream px-5 py-3 text-right">
+                <p class="text-xs uppercase tracking-[0.25em] text-charcoal/60">Total</p>
+                <span class="text-3xl font-bold text-charcoal">Rp ${formatNumber(order.pricing.total)}</span>
+              </div>
+            </div>
+            <div class="mt-5 rounded-2xl border border-charcoal/5 bg-charcoal/2 p-4">
+              <div class="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">Items (${order.items.length})</div>
+              ${order.items.map(item => `
+                <div class="border-b border-charcoal/5 py-2 text-sm last:border-0">
+                  <div class="flex items-center justify-between">
+                    <span class="font-medium text-charcoal/80">${item.name}</span>
+                    <span class="text-charcoal/55">x${item.quantity} • Rp ${formatNumber(item.price * item.quantity)}</span>
+                  </div>
+                  ${item.notes ? `<p class="mt-1 text-xs text-charcoal/45">📝 ${item.notes}</p>` : ''}
+                </div>
+              `).join('')}
+            </div>
+            <div class="mt-4 flex flex-col gap-2 text-xs font-semibold text-charcoal/55 sm:flex-row sm:items-center sm:justify-between">
+              <span>⏰ Sisa waktu ke kasir: ${minutesLeft} menit</span>
+              <span>🕐 Dibuat: ${new Date(order.createdAt).toLocaleString('id-ID')}</span>
+            </div>
+            <div class="mt-5 grid gap-3 sm:grid-cols-2">
+              <button class="rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="acceptCash('${order.orderId}')">✅ Terima Tunai & Proses</button>
+              <button class="rounded-2xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="cancelCash('${order.orderId}')">❌ Batalkan (No Show)</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  } catch (error) {
+    console.error('Failed to load pending cash:', error);
+  }
+}
+
+async function acceptCash(orderId) {
+  const proceed = confirm(`Terima pembayaran tunai dan mulai proses barista?\n\nOrder: ${orderId}`);
+  if (!proceed) return;
+  try {
+    const res = await fetch(`/api/orders/cash/accept/${orderId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ acceptedBy: 'kasir' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showNotification('✅ Tunai diterima, pesanan diproses');
+      knownPendingCashIds.delete(orderId);
+      loadPendingCash();
+      loadProcessingOrders();
+    } else {
+      showNotification('❌ Gagal terima tunai: ' + (data.message || 'Unknown error'));
+    }
+  } catch (e) {
+    showNotification('❌ Error: ' + e.message);
+  }
+}
+
+async function cancelCash(orderId) {
+  const reason = prompt(`Alasan pembatalan (opsional):`, 'No show di kasir');
+  if (reason === null) return;
+  try {
+    const res = await fetch(`/api/orders/cash/cancel/${orderId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason, cancelledBy: 'kasir' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showNotification('⏸️ Tunai dibatalkan. Customer diberi instruksi !lanjut');
+      knownPendingCashIds.delete(orderId);
+      loadPendingCash();
+    } else {
+      showNotification('❌ Gagal batalkan: ' + (data.message || 'Unknown error'));
+    }
+  } catch (e) {
+    showNotification('❌ Error: ' + e.message);
   }
 }
 
@@ -396,6 +538,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   loadPayments();
   loadProcessingOrders();
+  loadPendingCash();
 
   // Bind modal buttons
   const cancelBtn = document.getElementById('reject-cancel');
@@ -408,6 +551,7 @@ window.addEventListener('DOMContentLoaded', () => {
 autoRefresh = setInterval(() => {
   loadPayments();
   loadProcessingOrders();
+  loadPendingCash();
 }, 3000);
 
 // Expose modal open for inline onclick

@@ -6,6 +6,21 @@ module.exports = {
         timezone: 'Asia/Makassar'
     },
 
+    // Payment Provider Integration (optional)
+    // Enable this to use a real QRIS provider/aggregator that sends webhooks when paid
+    paymentProvider: {
+        enabled: false,           // set to true after configuring below
+        name: 'generic',          // e.g., 'xendit', 'midtrans', 'duitku', etc.
+        callbackSecret: 'CHANGE_ME', // shared secret or HMAC key provided by provider
+        signatureHeader: 'x-callback-token', // header key used by provider for signature/token (adjust per provider)
+        // If your provider uses HMAC with a specific header and algorithm, specify here:
+        hmac: {
+            enabled: false,
+            header: 'x-signature',   // e.g., 'x-callback-signature'
+            algorithm: 'sha256'       // 'sha256' | 'sha512'
+        }
+    },
+
     // Coffee Shop Configuration
     shop: {
         name: 'My Coffee Shop',
@@ -78,6 +93,7 @@ module.exports = {
         maxItemsPerOrder: 10,
         orderTimeout: 15, // minutes
         paymentTimeout: 10, // minutes
+        cashTimeout: 10, // minutes to reach cashier before auto-cancel
         minOrderAmount: 10000,
         
         // Fee Configuration (optional)

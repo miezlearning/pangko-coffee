@@ -6,6 +6,7 @@ const express = require('express');
 const router = express.Router();
 const dataStore = require('../dataStore');
 const path = require('path');
+const PaymentProvider = require('../../services/paymentProvider');
 
 /**
  * Format number helper
@@ -172,3 +173,60 @@ router.get('/tester', (req, res) => {
 });
 
 module.exports = router;
+
+/**
+ * POST /api/webhook/provider
+ * Real provider webhook endpoint (signature verification + auto-confirm)
+ */
+router.post('/provider', async (req, res) => {
+    try {
+        if (!PaymentProvider.isEnabled()) {
+            return res.status(400).json({ success: false, message: 'Payment provider is disabled' });
+        }
+        // Verify signature/token
+        const ok = PaymentProvider.verifySignature(req);
+        if (!ok) {
+            return res.status(401).json({ success: false, message: 'Invalid signature' });
+        }
+        const payload = PaymentProvider.parseWebhook(req);
+        if (!payload.orderId) {
+            return res.status(400).json({ success: false, message: 'Missing order reference' });
+        }
+
+        const payment = dataStore.findPendingPayment(payload.orderId);
+        if (!payment) {
+            // Idempotency or already processed; accept silently
+            return res.json({ success: true, message: 'Payment already processed or not pending' });
+        }
+
+        if (payload.status === 'paid') {
+            // Confirm payment
+            payment.status = 'confirmed';
+            payment.confirmedAt = new Date();
+            payment.confirmedBy = (require('../../config/config').paymentProvider.name || 'provider');
+            payment.paymentMethod = 'QRIS';
+            dataStore.removePendingPayment(payload.orderId);
+            dataStore.addToHistory(payment);
+
+            try {
+                await triggerBotConfirmation(payment);
+            } catch (e) {
+                console.warn('[provider webhook] bot notify failed:', e.message);
+            }
+            return res.json({ success: true, message: 'Payment confirmed' });
+        } else if (payload.status === 'failed') {
+            payment.status = 'rejected';
+            payment.rejectedAt = new Date();
+            payment.rejectionReason = `Provider: ${payload.rawStatus || 'failed'}`;
+            dataStore.removePendingPayment(payload.orderId);
+            dataStore.addToHistory(payment);
+            return res.json({ success: true, message: 'Payment marked failed' });
+        } else {
+            // pending or unknown → acknowledge
+            return res.json({ success: true, message: 'Event acknowledged', status: payload.status });
+        }
+    } catch (err) {
+        console.error('Provider webhook error:', err);
+        return res.status(500).json({ success: false, message: 'Internal error' });
+    }
+});

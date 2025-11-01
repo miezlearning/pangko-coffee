@@ -18,6 +18,7 @@ class OrderManager {
         this.STATUS = {
             DRAFT: 'draft',
             PENDING_PAYMENT: 'pending_payment',
+            PENDING_CASH: 'pending_cash',
             PAID: 'paid',
             PROCESSING: 'processing',
             READY: 'ready',
@@ -146,7 +147,7 @@ class OrderManager {
             items: session.items,
             notes: session.notes,
             pricing,
-            status: this.STATUS.PENDING_PAYMENT,
+            status: paymentMethod === 'CASH' ? this.STATUS.PENDING_CASH : this.STATUS.PENDING_PAYMENT,
             createdAt: new Date(),
             paymentExpiry: moment().add(config.order.paymentTimeout, 'minutes').toDate(),
             qrisGenerated: false,
@@ -155,6 +156,16 @@ class OrderManager {
             paidAt: null,
             completedAt: null
         };
+
+        // Cash-specific timers/metadata
+        if (paymentMethod === 'CASH') {
+            const cashTimeout = (config.order && (config.order.cashTimeout ?? config.order.paymentTimeout)) || 10;
+            order.cashExpiresAt = moment().add(cashTimeout, 'minutes').toDate();
+            order.cashAcceptedAt = null;
+            order.cashCancelledAt = null;
+            order.cashCancelReason = null;
+            order.canReopenUntil = null; // set when cancelled/expired
+        }
 
         this.orders.set(orderId, order);
         this.clearCart(userId);
@@ -240,6 +251,68 @@ class OrderManager {
     }
 
     /**
+     * Get pending cash orders
+     */
+    getPendingCashOrders() {
+        const allOrders = this.orders.keys().map(key => this.orders.get(key));
+        return allOrders.filter(order => order.status === this.STATUS.PENDING_CASH);
+    }
+
+    /**
+     * Accept cash payment (kasir presses Accept)
+     */
+    acceptCash(orderId, acceptedBy = 'kasir') {
+        const order = this.getOrder(orderId);
+        if (!order) throw new Error('Order not found');
+        if (order.paymentMethod !== 'CASH') throw new Error('Not a cash order');
+        if (order.status !== this.STATUS.PENDING_CASH) throw new Error(`Order status must be PENDING_CASH, got ${order.status}`);
+        order.cashAcceptedAt = new Date();
+        order.acceptedBy = acceptedBy;
+        order.status = this.STATUS.PROCESSING;
+        order.updatedAt = new Date();
+        this.orders.set(orderId, order);
+        return order;
+    }
+
+    /**
+     * Cancel cash (no-show or cashier decision). Allows reopen within windowMinutes (default 60)
+     */
+    cancelCash(orderId, reason = 'cash_cancel', windowMinutes = 60) {
+        const order = this.getOrder(orderId);
+        if (!order) throw new Error('Order not found');
+        if (order.paymentMethod !== 'CASH') throw new Error('Not a cash order');
+        // can cancel from pending_cash; if already cancelled, just update reason/window
+        order.cashCancelledAt = new Date();
+        order.cashCancelReason = reason;
+        order.canReopenUntil = moment().add(windowMinutes, 'minutes').toDate();
+        order.status = this.STATUS.CANCELLED;
+        order.updatedAt = new Date();
+        this.orders.set(orderId, order);
+        return order;
+    }
+
+    /**
+     * Reopen a recently-cancelled cash order within its reopen window
+     */
+    reopenCash(orderId) {
+        const order = this.getOrder(orderId);
+        if (!order) throw new Error('Order not found');
+        if (order.paymentMethod !== 'CASH') throw new Error('Not a cash order');
+        if (order.status !== this.STATUS.CANCELLED) throw new Error('Order is not cancelled');
+        if (!order.canReopenUntil || moment().isAfter(order.canReopenUntil)) {
+            throw new Error('Reopen window has expired');
+        }
+        const cashTimeout = (config.order && (config.order.cashTimeout ?? config.order.paymentTimeout)) || 10;
+        order.status = this.STATUS.PENDING_CASH;
+        order.cashCancelledAt = null;
+        order.cashCancelReason = null;
+        order.cashExpiresAt = moment().add(cashTimeout, 'minutes').toDate();
+        order.updatedAt = new Date();
+        this.orders.set(orderId, order);
+        return order;
+    }
+
+    /**
      * Get orders ready for pickup
      */
     getReadyOrders() {
@@ -285,6 +358,7 @@ class OrderManager {
         const emojis = {
             [this.STATUS.DRAFT]: '📝',
             [this.STATUS.PENDING_PAYMENT]: '💳',
+            [this.STATUS.PENDING_CASH]: '💵',
             [this.STATUS.PAID]: '✅',
             [this.STATUS.PROCESSING]: '👨‍🍳',
             [this.STATUS.READY]: '🎉',
@@ -306,13 +380,26 @@ class OrderManager {
      * Clean expired orders (run periodically)
      */
     cleanExpiredOrders() {
+        const expiredEvents = { qrisExpired: [], cashExpired: [] };
+        // QRIS pending expiry
         const pendingOrders = this.getPendingPaymentOrders();
-        
         pendingOrders.forEach(order => {
             if (this.isPaymentExpired(order.orderId)) {
                 this.updateOrderStatus(order.orderId, this.STATUS.EXPIRED);
+                expiredEvents.qrisExpired.push(order);
             }
         });
+
+        // Cash pending expiry -> auto-cancel with reopen window
+        const cashOrders = this.getPendingCashOrders();
+        cashOrders.forEach(order => {
+            if (order.cashExpiresAt && moment().isAfter(order.cashExpiresAt)) {
+                const cancelled = this.cancelCash(order.orderId, 'cash_timeout', 60);
+                expiredEvents.cashExpired.push(cancelled);
+            }
+        });
+
+        return expiredEvents;
     }
 }
 

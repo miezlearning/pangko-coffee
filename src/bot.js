@@ -135,7 +135,21 @@ class WhatsAppBot {
         setInterval(() => {
             try {
                 console.log('[Cleanup] Running expired order cleanup...');
-                orderManager.cleanExpiredOrders();
+                const expired = orderManager.cleanExpiredOrders();
+                // Notify users whose cash orders auto-cancelled
+                if (expired && Array.isArray(expired.cashExpired) && expired.cashExpired.length > 0) {
+                    expired.cashExpired.forEach(async (order) => {
+                        try {
+                            const until = order.canReopenUntil ? new Date(order.canReopenUntil).toLocaleString('id-ID') : '';
+                            const text = `⏰ *Waktu ke Kasir Habis*\n\n` +
+                                `Order ID: *${order.orderId}*\n` +
+                                `Status: Dibatalkan (tunai)\n\n` +
+                                `Anda masih bisa membuka kembali dalam 60 menit.\n` +
+                                `Balas: *!lanjut ${order.orderId}* sebelum ${until}.`;
+                            await this.sock.sendMessage(order.userId, { text });
+                        } catch (e) { /* ignore */ }
+                    });
+                }
             } catch (error) {
                 console.error('[Cleanup] Error:', error);
             }

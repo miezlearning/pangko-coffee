@@ -32,16 +32,20 @@ async function messageHandler(sock, msg) {
         // Check for interactive session only if NO prefix
         // This allows users to use commands even during interactive session
         if (!hasPrefix) {
-            const interactiveCommand = commands['pesan']; // orderInteractive command
-            if (interactiveCommand && interactiveCommand.hasActiveSession) {
-                const hasSession = await interactiveCommand.hasActiveSession(from);
-                if (hasSession) {
-                    console.log(`[${new Date().toISOString()}] ${from}: ${messageText} [Interactive Response]`);
-                    await interactiveCommand.handleResponse(sock, msg);
-                    return;
+            // Route to any active interactive command session
+            const allCommands = Object.values(commands);
+            for (const cmd of allCommands) {
+                if (cmd && typeof cmd.hasActiveSession === 'function') {
+                    try {
+                        const active = await cmd.hasActiveSession(from);
+                        if (active) {
+                            console.log(`[${new Date().toISOString()}] ${from}: ${messageText} [Interactive Response -> ${cmd.name}]`);
+                            await cmd.handleResponse(sock, msg);
+                            return;
+                        }
+                    } catch (_) { /* ignore */ }
                 }
             }
-            
             // No interactive session and no prefix - ignore
             return;
         }
