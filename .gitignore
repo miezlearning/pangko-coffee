@@ -31,3 +31,6 @@ test/
 # Build files
 dist/
 build/
+
+# Runtime data
+data/
