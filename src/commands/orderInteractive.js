@@ -41,7 +41,8 @@ module.exports = {
         text += `3️⃣ 🍰 Makanan\n\n`;
         text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
         text += `💡 Ketik angka (1, 2, atau 3) untuk memilih\n`;
-        text += `💡 Atau ketik *batal* untuk membatalkan`;
+        text += `💡 Ketik *batal* untuk membatalkan\n`;
+        text += `💡 Atau gunakan command lain (!menu, !cart, dll)`;
 
         await sock.sendMessage(from, { text });
     },
@@ -54,6 +55,19 @@ module.exports = {
             msg.message?.extendedTextMessage?.text ||
             ''
         ).trim();
+
+        // Check for cancel/exit keywords
+        const cancelKeywords = ['batal', 'cancel', 'exit', 'keluar', 'stop'];
+        if (cancelKeywords.includes(messageText.toLowerCase())) {
+            interactiveSessions.delete(userId);
+            await sock.sendMessage(from, {
+                text: `❌ *Sesi Dibatalkan*\n\n` +
+                      `Pesanan interaktif dibatalkan.\n\n` +
+                      `💡 Ketik *!pesan* untuk mulai lagi\n` +
+                      `💡 Atau ketik *!help* untuk command lain`
+            });
+            return;
+        }
 
         const session = interactiveSessions.get(userId);
         if (!session) return;
@@ -131,7 +145,8 @@ module.exports = {
         
         responseText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
         responseText += `💡 Ketik angka atau ID menu\n`;
-        responseText += `💡 Contoh: 1 atau C001`;
+        responseText += `💡 Contoh: 1 atau C001\n`;
+        responseText += `💡 Ketik *batal* untuk keluar`;
 
         await sock.sendMessage(from, { text: responseText });
     },
@@ -172,7 +187,8 @@ module.exports = {
                   `Harga: Rp ${this.formatNumber(selectedItem.price)}\n\n` +
                   `━━━━━━━━━━━━━━━━━━━━\n\n` +
                   `Berapa jumlahnya? (1-${config.order.maxItemsPerOrder})\n\n` +
-                  `💡 Ketik angka (contoh: 2)`
+                  `💡 Ketik angka (contoh: 2)\n` +
+                  `💡 Ketik *batal* untuk keluar`
         });
     },
 
@@ -202,7 +218,8 @@ module.exports = {
         notesText += `• "Extra shot, less ice"\n`;
         notesText += `• "Coklat extra"\n\n`;
         notesText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-        notesText += `💡 Ketik catatan Anda, atau ketik *skip* jika tidak ada`;
+        notesText += `💡 Ketik catatan Anda, atau *skip* jika tidak ada\n`;
+        notesText += `💡 Ketik *batal* untuk keluar`;
 
         await sock.sendMessage(from, { text: notesText });
     },

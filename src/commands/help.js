@@ -27,7 +27,7 @@ module.exports = {
         
         text += `💳 *PEMBAYARAN*\n`;
         text += `• *!pay [ORDER_ID]* - Generate QRIS\n`;
-        text += `• *!confirm [ORDER_ID]* - Konfirmasi bayar\n\n`;
+        text += `  Setelah transfer, tunggu konfirmasi dari kasir\n\n`;
         
         text += `📊 *STATUS*\n`;
         text += `• *!status* - Lihat semua pesanan\n`;
@@ -54,6 +54,7 @@ module.exports = {
             text += `👨‍🍳 *BARISTA COMMANDS:*\n`;
             text += `• *!queue* - Lihat antrian pesanan\n`;
             text += `• *!detail [ORDER_ID]* - Detail pesanan\n`;
+            text += `• *!confirm [ORDER_ID]* - Konfirmasi bayar\n`;
             text += `• *!ready [ORDER_ID]* - Tandai siap\n`;
             text += `• *!history* - Riwayat hari ini\n`;
             text += `• *!cancel-order [ORDER_ID]* - Batalkan`;

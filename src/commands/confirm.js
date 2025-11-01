@@ -3,12 +3,25 @@ const config = require('../config/config');
 
 module.exports = {
     name: 'confirm',
-    description: 'Konfirmasi pembayaran',
+    description: '[BARISTA/ADMIN] Konfirmasi pembayaran (hanya untuk kasir/admin)',
     aliases: ['konfirmasi', 'paid'],
     
     async execute(sock, msg, args) {
         const from = msg.key.remoteJid;
         const userId = msg.key.remoteJid;
+
+        // ⚠️ RESTRICT: Only barista/admin can confirm payment
+        // Customer CANNOT manually confirm - must be confirmed by kasir after checking QRIS
+        if (!this.isBarista(from)) {
+            await sock.sendMessage(from, {
+                text: `ℹ️ *Menunggu Konfirmasi Pembayaran*\n\n` +
+                      `Setelah Anda transfer via QRIS, silakan *tunggu*.\n` +
+                      `Kasir akan mengkonfirmasi pembayaran Anda setelah memeriksa QRIS yang masuk.\n\n` +
+                      `⏰ Proses konfirmasi biasanya 1-2 menit\n\n` +
+                      `💡 Ketik *!status [ORDER_ID]* untuk cek status pembayaran`
+            });
+            return;
+        }
 
         // Get order ID
         if (args.length === 0) {
@@ -29,13 +42,8 @@ module.exports = {
             return;
         }
 
-        if (order.userId !== userId) {
-            await sock.sendMessage(from, {
-                text: `❌ Ini bukan pesanan Anda!`
-            });
-            return;
-        }
-
+        // Barista/admin can confirm any order (no need to check userId)
+        
         if (order.status !== orderManager.STATUS.PENDING_PAYMENT) {
             await sock.sendMessage(from, {
                 text: `ℹ️ Status pesanan: ${order.status}\n\nPesanan ini sudah dikonfirmasi atau tidak perlu konfirmasi.`
@@ -111,5 +119,10 @@ module.exports = {
 
     formatNumber(num) {
         return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    },
+
+    isBarista(jid) {
+        return config.shop.baristaNumbers.includes(jid) || 
+               config.shop.adminNumbers.includes(jid);
     }
 };

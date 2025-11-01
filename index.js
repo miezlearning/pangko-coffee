@@ -1,5 +1,5 @@
 const WhatsAppBot = require('./src/bot');
-const PaymentGateway = require('./src/services/paymentGateway');
+const PaymentGateway = require('./src/paymentGateway');
 
 /**
  * Main Entry Point

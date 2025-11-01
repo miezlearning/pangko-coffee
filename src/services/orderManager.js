@@ -130,7 +130,7 @@ class OrderManager {
     /**
      * Create order from session
      */
-    createOrder(userId) {
+    createOrder(userId, customerName = null) {
         const session = this.getSession(userId);
         if (!session || session.items.length === 0) {
             throw new Error('Cart is empty');
@@ -142,6 +142,7 @@ class OrderManager {
         const order = {
             orderId,
             userId,
+            customerName: customerName || 'Customer', // Default if not provided
             items: session.items,
             notes: session.notes,
             pricing,

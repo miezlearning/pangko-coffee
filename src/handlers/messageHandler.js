@@ -26,21 +26,23 @@ async function messageHandler(sock, msg) {
         const args = messageText.trim().split(/\s+/);
         const commandText = args[0].toLowerCase();
 
-        // Check for interactive session first (before prefix check)
-        // This allows commands like orderInteractive to handle non-prefixed responses
-        const interactiveCommand = commands['pesan']; // orderInteractive command
-        if (interactiveCommand && interactiveCommand.hasActiveSession) {
-            const hasSession = await interactiveCommand.hasActiveSession(from);
-            if (hasSession) {
-                console.log(`[${new Date().toISOString()}] ${from}: ${messageText} [Interactive Response]`);
-                await interactiveCommand.handleResponse(sock, msg);
-                return;
+        // Check if message starts with prefix (commands override interactive sessions)
+        const hasPrefix = commandText.startsWith(config.bot.prefix);
+        
+        // Check for interactive session only if NO prefix
+        // This allows users to use commands even during interactive session
+        if (!hasPrefix) {
+            const interactiveCommand = commands['pesan']; // orderInteractive command
+            if (interactiveCommand && interactiveCommand.hasActiveSession) {
+                const hasSession = await interactiveCommand.hasActiveSession(from);
+                if (hasSession) {
+                    console.log(`[${new Date().toISOString()}] ${from}: ${messageText} [Interactive Response]`);
+                    await interactiveCommand.handleResponse(sock, msg);
+                    return;
+                }
             }
-        }
-
-        // Check if message starts with prefix
-        if (!commandText.startsWith(config.bot.prefix)) {
-            // Handle non-command messages (optional)
+            
+            // No interactive session and no prefix - ignore
             return;
         }
 

@@ -59,12 +59,40 @@ function registerPayment(orderData) {
 }
 
 /**
- * API: Get all pending payments
+ * API: Get all pending payments (with real-time sync from orderManager)
  */
 app.get('/api/payments/pending', (req, res) => {
     // Remove expired payments
     const now = new Date();
-    pendingPayments = pendingPayments.filter(p => new Date(p.expiresAt) > now);
+    const orderManager = require('./orderManager');
+    
+    // Sync with orderManager - remove orders that are no longer pending
+    const syncedPayments = [];
+    
+    for (const payment of pendingPayments) {
+        const order = orderManager.getOrder(payment.orderId);
+        
+        // Skip expired
+        if (new Date(payment.expiresAt) <= now) {
+            continue;
+        }
+        
+        // Only keep if order still exists and is pending payment
+        if (order && order.status === orderManager.STATUS.PENDING_PAYMENT) {
+            syncedPayments.push(payment);
+        } else if (order && order.status !== orderManager.STATUS.PENDING_PAYMENT) {
+            // Order was confirmed via bot command - automatically move to history
+            console.log(`🔄 Auto-sync: ${payment.orderId} confirmed via bot`);
+            payment.status = 'confirmed';
+            payment.confirmedAt = new Date();
+            payment.confirmedBy = 'bot-command';
+            paymentHistory.push(payment);
+        }
+    }
+    
+    // Update pending payments
+    pendingPayments.length = 0;
+    pendingPayments.push(...syncedPayments);
     
     res.json({
         success: true,
@@ -130,6 +158,70 @@ app.post('/api/payments/confirm/:orderId', async (req, res) => {
 });
 
 /**
+ * API: Mark order as ready (kasir click button)
+ */
+app.post('/api/orders/ready/:orderId', async (req, res) => {
+    const { orderId } = req.params;
+    const { markedBy } = req.body;
+    
+    const orderManager = require('./orderManager');
+    const order = orderManager.getOrder(orderId);
+    
+    if (!order) {
+        return res.status(404).json({
+            success: false,
+            message: 'Order not found'
+        });
+    }
+    
+    if (order.status !== orderManager.STATUS.PROCESSING) {
+        return res.status(400).json({
+            success: false,
+            message: `Order status is ${order.status}, must be PROCESSING to mark as ready`
+        });
+    }
+    
+    try {
+        // Update order status
+        orderManager.updateOrderStatus(orderId, orderManager.STATUS.READY);
+        
+        // Notify customer via bot
+        if (botInstance && botInstance.sock) {
+            const config = require('../config/config');
+            const customerText = `🎉 *Pesanan Anda Siap!*\n\n` +
+                `📋 Order ID: *${orderId}*\n` +
+                `👤 Atas Nama: *${order.customerName || 'Customer'}*\n\n` +
+                `━━━━━━━━━━━━━━━━━━━━\n\n` +
+                `Pesanan Anda sudah siap diambil! 🥳\n\n` +
+                `📍 Silakan ambil di counter:\n` +
+                `"Atas nama *${order.customerName}*, pesanan sudah siap!"\n\n` +
+                `Terima kasih sudah memesan di ${config.shop.name}! ☕`;
+            
+            await botInstance.sock.sendMessage(order.userId, { text: customerText });
+        }
+        
+        console.log(`✅ Order marked as ready: ${orderId} by ${markedBy || 'kasir'}`);
+        
+        res.json({
+            success: true,
+            message: 'Order marked as ready',
+            order: {
+                orderId: order.orderId,
+                status: order.status,
+                customerName: order.customerName
+            }
+        });
+    } catch (error) {
+        console.error('Mark ready error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to mark order as ready',
+            error: error.message
+        });
+    }
+});
+
+/**
  * API: Reject payment
  */
 app.post('/api/payments/reject/:orderId', (req, res) => {
@@ -172,7 +264,36 @@ app.get('/api/payments/history', (req, res) => {
 });
 
 /**
- * API: Dashboard stats
+ * API: Get processing orders (for ready button)
+ */
+app.get('/api/orders/processing', (req, res) => {
+    const orderManager = require('./orderManager');
+    const allOrders = [];
+    
+    for (const orderId of orderManager.orders.keys()) {
+        const order = orderManager.getOrder(orderId);
+        if (order && order.status === orderManager.STATUS.PROCESSING) {
+            allOrders.push({
+                orderId: order.orderId,
+                customerName: order.customerName || 'Customer',
+                userId: order.userId.split('@')[0],
+                items: order.items,
+                pricing: order.pricing,
+                confirmedAt: order.confirmedAt,
+                status: order.status
+            });
+        }
+    }
+    
+    res.json({
+        success: true,
+        count: allOrders.length,
+        orders: allOrders
+    });
+});
+
+/**
+ * API: Dashboard stats (with real-time order status sync)
  */
 app.get('/api/stats', (req, res) => {
     const today = new Date();
@@ -183,6 +304,30 @@ app.get('/api/stats', (req, res) => {
     );
     
     const todayRevenue = todayPayments.reduce((sum, p) => sum + p.amount, 0);
+    
+    // Sync pending payments with orderManager to remove processed orders
+    const orderManager = require('./orderManager');
+    const syncedPending = [];
+    
+    for (const payment of pendingPayments) {
+        const order = orderManager.getOrder(payment.orderId);
+        
+        // Only keep if order still exists and is pending payment
+        if (order && order.status === orderManager.STATUS.PENDING_PAYMENT) {
+            syncedPending.push(payment);
+        } else if (order && order.status !== orderManager.STATUS.PENDING_PAYMENT) {
+            // Order was confirmed/processed via bot command - move to history
+            console.log(`🔄 Syncing: ${payment.orderId} status changed via bot command`);
+            payment.status = 'confirmed';
+            payment.confirmedAt = new Date();
+            payment.confirmedBy = 'bot-command';
+            paymentHistory.push(payment);
+        }
+    }
+    
+    // Update pending payments array
+    pendingPayments.length = 0;
+    pendingPayments.push(...syncedPending);
     
     res.json({
         success: true,
@@ -949,6 +1094,14 @@ app.get('/', (req, res) => {
             </div>
             <div id="payments-list"></div>
         </div>
+        
+        <div class="payments-section" style="margin-top: 30px;">
+            <div class="section-header">
+                <h2>👨‍🍳 Processing Orders</h2>
+                <button class="btn-refresh" onclick="loadProcessingOrders()">🔄 Refresh</button>
+            </div>
+            <div id="processing-list"></div>
+        </div>
     </div>
     
     <div class="notification" id="notification">
@@ -1160,6 +1313,89 @@ app.get('/', (req, res) => {
             }
         }
         
+        // Load processing orders
+        async function loadProcessingOrders() {
+            try {
+                const res = await fetch('/api/orders/processing');
+                const data = await res.json();
+                
+                const list = document.getElementById('processing-list');
+                
+                if (data.orders.length === 0) {
+                    list.innerHTML = \`
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🎉</div>
+                            <h3>Tidak ada pesanan yang diproses</h3>
+                            <p style="margin-top: 10px;">Semua pesanan sudah selesai</p>
+                        </div>
+                    \`;
+                } else {
+                    list.innerHTML = data.orders.map((order) => {
+                        const processingTime = Math.floor((Date.now() - new Date(order.confirmedAt)) / 60000);
+                        return \`
+                        <div class="payment-card">
+                            <div class="payment-header">
+                                <div>
+                                    <div class="order-id">📋 \${order.orderId}</div>
+                                    <div class="customer-info" style="font-size: 16px; font-weight: 600; color: #667eea;">
+                                        👤 Atas Nama: \${order.customerName}
+                                    </div>
+                                    <div class="customer-info">📱 \${order.userId}</div>
+                                </div>
+                                <div class="amount">Rp \${formatNumber(order.pricing.total)}</div>
+                            </div>
+                            <div class="items">
+                                <strong>Items (\${order.items.length}):</strong>
+                                \${order.items.map(item => \`
+                                    <div class="item">
+                                        <span style="font-weight: 600;">\${item.name}</span>
+                                        <span style="float: right;">x\${item.quantity} • Rp \${formatNumber(item.price * item.quantity)}</span>
+                                        \${item.notes ? \`<br><span style="color: #666; font-size: 13px;">📝 \${item.notes}</span>\` : ''}
+                                    </div>
+                                \`).join('')}
+                            </div>
+                            <div class="timer">
+                                ⏱️ Diproses: \${processingTime} menit yang lalu
+                            </div>
+                            <div class="actions">
+                                <button class="btn-confirm" onclick="markOrderReady('\${order.orderId}', '\${order.customerName}')" style="font-size: 16px; padding: 12px 24px;">
+                                    ✅ Tandai Siap - Atas Nama: \${order.customerName}
+                                </button>
+                            </div>
+                        </div>
+                    \`;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Failed to load processing orders:', error);
+            }
+        }
+        
+        // Mark order as ready
+        async function markOrderReady(orderId, customerName) {
+            if (!confirm(\`Tandai pesanan siap untuk diambil?\\n\\nOrder: \${orderId}\\nAtas Nama: \${customerName}\\n\\nCustomer akan dinotifikasi.\`)) return;
+            
+            try {
+                const res = await fetch(\`/api/orders/ready/\${orderId}\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ markedBy: 'kasir' })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    alert(\`✅ Pesanan ditandai siap!\\n\\nOrder: \${orderId}\\nAtas Nama: \${customerName}\\n\\nCustomer sudah dinotifikasi:\\n"Atas nama \${customerName}, pesanan sudah siap!"\`);
+                    loadProcessingOrders();
+                    loadStats();
+                } else {
+                    alert('❌ Gagal: ' + data.message);
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+        
         // Format number
         function formatNumber(num) {
             return num.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');
@@ -1167,9 +1403,13 @@ app.get('/', (req, res) => {
         
         // Initial load
         loadPayments();
+        loadProcessingOrders();
         
         // Auto-refresh every 3 seconds
-        autoRefresh = setInterval(loadPayments, 3000);
+        autoRefresh = setInterval(() => {
+            loadPayments();
+            loadProcessingOrders();
+        }, 3000);
     </script>
 </body>
 </html>

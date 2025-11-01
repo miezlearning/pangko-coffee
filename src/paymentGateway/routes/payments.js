@@ -1,0 +1,209 @@
+/**
+ * Payment Routes
+ * Endpoints untuk payment management
+ */
+const express = require('express');
+const router = express.Router();
+const dataStore = require('../dataStore');
+
+/**
+ * Trigger bot confirmation
+ */
+async function triggerBotConfirmation(payment) {
+    const botInstance = dataStore.getBotInstance();
+    const orderManager = require('../../services/orderManager');
+    const config = require('../../config/config');
+    
+    if (!botInstance || !botInstance.sock) {
+        throw new Error('Bot not connected');
+    }
+    
+    // Update order status to PROCESSING
+    orderManager.updateOrderStatus(payment.orderId, orderManager.STATUS.PROCESSING);
+    
+    const order = orderManager.getOrder(payment.orderId);
+    
+    if (!order) {
+        throw new Error('Order not found in orderManager');
+    }
+    
+    // Notify customer
+    const customerText = `✅ *Pembayaran Diterima!*\n\n` +
+        `📋 Order ID: *${payment.orderId}*\n` +
+        `👤 Atas Nama: *${order.customerName || 'Customer'}*\n` +
+        `💰 Total: *Rp ${payment.amount.toLocaleString('id-ID')}*\n\n` +
+        `Pesanan Anda sedang diproses oleh barista.\n` +
+        `Anda akan diberi notifikasi saat pesanan siap! ⏰`;
+    
+    await botInstance.sock.sendMessage(order.userId, { text: customerText });
+    
+    // Notify baristas
+    const baristaText = `🔔 *Pesanan Baru Masuk!*\n\n` +
+        `📋 Order ID: *${payment.orderId}*\n` +
+        `👤 Atas Nama: *${order.customerName || 'Customer'}*\n` +
+        `👨‍💼 Customer: ${order.userId.split('@')[0]}\n` +
+        `💰 Total: *Rp ${payment.amount.toLocaleString('id-ID')}*\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `*PESANAN:*\n${order.items.map((item, idx) => 
+            `${idx + 1}. ${item.name} (${item.size}) x${item.quantity}${item.notes ? `\n   📝 ${item.notes}` : ''}`
+        ).join('\n')}\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `Silakan proses pesanan ini! 👨‍🍳`;
+    
+    // Send to all baristas
+    for (const baristaNumber of config.baristaNumbers) {
+        try {
+            await botInstance.sock.sendMessage(baristaNumber, { text: baristaText });
+        } catch (err) {
+            console.error(`Failed to notify barista ${baristaNumber}:`, err);
+        }
+    }
+    
+    console.log(`✅ Payment confirmed via gateway: ${payment.orderId}`);
+}
+
+/**
+ * GET /api/payments/pending
+ * Get all pending payments with sync
+ */
+router.get('/pending', (req, res) => {
+    const now = new Date();
+    const orderManager = require('../../services/orderManager');
+    
+    // Sync with orderManager - remove orders that are no longer pending
+    const syncedPayments = [];
+    const pendingPayments = dataStore.getPendingPayments();
+    
+    for (const payment of pendingPayments) {
+        const order = orderManager.getOrder(payment.orderId);
+        
+        // Skip expired
+        if (new Date(payment.expiresAt) <= now) {
+            continue;
+        }
+        
+        // Only keep if order still exists and is pending payment
+        if (order && order.status === orderManager.STATUS.PENDING_PAYMENT) {
+            syncedPayments.push(payment);
+        } else if (order && order.status !== orderManager.STATUS.PENDING_PAYMENT) {
+            // Order was confirmed via bot command - automatically move to history
+            console.log(`🔄 Auto-sync: ${payment.orderId} confirmed via bot`);
+            payment.status = 'confirmed';
+            payment.confirmedAt = new Date();
+            payment.confirmedBy = 'bot-command';
+            dataStore.addToHistory(payment);
+        }
+    }
+    
+    // Update pending payments
+    dataStore.updatePendingPayments(syncedPayments);
+    
+    res.json({
+        success: true,
+        count: syncedPayments.length,
+        payments: syncedPayments
+    });
+});
+
+/**
+ * POST /api/payments/confirm/:orderId
+ * Confirm payment (kasir click button)
+ */
+router.post('/confirm/:orderId', async (req, res) => {
+    const { orderId } = req.params;
+    const { confirmedBy } = req.body;
+    
+    console.log(`✅ Payment confirmation request: ${orderId} by ${confirmedBy}`);
+    
+    // Find payment
+    const payment = dataStore.findPendingPayment(orderId);
+    
+    if (!payment) {
+        return res.status(404).json({
+            success: false,
+            message: 'Payment not found'
+        });
+    }
+    
+    // Update status
+    payment.status = 'confirmed';
+    payment.confirmedAt = new Date();
+    payment.confirmedBy = confirmedBy || 'kasir';
+    
+    // Remove from pending and add to history
+    dataStore.removePendingPayment(orderId);
+    dataStore.addToHistory(payment);
+    
+    // Trigger bot to confirm order
+    const botInstance = dataStore.getBotInstance();
+    if (botInstance) {
+        try {
+            await triggerBotConfirmation(payment);
+            
+            res.json({
+                success: true,
+                message: 'Payment confirmed successfully',
+                payment: payment
+            });
+        } catch (error) {
+            console.error('Bot trigger error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to trigger bot confirmation'
+            });
+        }
+    } else {
+        res.json({
+            success: true,
+            message: 'Payment confirmed (bot not connected)',
+            payment: payment
+        });
+    }
+});
+
+/**
+ * POST /api/payments/reject/:orderId
+ * Reject payment
+ */
+router.post('/reject/:orderId', (req, res) => {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+    
+    const payment = dataStore.findPendingPayment(orderId);
+    
+    if (!payment) {
+        return res.status(404).json({
+            success: false,
+            message: 'Payment not found'
+        });
+    }
+    
+    payment.status = 'rejected';
+    payment.rejectedAt = new Date();
+    payment.rejectionReason = reason;
+    
+    dataStore.removePendingPayment(orderId);
+    dataStore.addToHistory(payment);
+    
+    res.json({
+        success: true,
+        message: 'Payment rejected',
+        payment: payment
+    });
+});
+
+/**
+ * GET /api/payments/history
+ * Get payment history
+ */
+router.get('/history', (req, res) => {
+    const paymentHistory = dataStore.getPaymentHistory();
+    
+    res.json({
+        success: true,
+        count: paymentHistory.length,
+        payments: paymentHistory.slice(-50) // Last 50
+    });
+});
+
+module.exports = router;

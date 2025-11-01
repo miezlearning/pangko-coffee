@@ -52,12 +52,13 @@ module.exports = {
 
             // Notify customer
             const customerText = `🎉 *Pesanan Anda Siap!*\n\n` +
-                `Order ID: *${orderId}*\n\n` +
+                `📋 Order ID: *${orderId}*\n` +
+                `👤 Atas Nama: *${order.customerName}*\n\n` +
                 `━━━━━━━━━━━━━━━━━━━━\n\n` +
                 `Pesanan Anda sudah siap diambil! 🥳\n\n` +
-                `📍 Silakan ambil di counter dengan menunjukkan Order ID ini.\n\n` +
-                `Terima kasih sudah memesan di ${config.shop.name}! ☕\n\n` +
-                `💡 Jangan lupa review kami: *!review ${orderId}*`;
+                `📍 Silakan ambil di counter:\n` +
+                `"Atas nama *${order.customerName}*, pesanan sudah siap!"\n\n` +
+                `Terima kasih sudah memesan di ${config.shop.name}! ☕`;
 
             await sock.sendMessage(order.userId, { text: customerText });
 

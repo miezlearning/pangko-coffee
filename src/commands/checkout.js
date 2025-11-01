@@ -21,9 +21,31 @@ module.exports = {
             return;
         }
 
+        // Check if customer name provided as argument
+        let customerName = args.join(' ').trim();
+        
+        // If no name provided, ask for it
+        if (!customerName) {
+            // Calculate total for display
+            const pricing = orderManager.calculateTotal(session.items, true);
+            
+            let text = `📋 *Siap Checkout?*\n\n`;
+            text += `Items: ${session.items.length} item\n`;
+            text += `Total: Rp ${this.formatNumber(pricing.total)}\n\n`;
+            text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+            text += `📝 *Nama Anda?*\n\n`;
+            text += `Untuk memudahkan pengambilan pesanan di counter:\n`;
+            text += `"Atas nama [NAMA], pesanan sudah siap!"\n\n`;
+            text += `💡 Ketik: \`!checkout [NAMA]\`\n`;
+            text += `Contoh: \`!checkout Budi\``;
+            
+            await sock.sendMessage(from, { text });
+            return;
+        }
+
         try {
-            // Create order
-            const order = orderManager.createOrder(userId);
+            // Create order with customer name
+            const order = orderManager.createOrder(userId, customerName);
             
             // Validate static QRIS
             if (!QRISGenerator.validateQRIS(config.shop.qrisStatic)) {
@@ -50,6 +72,7 @@ module.exports = {
             // Send order confirmation
             let text = `✅ *Pesanan Berhasil Dibuat!*\n\n`;
             text += `📋 Order ID: *${order.orderId}*\n`;
+            text += `👤 Atas Nama: *${order.customerName}*\n`;
             text += `⏰ Dibuat: ${moment(order.createdAt).format('DD/MM/YYYY HH:mm')}\n\n`;
             
             text += `*Items:*\n`;
@@ -109,7 +132,7 @@ module.exports = {
                 });
                 
                 // Register to payment gateway dashboard
-                const PaymentGateway = require('../services/paymentGateway');
+                const PaymentGateway = require('../paymentGateway');
                 PaymentGateway.registerPayment(order);
 
             } catch (qrError) {
