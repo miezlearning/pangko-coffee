@@ -90,7 +90,8 @@ router.get('/processing', (req, res) => {
                 items: order.items,
                 pricing: order.pricing,
                 confirmedAt: order.confirmedAt,
-                status: order.status
+                status: order.status,
+                paymentMethod: order.paymentMethod || 'QRIS'
             });
         }
     }

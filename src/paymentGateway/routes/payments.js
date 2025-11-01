@@ -167,7 +167,7 @@ router.post('/confirm/:orderId', async (req, res) => {
  */
 router.post('/reject/:orderId', (req, res) => {
     const { orderId } = req.params;
-    const { reason } = req.body;
+    const { reason, rejectedBy } = req.body;
     
     const payment = dataStore.findPendingPayment(orderId);
     
@@ -181,15 +181,52 @@ router.post('/reject/:orderId', (req, res) => {
     payment.status = 'rejected';
     payment.rejectedAt = new Date();
     payment.rejectionReason = reason;
+    payment.rejectedBy = rejectedBy || 'kasir';
     
     dataStore.removePendingPayment(orderId);
     dataStore.addToHistory(payment);
     
-    res.json({
-        success: true,
-        message: 'Payment rejected',
-        payment: payment
-    });
+    try {
+        const orderManager = require('../../services/orderManager');
+        const order = orderManager.getOrder(orderId);
+        const botInstance = dataStore.getBotInstance();
+
+        if (order) {
+            // Update order status to CANCELLED and attach reason
+            orderManager.updateOrderStatus(orderId, orderManager.STATUS.CANCELLED, {
+                cancelReason: reason,
+                cancelledAt: new Date()
+            });
+
+            // Clear any lingering cart/session for safety
+            try { orderManager.clearCart(order.userId); } catch (e) {}
+
+            // Notify customer via bot if connected
+            if (botInstance && botInstance.sock) {
+                const text = `❌ *Pembayaran Ditolak*\n\n` +
+                    `📋 Order ID: *${orderId}*\n` +
+                    `💰 Total: *Rp ${order.pricing.total.toLocaleString('id-ID')}*\n` +
+                    `${reason ? `\n📝 Alasan: ${reason}\n` : ''}` +
+                    `\nSilakan cek kembali bukti transfer atau lakukan pemesanan ulang.\n` +
+                    `Ketik *!order* atau *!pesan* untuk mulai lagi.`;
+                botInstance.sock.sendMessage(order.userId, { text }).catch(() => {});
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'Payment rejected',
+            payment: payment
+        });
+    } catch (error) {
+        console.error('Reject flow error:', error);
+        res.json({
+            success: true,
+            message: 'Payment rejected (notification failed)',
+            payment: payment
+        });
+    }
+
 });
 
 /**

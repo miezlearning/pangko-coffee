@@ -205,6 +205,22 @@
             <p id="notification-text" class="mt-1 text-charcoal/70"></p>
         </div>
 
+        <!-- Reject Modal -->
+        <div id="reject-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-charcoal/40 p-4 opacity-0 transition-opacity duration-200">
+            <div class="w-full max-w-md rounded-3xl border border-white/50 bg-white/95 p-6 shadow-2xl">
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold">❌ Tolak Pembayaran</h3>
+                    <p class="mt-1 text-sm text-charcoal/65">Berikan alasan penolakan. Customer akan menerima pesan ini.</p>
+                </div>
+                <label for="reject-reason" class="mb-2 block text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/60">Alasan</label>
+                <textarea id="reject-reason" rows="4" class="w-full rounded-2xl border border-charcoal/10 bg-white/90 p-3 text-sm outline-none ring-matcha/30 focus:ring-2" placeholder="Contoh: Bukti transfer tidak sesuai / kode nominal salah"></textarea>
+                <div class="mt-5 grid grid-cols-2 gap-3">
+                    <button id="reject-cancel" class="rounded-2xl border border-charcoal/15 bg-white px-4 py-2 text-sm font-semibold text-charcoal/70 transition hover:bg-charcoal/5">Batal</button>
+                    <button id="reject-submit" class="rounded-2xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">Tolak Pembayaran</button>
+                </div>
+            </div>
+        </div>
+
         <script>
             const shell = document.getElementById('nav-shell');
             function handleNavShadow() {

@@ -130,7 +130,7 @@ class OrderManager {
     /**
      * Create order from session
      */
-    createOrder(userId, customerName = null) {
+    createOrder(userId, customerName = null, paymentMethod = 'QRIS') {
         const session = this.getSession(userId);
         if (!session || session.items.length === 0) {
             throw new Error('Cart is empty');
@@ -151,6 +151,7 @@ class OrderManager {
             paymentExpiry: moment().add(config.order.paymentTimeout, 'minutes').toDate(),
             qrisGenerated: false,
             qrisCode: null,
+            paymentMethod,
             paidAt: null,
             completedAt: null
         };

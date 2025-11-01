@@ -21,8 +21,20 @@ module.exports = {
             return;
         }
 
-        // Check if customer name provided as argument
-        let customerName = args.join(' ').trim();
+        // Parse args: allow optional payment method (qris|tunai|cash) as last word
+        let raw = args.join(' ').trim();
+        let method = null;
+        if (raw) {
+            const parts = raw.split(/\s+/);
+            const last = parts[parts.length - 1].toLowerCase();
+            if (['qris', 'tunai', 'cash'].includes(last)) {
+                method = last === 'tunai' || last === 'cash' ? 'CASH' : 'QRIS';
+                parts.pop();
+                raw = parts.join(' ').trim();
+            }
+        }
+        // Check if customer name provided as argument (remaining raw)
+        let customerName = raw;
         
         // If no name provided, ask for it
         if (!customerName) {
@@ -36,17 +48,67 @@ module.exports = {
             text += `📝 *Nama Anda?*\n\n`;
             text += `Untuk memudahkan pengambilan pesanan di counter:\n`;
             text += `"Atas nama [NAMA], pesanan sudah siap!"\n\n`;
-            text += `💡 Ketik: \`!checkout [NAMA]\`\n`;
-            text += `Contoh: \`!checkout Budi\``;
+            text += `💡 Ketik: \`!checkout [NAMA] [METODE]\`\n`;
+            text += `Metode: qris | tunai\n`;
+            text += `Contoh: \`!checkout Budi qris\` atau \`!checkout Budi tunai\``;
             
             await sock.sendMessage(from, { text });
             return;
         }
 
         try {
-            // Create order with customer name
-            const order = orderManager.createOrder(userId, customerName);
+            // Default method if not provided: QRIS
+            const paymentMethod = method || 'QRIS';
+            // Create order with customer name and method
+            const order = orderManager.createOrder(userId, customerName, paymentMethod);
             
+            if (paymentMethod === 'CASH') {
+                // CASH flow: set to PROCESSING immediately, notify customer and baristas
+                orderManager.updateOrderStatus(order.orderId, orderManager.STATUS.PROCESSING, { confirmedAt: new Date() });
+
+                // Message to customer
+                let text = `✅ *Pesanan Berhasil Dibuat (Tunai)!*\n\n`;
+                text += `📋 Order ID: *${order.orderId}*\n`;
+                text += `👤 Atas Nama: *${order.customerName}*\n`;
+                text += `💳 Metode: *Tunai di Kasir*\n`;
+                text += `⏰ Dibuat: ${moment(order.createdAt).format('DD/MM/YYYY HH:mm')}\n\n`;
+                text += `*Items:*\n`;
+                order.items.forEach((item, index) => {
+                    text += `${index + 1}. ${item.name} x${item.quantity}\n`;
+                    text += `   Rp ${this.formatNumber(item.price * item.quantity)}\n`;
+                });
+                text += `\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+                text += `*TOTAL: Rp ${this.formatNumber(order.pricing.total)}*\n\n`;
+                text += `Silakan bayar di kasir dan sebutkan: *Order ${order.orderId} atas nama ${order.customerName}*.\n`;
+                text += `Pesanan Anda sedang diproses oleh barista. Anda akan diberi notifikasi saat siap. 👨‍🍳`;
+
+                await sock.sendMessage(from, { text });
+
+                // Notify baristas (reusing wording similar to payment confirmation)
+                const baristaText = `🔔 *Pesanan Tunai Baru!*\n\n` +
+                    `📋 Order ID: *${order.orderId}*\n` +
+                    `👤 Atas Nama: *${order.customerName}*\n` +
+                    `👨‍💼 Customer: ${order.userId.split('@')[0]}\n` +
+                    `💳 Metode: *Tunai*\n` +
+                    `💰 Total: *Rp ${order.pricing.total.toLocaleString('id-ID')}*\n\n` +
+                    `━━━━━━━━━━━━━━━━━━━━\n` +
+                    `*PESANAN:*\n${order.items.map((item, idx) => 
+                        `${idx + 1}. ${item.name} (${item.size}) x${item.quantity}${item.notes ? `\n   📝 ${item.notes}` : ''}`
+                    ).join('\n')}\n` +
+                    `━━━━━━━━━━━━━━━━━━━━\n\n` +
+                    `Silakan proses pesanan ini! 👨‍🍳`;
+
+                try {
+                    const config = require('../config/config');
+                    for (const baristaNumber of config.baristaNumbers) {
+                        try { await sock.sendMessage(baristaNumber, { text: baristaText }); } catch (_) {}
+                    }
+                } catch (_) {}
+
+                return;
+            }
+
+            // QRIS flow
             // Validate static QRIS
             if (!QRISGenerator.validateQRIS(config.shop.qrisStatic)) {
                 throw new Error('Static QRIS tidak valid. Silakan hubungi admin.');
@@ -70,7 +132,7 @@ module.exports = {
             const minutesLeft = moment(order.paymentExpiry).diff(moment(), 'minutes');
 
             // Send order confirmation
-            let text = `✅ *Pesanan Berhasil Dibuat!*\n\n`;
+            let text = `✅ *Pesanan Berhasil Dibuat (QRIS)!*\n\n`;
             text += `📋 Order ID: *${order.orderId}*\n`;
             text += `👤 Atas Nama: *${order.customerName}*\n`;
             text += `⏰ Dibuat: ${moment(order.createdAt).format('DD/MM/YYYY HH:mm')}\n\n`;
