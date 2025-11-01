@@ -3,116 +3,145 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Webhook Simulator</title>
-            <!-- Tailwind CSS (CDN) -->
-            <script src="https://cdn.tailwindcss.com"></script>
-            <script>
-                tailwind.config = {
-                    theme: {
-                        extend: {
-                            colors: {
-                                matcha: '#74A662',
-                                cream: '#FFFDD0',
-                                charcoal: '#333333',
-                                peach: '#FFE5B4'
-                            }
+        <title>Pangko Coffee · Webhook Tester</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        fontFamily: {
+                            sans: ['Manrope', 'system-ui', 'sans-serif']
+                        },
+                        colors: {
+                            matcha: '#74A662',
+                            cream: '#FFFDD0',
+                            charcoal: '#333333',
+                            peach: '#FFE5B4'
+                        },
+                        boxShadow: {
+                            glow: '0 35px 80px -45px rgba(116, 166, 98, 0.65)'
                         }
                     }
                 }
-            </script>
+            }
+        </script>
     </head>
-        <body class="min-h-screen bg-cream text-charcoal">
-            <!-- Floating Navbar -->
-            <nav id="app-navbar" class="fixed inset-x-0 top-0 z-50 transition-all">
-                <div class="mx-auto max-w-[1400px] px-4">
-                    <div class="mt-4 rounded-2xl bg-white/50 backdrop-blur border border-white/40 shadow-sm transition-all flex items-center justify-between px-5 py-3" id="nav-shell">
-                        <div class="flex items-center gap-2">
-                            <div class="w-8 h-8 rounded-full bg-matcha/90 flex items-center justify-center text-white font-bold">P</div>
-                            <span class="font-semibold">Pangko Coffee</span>
+    <body class="min-h-screen bg-cream text-charcoal antialiased">
+        <!-- Floating Navbar -->
+        <nav id="app-navbar" class="fixed inset-x-0 top-0 z-50 py-4">
+            <div class="mx-auto w-full max-w-[1180px] px-5">
+                <div id="nav-shell" class="flex items-center justify-between rounded-2xl border border-white/40 bg-white/60 px-6 py-3 backdrop-blur transition-all duration-300">
+                    <div class="flex items-center gap-3">
+                        <div class="grid h-10 w-10 place-items-center rounded-full bg-matcha text-white font-semibold">P</div>
+                                    <div class="flex flex-col">
+                                        <span class="text-sm uppercase tracking-[0.18em] text-matcha">Pangko Coffee</span>
+                                        <strong class="text-base">Pangko Ops Center</strong>
+                                    </div>
+                    </div>
+                    <div class="hidden items-center gap-5 text-sm font-semibold sm:flex">
+                        <a href="/" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Dashboard</a>
+                        <a href="/webhook-tester" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white" aria-current="page">Webhook Tester</a>
+                    </div>
+                    <a href="/" class="sm:hidden rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Dashboard →</a>
+                </div>
+            </div>
+        </nav>
+
+        <main class="mx-auto flex w-full max-w-[960px] flex-col gap-10 px-5 pt-32 pb-20">
+            <header class="relative overflow-hidden rounded-3xl border border-white/40 bg-white/90 px-8 py-10 shadow-glow">
+                <div class="pointer-events-none absolute -top-16 right-10 h-40 w-40 rounded-full bg-matcha/25 blur-3xl"></div>
+                <div class="pointer-events-none absolute -bottom-20 left-5 h-48 w-48 rounded-full bg-peach/35 blur-3xl"></div>
+                <div class="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                    <div class="max-w-xl space-y-4">
+                        <span class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-matcha">Testing Mode</span>
+                        <h1 class="text-3xl font-extrabold leading-tight md:text-4xl">Webhook Tester untuk Simulasi Pembayaran yang Aman</h1>
+                        <p class="text-sm text-charcoal/65 md:text-base">
+                            Jalankan simulasi notifikasi pembayaran selaras dengan Order Manager. Dengan satu klik kamu bisa memastikan alur konfirmasi customer & barista berjalan mulus—tanpa transaksi real.
+                        </p>
+                    </div>
+                    <div class="w-full max-w-[240px] rounded-2xl border border-matcha/20 bg-matcha/10 px-5 py-6 text-sm font-semibold text-matcha">
+                        <p class="text-xs uppercase tracking-[0.25em] text-matcha/80">Snapshot</p>
+                        <div class="mt-3 space-y-3 text-charcoal">
+                            <p class="flex items-center justify-between text-sm"><span>Auto refresh</span><span class="font-bold">10 detik</span></p>
+                            <p class="flex items-center justify-between text-sm"><span>Target</span><span class="font-bold">Pending orders</span></p>
+                            <p class="flex items-center justify-between text-sm"><span>Output</span><span class="font-bold">Webhook JSON</span></p>
                         </div>
-                        <ul class="hidden sm:flex items-center gap-6 text-sm font-semibold">
-                            <li><a href="/" class="hover:text-matcha transition">Home</a></li>
-                            <li><a href="#about" class="hover:text-matcha transition">About</a></li>
-                            <li><a href="#services" class="hover:text-matcha transition">Services</a></li>
-                            <li><a href="#contact" class="hover:text-matcha transition">Contact</a></li>
-                        </ul>
                     </div>
                 </div>
-            </nav>
+            </header>
 
-            <main class="max-w-2xl mx-auto px-4 pt-28 pb-8">
-            <section class="bg-white/95 backdrop-blur rounded-xl shadow-2xl p-6">
-                <div class="flex items-center justify-between mb-2">
-                    <h1 class="text-2xl font-semibold text-gray-800">🧪 Webhook Simulator</h1>
-                    <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-rose-100 text-rose-600">TESTING ONLY</span>
-                </div>
-
-                <div class="mb-5 text-sm text-blue-700 bg-blue-50 border-l-4 border-blue-400 p-3 rounded">
-                    <strong>⚠️ Mode Testing:</strong>
-                    Gunakan tool ini untuk mensimulasikan notifikasi pembayaran dari payment gateway.
-                    Cocok untuk development & testing tanpa real payment.
-                </div>
-
-                <div class="mb-4">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Select Pending Order</label>
-                    <div id="pending-orders" class="space-y-2">
-                        <p class="text-gray-400 text-sm">Loading...</p>
+            <section class="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+                <aside class="rounded-3xl border border-white/40 bg-white/85 px-6 py-7 shadow-[0_20px_50px_-38px_rgba(116,166,98,0.45)] backdrop-blur">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-lg font-semibold">Pending Orders</h2>
+                        <button onclick="loadPendingOrders()" class="inline-flex items-center gap-2 rounded-full border border-matcha/40 px-4 py-2 text-xs font-semibold text-matcha transition hover:bg-matcha hover:text-white">🔄 Refresh</button>
                     </div>
-                </div>
+                    <p class="mt-2 text-xs text-charcoal/55">Pilih order untuk auto-fill data webhook.</p>
+                    <div id="pending-orders" class="mt-5 space-y-3 text-sm">
+                        <p class="text-charcoal/40">Loading...</p>
+                    </div>
+                </aside>
 
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Order ID</label>
-                        <input id="orderId" type="text" placeholder="CF123456" required
-                                     class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500" />
+                <div class="rounded-3xl border border-white/40 bg-white/90 px-6 py-7 shadow-[0_20px_55px_-38px_rgba(255,229,180,0.55)] backdrop-blur">
+                    <div class="flex items-center justify-between gap-3 border-b border-white/60 pb-5">
+                        <div>
+                            <h2 class="text-lg font-semibold">Form Webhook Simulation</h2>
+                            <p class="text-xs text-charcoal/55">Lengkapi data sesuai order untuk kirim payload.</p>
+                        </div>
+                        <span class="rounded-full bg-rose-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-rose-600">Testing Only</span>
                     </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Payment Status</label>
-                        <select id="status" class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500">
-                            <option value="success">✅ Success (Paid)</option>
-                            <option value="settlement">✅ Settlement (Confirmed)</option>
-                            <option value="failed">❌ Failed</option>
-                            <option value="expired">⏰ Expired</option>
-                        </select>
+                    <div class="mt-6 grid gap-5 md:grid-cols-2">
+                        <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-charcoal/50">
+                            Order ID
+                            <input id="orderId" type="text" placeholder="CF123456" required class="rounded-2xl border border-charcoal/10 bg-white px-4 py-3 text-sm font-semibold text-charcoal outline-none transition focus:border-matcha focus:ring-2 focus:ring-matcha/30" />
+                        </label>
+                        <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-charcoal/50">
+                            Payment Status
+                            <select id="status" class="rounded-2xl border border-charcoal/10 bg-white px-4 py-3 text-sm font-semibold text-charcoal outline-none transition focus:border-matcha focus:ring-2 focus:ring-matcha/30">
+                                <option value="success">✅ Success (Paid)</option>
+                                <option value="settlement">✅ Settlement (Confirmed)</option>
+                                <option value="failed">❌ Failed</option>
+                                <option value="expired">⏰ Expired</option>
+                            </select>
+                        </label>
+                        <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-charcoal/50">
+                            Amount (Rp)
+                            <input id="amount" type="number" placeholder="50000" required class="rounded-2xl border border-charcoal/10 bg-white px-4 py-3 text-sm font-semibold text-charcoal outline-none transition focus:border-matcha focus:ring-2 focus:ring-matcha/30" />
+                        </label>
+                        <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-charcoal/50">
+                            Provider / Gateway
+                            <input id="provider" type="text" value="webhook-simulator" class="rounded-2xl border border-charcoal/10 bg-white px-4 py-3 text-sm font-semibold text-charcoal outline-none transition focus:border-matcha focus:ring-2 focus:ring-matcha/30" />
+                        </label>
                     </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Amount (Rp)</label>
-                        <input id="amount" type="number" placeholder="50000" required
-                                     class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500" />
+                    <div class="mt-6 space-y-3">
+                        <button onclick="sendWebhook()" class="w-full rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg">
+                            🚀 Kirim Simulasi Webhook
+                        </button>
+                        <button onclick="loadPendingOrders()" class="w-full rounded-2xl border border-charcoal/15 px-4 py-3 text-sm font-semibold text-charcoal transition hover:bg-charcoal/5">
+                            🔄 Muat Ulang Pending Orders
+                        </button>
                     </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Provider/Gateway</label>
-                        <input id="provider" type="text" value="webhook-simulator"
-                                     class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500" />
-                    </div>
+                    <pre id="response" class="hidden whitespace-pre-wrap text-xs leading-relaxed text-charcoal/75 mt-6 rounded-2xl border border-charcoal/10 bg-charcoal/3 p-4"></pre>
                 </div>
-
-                <div class="mt-4 space-y-2">
-                    <button onclick="sendWebhook()" class="w-full px-4 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition">
-                        🚀 Simulate Payment Webhook
-                    </button>
-                    <button onclick="loadPendingOrders()" class="w-full px-4 py-3 border-2 border-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition">
-                        🔄 Refresh Pending Orders
-                    </button>
-                </div>
-
-                        <pre id="response" class="hidden whitespace-pre-wrap text-xs mt-4 p-3 rounded-lg bg-gray-50 border border-gray-200"></pre>
             </section>
         </main>
 
+        <script>
+            const shell = document.getElementById('nav-shell');
+            function handleNavShadow() {
+                if (window.scrollY > 6) {
+                    shell.classList.add('shadow-[0_25px_60px_-35px_rgba(51,51,51,0.25)]','bg-white/85');
+                } else {
+                    shell.classList.remove('shadow-[0_25px_60px_-35px_rgba(51,51,51,0.25)]','bg-white/85');
+                }
+            }
+            window.addEventListener('scroll', handleNavShadow);
+            handleNavShadow();
+        </script>
+
         <script src="/js/webhookTester.js"></script>
-                <script>
-                    // Navbar scrolled state
-                    const shell = document.getElementById('nav-shell');
-                    function onScroll() {
-                        if (window.scrollY > 10) {
-                            shell.classList.add('shadow-lg','bg-white/70');
-                        } else {
-                            shell.classList.remove('shadow-lg','bg-white/70');
-                        }
-                    }
-                    window.addEventListener('scroll', onScroll);
-                    onScroll();
-                </script>
     </body>
-    </html>
+</html>

@@ -20,9 +20,7 @@ module.exports = {
         // ⚠️ PENTING: Hanya masukkan nomor barista/kasir ASLI disini
         // Customer TIDAK boleh ada di list ini!
         baristaNumbers: [
-            '6281345028895@s.whatsapp.net', // Nomor barista 1
-            // '6281234567890@s.whatsapp.net', // Nomor barista 2 (jika ada)
-            // Tambahkan nomor barista lain jika perlu
+            '6281345028895@s.whatsapp.net'
         ],
 
         // Admin Numbers (untuk akses penuh ke semua command)

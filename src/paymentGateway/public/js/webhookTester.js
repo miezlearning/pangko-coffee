@@ -9,17 +9,25 @@ async function loadPendingOrders() {
         const container = document.getElementById('pending-orders');
         
         if (data.payments.length === 0) {
-            container.innerHTML = '<p class="text-gray-400 text-sm">No pending orders</p>';
+            container.innerHTML = '<div class="rounded-2xl border border-dashed border-matcha/30 bg-matcha/10 px-5 py-6 text-center text-sm text-matcha/70">Tidak ada pending order 🎉</div>';
         } else {
-            container.innerHTML = data.payments.map(p => `
-                <button class="w-full text-left rounded-xl border border-gray-200 hover:border-matcha/50 hover:shadow transition p-3" onclick="selectOrder('${p.orderId}', ${p.amount})">
-                  <div class="flex items-center justify-between">
-                    <div class="font-semibold">📋 ${p.orderId}</div>
-                    <div class="font-bold text-matcha">Rp ${formatNumber(p.amount)}</div>
-                  </div>
-                  <div class="text-xs text-gray-500 mt-1">${p.items.length} items • Expires: ${new Date(p.expiresAt).toLocaleTimeString('id-ID')}</div>
+            container.innerHTML = data.payments.map(p => {
+                const expiresLabel = new Date(p.expiresAt).toLocaleTimeString('id-ID');
+                const createdLabel = p.createdAt ? new Date(p.createdAt).toLocaleTimeString('id-ID') : 'Waktu tidak tersedia';
+                return `
+                <button class="group w-full rounded-2xl border border-charcoal/10 bg-white/90 px-4 py-4 text-left transition hover:-translate-y-0.5 hover:border-matcha/40 hover:shadow-lg" onclick="selectOrder('${p.orderId}', ${p.amount})">
+                    <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/45">
+                        <span>Order</span>
+                        <span>Expires ${expiresLabel}</span>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between">
+                        <div class="text-lg font-semibold text-charcoal">📋 ${p.orderId}</div>
+                        <span class="rounded-full bg-matcha/15 px-3 py-1 text-sm font-semibold text-matcha shadow-sm">Rp ${formatNumber(p.amount)}</span>
+                    </div>
+                    <p class="mt-2 text-xs text-charcoal/55">${p.items.length} items • Dibuat ${createdLabel}</p>
                 </button>
-            `).join('');
+            `;
+            }).join('');
         }
     } catch (error) {
         console.error('Failed to load orders:', error);
@@ -47,7 +55,7 @@ async function sendWebhook() {
     const responseDiv = document.getElementById('response');
     responseDiv.textContent = 'Sending webhook...';
     responseDiv.classList.remove('hidden');
-    responseDiv.classList.remove('bg-rose-50','border-rose-400','bg-green-50','border-green-400');
+    responseDiv.classList.remove('border-rose-300','bg-rose-50','text-rose-700','border-matcha/40','bg-matcha/10','text-matcha');
     
     try {
         const res = await fetch('/api/webhook/simulate', {
@@ -65,17 +73,17 @@ async function sendWebhook() {
         const data = await res.json();
         
         if (data.success) {
-            responseDiv.classList.add('bg-green-50','border-green-400');
+            responseDiv.classList.add('border-matcha/40','bg-matcha/10','text-matcha');
             responseDiv.textContent = '✅ SUCCESS\n\n' + JSON.stringify(data, null, 2);
             
             // Reload orders
             setTimeout(loadPendingOrders, 1000);
         } else {
-            responseDiv.classList.add('bg-rose-50','border-rose-400');
+            responseDiv.classList.add('border-rose-300','bg-rose-50','text-rose-700');
             responseDiv.textContent = '❌ FAILED\n\n' + JSON.stringify(data, null, 2);
         }
     } catch (error) {
-        responseDiv.classList.add('bg-rose-50','border-rose-400');
+        responseDiv.classList.add('border-rose-300','bg-rose-50','text-rose-700');
         responseDiv.textContent = '❌ ERROR\n\n' + error.message;
     }
 }

@@ -29,12 +29,14 @@ const paymentsRouter = require('./routes/payments');
 const ordersRouter = require('./routes/orders');
 const statsRouter = require('./routes/stats');
 const webhookRouter = require('./routes/webhook');
+const exportRouter = require('./routes/export');
 
 // Mount routes
 app.use('/api/payments', paymentsRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/webhook', webhookRouter);
+app.use('/api/export', exportRouter);
 
 // Serve dashboard
 app.get('/', (req, res) => {

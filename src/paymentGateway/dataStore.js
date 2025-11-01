@@ -86,6 +86,22 @@ function updatePendingPayments(newPayments) {
     pendingPayments = newPayments;
 }
 
+/**
+ * Get all payments (pending + history)
+ */
+function getAllPayments() {
+    // Combine pending and history for export
+    return [...pendingPayments, ...paymentHistory];
+}
+
+/**
+ * Get all orders (dummy, for demo; replace with real order source if needed)
+ */
+function getAllOrders() {
+    // If you have a real order store, replace this
+    return [];
+}
+
 module.exports = {
     getPendingPayments,
     getPaymentHistory,
@@ -96,5 +112,7 @@ module.exports = {
     setBotInstance,
     getBotInstance,
     clearPendingPayments,
-    updatePendingPayments
+    updatePendingPayments,
+    getAllPayments,
+    getAllOrders
 };
