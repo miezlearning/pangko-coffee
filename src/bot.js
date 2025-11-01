@@ -144,7 +144,7 @@ class WhatsAppBot {
                             const text = `⏰ *Waktu ke Kasir Habis*\n\n` +
                                 `Order ID: *${order.orderId}*\n` +
                                 `Status: Dibatalkan (tunai)\n\n` +
-                                `Anda masih bisa membuka kembali dalam 60 menit.\n` +
+                                `Anda masih bisa membuka kembali dalam 60 menit (maksimal ${require('./config/config').order.maxReopenPerOrder}x per pesanan).\n` +
                                 `Balas: *!lanjut ${order.orderId}* sebelum ${until}.`;
                             await this.sock.sendMessage(order.userId, { text });
                         } catch (e) { /* ignore */ }

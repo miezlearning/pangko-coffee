@@ -94,6 +94,9 @@ module.exports = {
         orderTimeout: 15, // minutes
         paymentTimeout: 10, // minutes
         cashTimeout: 10, // minutes to reach cashier before auto-cancel
+        // Anti-abuse for cash reopen
+        maxReopenPerOrder: 1, // allow only once per order
+        reopenCooldownMinutes: 3, // must wait this long after cancel before !lanjut
         minOrderAmount: 10000,
         
         // Fee Configuration (optional)

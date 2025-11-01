@@ -51,11 +51,16 @@ module.exports = {
       text += `👤 Atas Nama: *${reopened.customerName}*\n`;
       text += `⏰ Batas ke kasir: ${expiryTime} WIB (${minutesLeft} menit)\n\n`;
       text += `📍 Segera menuju kasir dan sebutkan: *Order ${reopened.orderId} atas nama ${reopened.customerName}*.\n`;
-      text += `Kasir akan konfirmasi penerimaan tunai untuk mulai proses barista.`;
+      text += `Kasir akan konfirmasi penerimaan tunai untuk mulai proses barista.\n\n`;
+      text += `ℹ️ Catatan: Fitur buka kembali hanya berlaku untuk *timeout* dan maksimal ${require('../config/config').order.maxReopenPerOrder}x per pesanan.`;
 
       await sock.sendMessage(from, { text });
     } catch (error) {
-      await sock.sendMessage(from, { text: `❌ Gagal membuka kembali: ${error.message}` });
+      let msg = error.message || 'Gagal membuka kembali.';
+      if (/timeout/i.test(msg)) {
+        msg += `\n\nJika dibatalkan oleh kasir, minta kasir untuk buka kembali dari dashboard.`;
+      }
+      await sock.sendMessage(from, { text: `❌ ${msg}` });
     }
   }
 };

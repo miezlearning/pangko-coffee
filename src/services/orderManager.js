@@ -165,6 +165,7 @@ class OrderManager {
             order.cashCancelledAt = null;
             order.cashCancelReason = null;
             order.canReopenUntil = null; // set when cancelled/expired
+            order.reopenCount = 0;
         }
 
         this.orders.set(orderId, order);
@@ -302,11 +303,24 @@ class OrderManager {
         if (!order.canReopenUntil || moment().isAfter(order.canReopenUntil)) {
             throw new Error('Reopen window has expired');
         }
+        // Only allow reopen if last cancel was timeout (auto-cancel). If kasir canceled, require kasir-side reopen.
+        if (order.cashCancelReason && order.cashCancelReason !== 'cash_timeout') {
+            throw new Error('Reopen oleh pelanggan hanya untuk kasus timeout. Minta kasir untuk membuka kembali.');
+        }
+        const maxReopen = (config.order && (config.order.maxReopenPerOrder ?? 1)) || 1;
+        const cooldown = (config.order && (config.order.reopenCooldownMinutes ?? 3)) || 3;
+        if (typeof order.reopenCount === 'number' && order.reopenCount >= maxReopen) {
+            throw new Error('Batas buka kembali sudah tercapai. Silakan buat pesanan baru.');
+        }
+        if (order.cashCancelledAt && moment().isBefore(moment(order.cashCancelledAt).add(cooldown, 'minutes'))) {
+            throw new Error(`Tunggu ${cooldown} menit sebelum membuka kembali.`);
+        }
         const cashTimeout = (config.order && (config.order.cashTimeout ?? config.order.paymentTimeout)) || 10;
         order.status = this.STATUS.PENDING_CASH;
         order.cashCancelledAt = null;
         order.cashCancelReason = null;
         order.cashExpiresAt = moment().add(cashTimeout, 'minutes').toDate();
+        order.reopenCount = (order.reopenCount || 0) + 1;
         order.updatedAt = new Date();
         this.orders.set(orderId, order);
         return order;
