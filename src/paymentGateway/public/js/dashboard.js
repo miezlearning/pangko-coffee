@@ -101,7 +101,7 @@ async function loadStats() {
       document.getElementById('pending-count').textContent = data.stats.pendingCount;
       document.getElementById('today-orders').textContent = data.stats.todayOrders;
       document.getElementById('today-revenue').textContent = 'Rp ' + formatNumber(data.stats.todayRevenue);
-      document.getElementById('total-orders').textContent = data.stats.totalOrders;
+  // Dashboard difokuskan untuk data hari ini saja
 
       // Notify when pending increases after initial load
       if (statsInitialized && data.stats.pendingCount > previousPaymentCount) {
@@ -539,12 +539,14 @@ window.addEventListener('DOMContentLoaded', () => {
   loadPayments();
   loadProcessingOrders();
   loadPendingCash();
+  loadCancelledCash();
 
   // Bind modal buttons
   const cancelBtn = document.getElementById('reject-cancel');
   const submitBtn = document.getElementById('reject-submit');
   if (cancelBtn) cancelBtn.addEventListener('click', closeRejectModal);
   if (submitBtn) submitBtn.addEventListener('click', submitReject);
+
 });
 
 // Auto-refresh every 3 seconds
@@ -552,9 +554,162 @@ autoRefresh = setInterval(() => {
   loadPayments();
   loadProcessingOrders();
   loadPendingCash();
+  loadCancelledCash();
 }, 3000);
 
 // Expose modal open for inline onclick
 function rejectPayment(orderId) {
   openRejectModal(orderId);
+}
+
+// Load cancelled cash orders (reopen-able)
+async function loadCancelledCash() {
+  try {
+    const res = await fetch('/api/orders/cancelled-cash?withinWindow=true');
+    const data = await res.json();
+
+    const list = document.getElementById('cancelled-cash-list');
+    if (!list) return;
+
+    if (!data.orders || data.orders.length === 0) {
+      list.innerHTML = `
+        <div class="rounded-3xl border border-dashed border-rose-200 bg-rose-50 px-6 py-10 text-center text-sm">
+          <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-3xl shadow-inner">🕊️</div>
+          <h3 class="mt-5 text-lg font-semibold">Tidak ada pesanan tunai yang bisa dibuka kembali</h3>
+          <p class="mt-2 text-charcoal/60">Daftar ini hanya menampilkan pesanan yang masih dalam window buka kembali.</p>
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = data.orders.map((order) => {
+      const until = order.canReopenUntil ? new Date(order.canReopenUntil).toLocaleString('id-ID') : '-';
+      const cancelledAt = order.cancelledAt ? new Date(order.cancelledAt).toLocaleString('id-ID') : '-';
+      return `
+        <div class="rounded-3xl border border-white/60 bg-white/95 p-6 shadow-[0_20px_45px_-38px_rgba(225,29,72,0.25)] transition hover:-translate-y-1">
+          <div class="flex flex-col gap-4 border-b border-charcoal/5 pb-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p class="text-xs uppercase tracking-[0.3em] text-rose-700/80">Cash Cancelled</p>
+              <h4 class="mt-2 text-xl font-semibold">📋 ${order.orderId}</h4>
+              <p class="text-sm text-charcoal font-semibold">👤 ${order.customerName}</p>
+              <p class="text-xs text-charcoal/55">📱 ${order.userId}</p>
+            </div>
+            <div class="rounded-2xl bg-rose-50 px-5 py-3 text-right">
+              <p class="text-xs uppercase tracking-[0.25em] text-rose-700/80">Total</p>
+              <span class="text-3xl font-bold text-charcoal">Rp ${formatNumber(order.pricing.total)}</span>
+            </div>
+          </div>
+          <div class="mt-5 rounded-2xl border border-charcoal/5 bg-charcoal/2 p-4">
+            <div class="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">Items (${order.items.length})</div>
+            ${order.items.map(item => `
+              <div class="border-b border-charcoal/5 py-2 text-sm last:border-0">
+                <div class="flex items-center justify-between">
+                  <span class="font-medium text-charcoal/80">${item.name}</span>
+                  <span class="text-charcoal/55">x${item.quantity} • Rp ${formatNumber(item.price * item.quantity)}</span>
+                </div>
+                ${item.notes ? `<p class="mt-1 text-xs text-charcoal/45">📝 ${item.notes}</p>` : ''}
+              </div>
+            `).join('')}
+          </div>
+          <div class="mt-4 grid gap-2 text-xs font-semibold text-charcoal/60 sm:grid-cols-3">
+            <span>🛑 Dibatalkan: ${cancelledAt}</span>
+            <span>🔁 Batas buka kembali: ${until}</span>
+            <span>📄 Alasan: ${order.cancelReason || '-'}</span>
+          </div>
+          <div class="mt-5">
+            <button class="w-full rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="reopenCash('${order.orderId}')">🔁 Buka Kembali</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Failed to load cancelled cash:', err);
+  }
+}
+
+// Reopen a cancelled cash order
+async function reopenCash(orderId) {
+  const proceed = confirm(`Buka kembali pesanan tunai ini?
+\nOrder: ${orderId}`);
+  if (!proceed) return;
+  try {
+    const res = await fetch(`/api/orders/cash/reopen/${orderId}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showNotification('🔁 Pesanan tunai dibuka kembali');
+      loadCancelledCash();
+      loadPendingCash();
+    } else {
+      showNotification('❌ Gagal buka kembali: ' + (data.message || 'Unknown error'));
+    }
+  } catch (e) {
+    showNotification('❌ Error: ' + e.message);
+  }
+}
+
+// Run search
+async function runSearch() {
+  const qEl = document.getElementById('search-input');
+  const statusEl = document.getElementById('search-status');
+  const resultsEl = document.getElementById('search-results');
+  if (!resultsEl) return;
+  const q = encodeURIComponent((qEl?.value || '').trim());
+  const status = encodeURIComponent((statusEl?.value || 'all').trim());
+  try {
+    const res = await fetch(`/api/orders/search?q=${q}&status=${status}`);
+    const data = await res.json();
+    if (!data.results || data.results.length === 0) {
+      resultsEl.innerHTML = `
+        <div class="rounded-2xl border border-charcoal/10 bg-white/90 px-4 py-6 text-center text-sm">
+          <div>🔎</div>
+          <p class="mt-2 text-charcoal/60">Tidak ada hasil untuk pencarian ini.</p>
+        </div>
+      `;
+      return;
+    }
+    resultsEl.innerHTML = data.results.map(r => renderSearchResult(r)).join('');
+  } catch (e) {
+    console.error('Search failed:', e);
+  }
+}
+
+function renderSearchResult(r) {
+  if (r.type === 'payment') {
+    return `
+      <div class="rounded-2xl border border-matcha/20 bg-matcha/10 p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.25em] text-matcha/80">Pembayaran Pending (QRIS)</p>
+            <div class="mt-1 text-sm">📋 ${r.orderId} · 📱 ${r.userId}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-charcoal/55">Nominal</div>
+            <div class="text-xl font-bold">Rp ${formatNumber(r.total)}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  // order type
+  const statusBadge = {
+    PENDING_CASH: '💵 Menunggu Tunai',
+    PROCESSING: '👨‍🍳 Diproses',
+    READY: '✅ Siap',
+    COMPLETED: '✔️ Selesai',
+    CANCELLED: '⛔ Dibatalkan',
+  }[r.status] || r.status;
+  return `
+    <div class="rounded-2xl border border-charcoal/10 bg-white p-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-charcoal/50">${statusBadge}</p>
+          <div class="mt-1 text-sm">📋 ${r.orderId} · 👤 ${r.customerName} · 📱 ${r.userId} · 💳 ${r.paymentMethod}</div>
+        </div>
+        <div class="text-right">
+          <div class="text-xs text-charcoal/55">Total</div>
+          <div class="text-xl font-bold">Rp ${formatNumber(r.total || 0)}</div>
+        </div>
+      </div>
+    </div>
+  `;
 }

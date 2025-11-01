@@ -150,11 +150,22 @@ function getAllPayments() {
 }
 
 /**
- * Get all orders (dummy, for demo; replace with real order source if needed)
+ * Get all orders from SQLite (via services/orderStore)
+ * Returns only orders that have reached READY or COMPLETED by default
  */
-function getAllOrders() {
-    // If you have a real order store, replace this
-    return [];
+function getAllOrders(options = {}) {
+    try {
+        const { includeAll = false } = options || {};
+        // Lazy-require with absolute path to avoid resolution issues on Windows
+        const orderStore = require(path.resolve(__dirname, '..', 'services', 'orderStore'));
+        const orders = orderStore.loadOrders() || [];
+        if (includeAll) return orders;
+        // Filter to orders that are ready for pickup or completed
+        return orders.filter(o => (o && (o.status === 'ready' || o.status === 'completed')));
+    } catch (e) {
+        console.warn('[dataStore] Failed to read orders from sqlite:', e.message);
+        return [];
+    }
 }
 
 module.exports = {

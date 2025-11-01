@@ -42,15 +42,20 @@
                         </div>
                     </div>
                     <div class="hidden items-center gap-5 text-sm font-semibold sm:flex">
-                        <a href="/" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white" aria-current="page">Dashboard</a>
+                        <a href="/" class="rounded-full px-4 py-2 transition bg-matcha text-white" aria-current="page">Dashboard</a>
+                        <a href="/analytics" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Statistik</a>
+                        <a href="/search" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Cari Order</a>
                         <a href="/webhook-tester" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Webhook Tester</a>
                     </div>
-                    <a href="/webhook-tester" class="sm:hidden rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Webhook →</a>
+                    <div class="sm:hidden flex items-center gap-2">
+                        <a href="/search" class="rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Cari Order →</a>
+                        <a href="/analytics" class="rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Analisis →</a>
+                    </div>
                 </div>
             </div>
         </nav>
 
-        <main class="relative mx-auto flex w-full max-w-[1180px] flex-col gap-12 px-5 pt-32 pb-20">
+        <main class="relative mx-auto flex w-full max-w-[1180px] flex-col gap-12 px-5 pt-40 pb-20">
             <!-- Hero / Overview -->
             <section class="relative grid gap-10 lg:grid-cols-[1.05fr_0.95fr]">
                 <div class="relative overflow-hidden rounded-3xl bg-white/90 px-10 py-12 shadow-glow">
@@ -68,6 +73,9 @@
                             </a>
                             <a href="/webhook-tester" class="inline-flex items-center gap-2 rounded-full border border-matcha/30 bg-white px-5 py-3 text-sm font-semibold text-matcha transition hover:bg-matcha/10">
                                 Buka Webhook Tester
+                            </a>
+                            <a href="/analytics" class="inline-flex items-center gap-2 rounded-full border border-matcha/30 bg-white px-5 py-3 text-sm font-semibold text-matcha transition hover:bg-matcha/10">
+                                📈 Buka Analisis
                             </a>
                         </div>
                         <dl class="grid gap-4 pt-4 sm:grid-cols-2">
@@ -134,16 +142,22 @@
                             <h2 class="text-2xl font-semibold">Snapshot Statistik</h2>
                             <p class="text-sm text-charcoal/60">Semua metrik diperbarui otomatis tanpa perlu refresh manual.</p>
                         </div>
-                        <div class="flex flex-wrap gap-2 text-xs font-semibold text-charcoal/60">
+                        <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-charcoal/60">
                             <span class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-3 py-1">
                                 <span class="text-matcha">●</span> Realtime Watcher
                             </span>
                             <span class="inline-flex items-center gap-2 rounded-full bg-peach/25 px-3 py-1">
                                 <span class="text-peach-800">🚀</span> Sinkron Order Manager
                             </span>
+                            <a href="/analytics" class="inline-flex items-center gap-2 rounded-full border border-matcha/35 bg-white px-4 py-2 text-sm font-semibold text-matcha transition hover:bg-matcha hover:text-white">
+                                📈 Statistik
+                            </a>
+                            <a href="/api/export/finance" class="ml-auto inline-flex items-center gap-2 rounded-full border border-peach/40 bg-white px-4 py-2 text-sm font-semibold text-peach-800 transition hover:bg-peach hover:text-charcoal">
+                                📤 Export Excel
+                            </a>
                         </div>
                     </div>
-                    <div id="stats" class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div id="stats" class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         <article class="group rounded-2xl border border-matcha/20 bg-cream/70 p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
                             <p class="text-sm text-charcoal/55">⏳ Pending Payments</p>
                             <span id="pending-count" class="mt-4 block text-4xl font-bold text-charcoal">-</span>
@@ -155,10 +169,6 @@
                         <article class="group rounded-2xl border border-peach/25 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
                             <p class="text-sm text-charcoal/55">💰 Revenue Hari Ini</p>
                             <span id="today-revenue" class="mt-4 block text-4xl font-bold text-charcoal">-</span>
-                        </article>
-                        <article class="group rounded-2xl border border-charcoal/10 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-                            <p class="text-sm text-charcoal/55">📊 Total Orders</p>
-                            <span id="total-orders" class="mt-4 block text-4xl font-bold text-charcoal">-</span>
                         </article>
                     </div>
                 </div>
@@ -175,9 +185,6 @@
                         <div class="flex gap-2">
                             <button onclick="loadPayments()" class="inline-flex items-center gap-2 rounded-full border border-matcha/30 px-4 py-2 text-sm font-semibold text-matcha transition hover:bg-matcha hover:text-white">
                                 🔄 Refresh Data
-                            </button>
-                            <button onclick="window.location.href='/api/export/finance'" class="inline-flex items-center gap-2 rounded-full border border-peach/40 px-4 py-2 text-sm font-semibold text-peach-800 transition hover:bg-peach hover:text-charcoal">
-                                📤 Export Excel
                             </button>
                         </div>
                     </div>
@@ -211,6 +218,22 @@
                         </button>
                     </div>
                     <div id="pending-cash-list" class="mt-6 space-y-4"></div>
+                </article>
+            </section>
+
+            <!-- Cancelled Cash (Reopen) -->
+            <section>
+                <article class="rounded-3xl border border-white/45 bg-white/90 p-7">
+                    <div class="flex flex-col gap-4 border-b border-white/60 pb-5 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 class="text-xl font-semibold">⏸️ Dibatalkan (Tunai) - Bisa Dibuka Kembali</h3>
+                            <p class="text-sm text-charcoal/60">Hanya yang masih dalam window buka kembali.</p>
+                        </div>
+                        <button onclick="loadCancelledCash()" class="inline-flex items-center gap-2 rounded-full border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50">
+                            🔄 Refresh Dibatalkan
+                        </button>
+                    </div>
+                    <div id="cancelled-cash-list" class="mt-6 space-y-4"></div>
                 </article>
             </section>
         </main>

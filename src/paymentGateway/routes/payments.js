@@ -50,8 +50,9 @@ async function triggerBotConfirmation(payment) {
         `━━━━━━━━━━━━━━━━━━━━\n\n` +
         `Silakan proses pesanan ini! 👨‍🍳`;
     
-    // Send to all baristas
-    for (const baristaNumber of config.baristaNumbers) {
+    // Send to all baristas (prefer config.shop.baristaNumbers)
+    const baristas = (config.shop && config.shop.baristaNumbers) || config.baristaNumbers || [];
+    for (const baristaNumber of baristas) {
         try {
             await botInstance.sock.sendMessage(baristaNumber, { text: baristaText });
         } catch (err) {

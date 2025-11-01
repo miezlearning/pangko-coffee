@@ -1,7 +1,7 @@
 module.exports = {
     // Bot Configuration
     bot: {
-        name: 'Coffee Shop Bot',
+        name: 'Pangko Coffee Bot',
         prefix: '!',
         timezone: 'Asia/Makassar'
     },
@@ -23,9 +23,9 @@ module.exports = {
 
     // Coffee Shop Configuration
     shop: {
-        name: 'My Coffee Shop',
-        address: 'Jl. Kopi No. 123, Jakarta',
-        openHours: '08:00 - 22:00',
+        name: 'Pangko Coffee',
+        address: 'Samarinda', // TODO: ganti dengan alamat lengkap sesuai website Pangko
+        openHours: '08:00 - 20:00 WITA', // jam operasional dengan label WITA
         contact: '6281345028895',
         
         // QRIS Static (Base QRIS dari merchant)
@@ -109,48 +109,49 @@ module.exports = {
 
     // Messages Template
     messages: {
-        welcome: `Selamat datang di *{shopName}*! ☕
+    welcome: `Selamat datang di *{shopName}*! ☕
 
 📍 Lokasi: {address}
-⏰ Jam Buka: {openHours}
-📞 Kontak: {contact}
+⏰ Jam Operasional: {openHours}
+📞 Kontak (WA): {contact}
 
-Ketik *!menu* untuk melihat daftar menu
-Ketik *!order* untuk mulai pesan
-Ketik *!help* untuk bantuan`,
+Ketik *!menu* untuk melihat daftar menu.
+Ketik *!order* untuk mulai pesan.
+Ketik *!help* untuk bantuan.
 
-        orderSuccess: `✅ *Pesanan Berhasil Dibuat*
+Seluruh waktu ditampilkan dalam WITA (Asia/Makassar).`,
+
+    orderSuccess: `✅ *Pesanan Berhasil Dibuat*
 
 Order ID: {orderId}
 Total: Rp {total}
 
 Silakan lakukan pembayaran dalam {timeout} menit.
-Ketik *!pay {orderId}* untuk melanjutkan pembayaran.`,
+Ketik *!pay {orderId}* untuk melanjutkan pembayaran (QRIS) atau pilih *CASH* saat checkout untuk bayar di kasir.`,
 
-        paymentPending: `💳 *Menunggu Pembayaran*
+    paymentPending: `💳 *Menunggu Pembayaran*
 
 Order ID: {orderId}
 Total Pembayaran: Rp {total}
 
-Scan QRIS di bawah ini untuk membayar:
-⏰ Batas waktu: {expiry}
+Scan QRIS di bawah ini untuk membayar.
+⏰ Batas waktu: {expiry} (WITA)
 
-Setelah transfer, ketik *!confirm {orderId}* untuk konfirmasi pembayaran.`,
+Setelah transfer, tunggu konfirmasi dari kasir. Jika butuh bantuan, hubungi kami.`,
 
-        paymentConfirmed: `✅ *Pembayaran Dikonfirmasi*
-
-Order ID: {orderId}
-Pesanan Anda sedang diproses oleh barista kami.
-
-Estimasi waktu: 10-15 menit
-Silakan tunggu notifikasi selanjutnya.`,
-
-        orderReady: `🎉 *Pesanan Siap!*
+    paymentConfirmed: `✅ *Pembayaran Dikonfirmasi*
 
 Order ID: {orderId}
-Pesanan Anda sudah siap!
+Terima kasih! Pesanan Anda sedang diproses oleh barista *{shopName}* ☕
 
-Silakan ambil di counter dengan menunjukkan Order ID ini.
-Terima kasih telah memesan! ☕`
+Estimasi waktu 10–15 menit. Kami akan beri tahu saat sudah siap diambil.`,
+
+    orderReady: `🎉 *Pesanan Siap Diambil!*
+
+Order ID: {orderId}
+Pesanan Anda sudah siap.
+
+Silakan ambil di counter dengan menyebutkan *Order ID* dan *nama pemesan*.
+Terima kasih telah memesan di *{shopName}*! ☕`
     }
 }

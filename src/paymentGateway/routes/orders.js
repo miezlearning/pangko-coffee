@@ -107,12 +107,34 @@ router.get('/processing', (req, res) => {
  * GET /api/orders/pending-cash
  * Get all cash orders waiting for cashier acceptance
  */
-router.get('/pending-cash', (req, res) => {
+router.get('/pending-cash', async (req, res) => {
     const orderManager = require('../../services/orderManager');
     const orders = [];
     for (const orderId of orderManager.orders.keys()) {
         const order = orderManager.getOrder(orderId);
-        if (order && order.status === orderManager.STATUS.PENDING_CASH) {
+        if (!order) continue;
+        if (order.status === orderManager.STATUS.PENDING_CASH) {
+            // Auto-cancel expired cash orders immediately on fetch
+            if (order.cashExpiresAt && new Date(order.cashExpiresAt) <= new Date()) {
+                try {
+                    const cancelled = orderManager.cancelCash(order.orderId, 'cash_timeout', 60);
+                    // Notify customer once with reopen instruction
+                    const botInstance = dataStore.getBotInstance();
+                    if (botInstance && botInstance.sock) {
+                        const until = cancelled.canReopenUntil ? new Date(cancelled.canReopenUntil).toLocaleString('id-ID') : '';
+                        const text = `⏰ *Waktu ke Kasir Habis*\n\n` +
+                            `Order ID: *${cancelled.orderId}*\n` +
+                            `Status: Dibatalkan (tunai)\n\n` +
+                            `Anda masih bisa membuka kembali dalam 60 menit (maksimal ${require('../../config/config').order.maxReopenPerOrder}x per pesanan).\n` +
+                            `Balas: *!lanjut ${cancelled.orderId}* sebelum ${until}.`;
+                        try { await botInstance.sock.sendMessage(cancelled.userId, { text }); } catch (_) {}
+                    }
+                    continue; // don't include in list since it's cancelled
+                } catch (_) {
+                    // fallthrough to not show if cancel failed
+                    continue;
+                }
+            }
             orders.push({
                 orderId: order.orderId,
                 customerName: order.customerName || 'Customer',
@@ -208,10 +230,163 @@ router.post('/cash/reopen/:orderId', (req, res) => {
     const { orderId } = req.params;
     const orderManager = require('../../services/orderManager');
     try {
-        const order = orderManager.reopenCash(orderId);
+        const order = orderManager.reopenCashByCashier(orderId);
         res.json({ success: true, order: { orderId: order.orderId, status: order.status, cashExpiresAt: order.cashExpiresAt } });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * GET /api/orders/cancelled-cash
+ * List recently cancelled cash orders (optionally only those still within reopen window)
+ */
+router.get('/cancelled-cash', (req, res) => {
+    const orderManager = require('../../services/orderManager');
+    const within = (req.query.withinWindow || 'true') === 'true';
+    const now = new Date();
+    const orders = [];
+    for (const orderId of orderManager.orders.keys()) {
+        const order = orderManager.getOrder(orderId);
+        if (!order) continue;
+        if (order.paymentMethod === 'CASH' && order.status === orderManager.STATUS.CANCELLED) {
+            const eligible = within ? (order.canReopenUntil && new Date(order.canReopenUntil) > now) : true;
+            if (eligible) {
+                orders.push({
+                    orderId: order.orderId,
+                    customerName: order.customerName || 'Customer',
+                    userId: order.userId.split('@')[0],
+                    items: order.items,
+                    pricing: order.pricing,
+                    cancelledAt: order.cashCancelledAt,
+                    canReopenUntil: order.canReopenUntil,
+                    cancelReason: order.cashCancelReason || '-',
+                });
+            }
+        }
+    }
+    // Sort by cancelledAt desc
+    orders.sort((a,b) => new Date(b.cancelledAt) - new Date(a.cancelledAt));
+    res.json({ success: true, count: orders.length, orders });
+});
+
+/**
+ * GET /api/orders/search
+ * Search across orders by orderId or customerName (where available) and status filter
+ * status can be: all|pending_cash|processing|ready|completed|cancelled|pending_payment
+ */
+router.get('/search', (req, res) => {
+    const q = (req.query.q || '').toString().trim().toLowerCase();
+    const status = (req.query.status || 'all').toString().toLowerCase();
+    const orderManager = require('../../services/orderManager');
+    const dataStore = require('../dataStore');
+    const results = [];
+
+    // Helper for match
+    const matches = (text) => !q || (text && text.toString().toLowerCase().includes(q));
+
+    // From orderManager (all but pending_payment for QRIS)
+    for (const orderId of orderManager.orders.keys()) {
+        const o = orderManager.getOrder(orderId);
+        if (!o) continue;
+        const record = {
+            type: 'order',
+            orderId: o.orderId,
+            customerName: o.customerName || 'Customer',
+            userId: (o.userId || '').split('@')[0],
+            status: o.status,
+            paymentMethod: o.paymentMethod || 'QRIS',
+            total: o.pricing?.total,
+            createdAt: o.createdAt,
+        };
+        const statusOk = (status === 'all') ||
+                         (status === 'pending_cash' && o.status === orderManager.STATUS.PENDING_CASH) ||
+                         (status === 'processing' && o.status === orderManager.STATUS.PROCESSING) ||
+                         (status === 'ready' && o.status === orderManager.STATUS.READY) ||
+                         (status === 'completed' && o.status === orderManager.STATUS.COMPLETED) ||
+                         (status === 'cancelled' && o.status === orderManager.STATUS.CANCELLED);
+        if (statusOk && (matches(o.orderId) || matches(o.customerName))) {
+            results.push(record);
+        }
+    }
+
+    // From pending QRIS payments (dataStore)
+    if (status === 'all' || status === 'pending_payment') {
+        const pend = dataStore.getPendingPayments();
+        pend.forEach(p => {
+            const record = {
+                type: 'payment',
+                orderId: p.orderId,
+                customerName: null,
+                userId: (p.customerId || '').split('@')[0],
+                status: 'pending_payment',
+                paymentMethod: 'QRIS',
+                total: p.amount,
+                createdAt: p.createdAt,
+            };
+            if (matches(p.orderId) || matches(record.userId)) {
+                results.push(record);
+            }
+        });
+    }
+
+    // sort by createdAt desc when available, else by orderId desc
+    results.sort((a,b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0) || (b.orderId || '').localeCompare(a.orderId || ''));
+    res.json({ success: true, count: results.length, results });
+});
+
+/**
+ * GET /api/orders/:orderId
+ * Get detailed order or pending payment info by orderId
+ */
+router.get('/:orderId', (req, res) => {
+    const { orderId } = req.params;
+    const orderManager = require('../../services/orderManager');
+    const ds = require('../dataStore');
+    const order = orderManager.getOrder(orderId);
+    if (order) {
+        return res.json({ success: true, type: 'order', order });
+    }
+    const pend = ds.getPendingPayments().find(p => p.orderId === orderId);
+    if (pend) {
+        return res.json({ success: true, type: 'payment', payment: pend });
+    }
+    res.status(404).json({ success: false, message: 'Not found' });
+});
+
+/**
+ * DELETE /api/orders/:orderId
+ * Delete order from database and memory (admin/kasir action)
+ */
+router.delete('/:orderId', async (req, res) => {
+    const { orderId } = req.params;
+    const orderManager = require('../../services/orderManager');
+    const orderStore = require('../../services/orderStore');
+    const dataStore = require('../dataStore');
+    
+    try {
+        // Check if order exists in memory
+        const order = orderManager.getOrder(orderId);
+        if (order) {
+            // Remove from memory
+            orderManager.orders.del(orderId);
+        }
+        
+        // Check if it's a pending payment and remove it (QRIS pending)
+        const removedPending = dataStore.removePendingPayment(orderId);
+        
+    // Remove from database (SQLite)
+    const dbDeleted = orderStore.deleteOrder(orderId);
+        
+        if (dbDeleted || !!removedPending) {
+            console.log(`🗑️ Order/payment deleted: ${orderId}`);
+            res.json({ success: true, message: 'Order deleted successfully' });
+        } else {
+            res.status(404).json({ success: false, message: 'Order not found' });
+        }
+    } catch (error) {
+        console.error('Delete order error:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete order', error: error.message });
     }
 });
 

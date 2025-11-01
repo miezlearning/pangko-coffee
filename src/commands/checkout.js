@@ -8,7 +8,7 @@ const moment = require('moment-timezone');
 module.exports = {
     name: 'checkout',
     description: 'Proses checkout dan buat pesanan (interactive: nama + metode)',
-    aliases: ['bayar', 'pay'],
+    aliases: ['bayar', 'pay', 'co'],
 
     // Interactive session helpers
     async hasActiveSession(userId) {
@@ -130,6 +130,7 @@ module.exports = {
                 const expiryTime = moment(order.cashExpiresAt || order.createdAt)
                     .tz(config.bot.timezone)
                     .format('HH:mm');
+                const tzLabel = getTzLabel(config.bot.timezone);
                 const minutesLeft = order.cashExpiresAt ? moment(order.cashExpiresAt).diff(moment(), 'minutes') : (config.order.cashTimeout || 10);
 
                 // Message to customer
@@ -147,7 +148,7 @@ module.exports = {
                 text += `*TOTAL: Rp ${this.formatNumber(order.pricing.total)}*\n\n`;
                 text += `📍 Silakan menuju kasir dan sebutkan: *Order ${order.orderId} atas nama ${order.customerName}*.\n`;
                 text += `Kasir akan melakukan *konfirmasi penerimaan tunai* terlebih dahulu sebelum barista mulai proses.\n\n`;
-                text += `⏰ Batas waktu kedatangan ke kasir: ${expiryTime} WIB (${minutesLeft} menit).\n`;
+                text += `⏰ Batas waktu kedatangan ke kasir: ${expiryTime} ${tzLabel} (${minutesLeft} menit).\n`;
                 text += `Jika lewat waktu, pesanan otomatis dibatalkan. Anda bisa buka kembali dalam 60 menit dengan perintah: *!lanjut ${order.orderId}*.`;
 
                 await sock.sendMessage(from, { text });
@@ -189,6 +190,7 @@ module.exports = {
             const expiryTime = moment(order.paymentExpiry)
                 .tz(config.bot.timezone)
                 .format('HH:mm');
+            const tzLabel = getTzLabel(config.bot.timezone);
             
             const minutesLeft = moment(order.paymentExpiry).diff(moment(), 'minutes');
 
@@ -214,7 +216,7 @@ module.exports = {
             text += `*TOTAL: Rp ${this.formatNumber(order.pricing.total)}*\n\n`;
             text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
             text += `💳 *SCAN QRIS DI BAWAH UNTUK BAYAR*\n`;
-            text += `⏰ Batas waktu: ${expiryTime} WIB (${minutesLeft} menit)\n\n`;
+            text += `⏰ Batas waktu: ${expiryTime} ${tzLabel} (${minutesLeft} menit)\n\n`;
             text += `⚠️ *PENTING:*\n`;
             text += `• Nominal sudah disesuaikan: Rp ${this.formatNumber(order.pricing.total)}\n`;
             text += `• Jangan ubah nominal saat bayar!\n`;
@@ -243,7 +245,7 @@ module.exports = {
                             `4. Konfirmasi pembayaran\n` +
                             `5. Setelah berhasil, ketik:\n` +
                             `   \`!confirm ${order.orderId}\`\n\n` +
-                            `⏰ Batas waktu: ${expiryTime} WIB`
+                            `⏰ Batas waktu: ${expiryTime} ${tzLabel}`
                 });
 
                 // Send reminder message
@@ -282,3 +284,13 @@ module.exports = {
         return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     }
 };
+
+function getTzLabel(tz) {
+    // Map common Indonesian timezones
+    if (!tz) return 'WIB';
+    const t = tz.toLowerCase();
+    if (t.includes('jakarta')) return 'WIB';
+    if (t.includes('makassar')) return 'WITA';
+    if (t.includes('jayapura')) return 'WIT';
+    return 'WIB';
+}

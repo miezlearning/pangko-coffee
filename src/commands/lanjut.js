@@ -1,4 +1,5 @@
 const orderManager = require('../services/orderManager');
+const config = require('../config/config');
 const moment = require('moment-timezone');
 
 module.exports = {
@@ -43,13 +44,14 @@ module.exports = {
 
     try {
       const reopened = orderManager.reopenCash(orderId);
-      const expiryTime = moment(reopened.cashExpiresAt).format('HH:mm');
+  const expiryTime = moment(reopened.cashExpiresAt).tz(config.bot.timezone).format('HH:mm');
       const minutesLeft = Math.max(0, moment(reopened.cashExpiresAt).diff(moment(), 'minutes'));
+  const tzLabel = getTzLabel(config.bot.timezone);
 
       let text = `✅ *Pesanan Tunai Dibuka Kembali!*\n\n`;
       text += `📋 Order ID: *${reopened.orderId}*\n`;
       text += `👤 Atas Nama: *${reopened.customerName}*\n`;
-      text += `⏰ Batas ke kasir: ${expiryTime} WIB (${minutesLeft} menit)\n\n`;
+  text += `⏰ Batas ke kasir: ${expiryTime} ${tzLabel} (${minutesLeft} menit)\n\n`;
       text += `📍 Segera menuju kasir dan sebutkan: *Order ${reopened.orderId} atas nama ${reopened.customerName}*.\n`;
       text += `Kasir akan konfirmasi penerimaan tunai untuk mulai proses barista.\n\n`;
       text += `ℹ️ Catatan: Fitur buka kembali hanya berlaku untuk *timeout* dan maksimal ${require('../config/config').order.maxReopenPerOrder}x per pesanan.`;
@@ -64,3 +66,12 @@ module.exports = {
     }
   }
 };
+
+function getTzLabel(tz) {
+  if (!tz) return 'WIB';
+  const t = tz.toLowerCase();
+  if (t.includes('jakarta')) return 'WIB';
+  if (t.includes('makassar')) return 'WITA';
+  if (t.includes('jayapura')) return 'WIT';
+  return 'WIB';
+}

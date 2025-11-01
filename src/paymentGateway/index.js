@@ -43,6 +43,16 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'views/dashboard.html'));
 });
 
+// Serve search page
+app.get('/search', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views/search.html'));
+});
+    
+    // Serve analytics page
+    app.get('/analytics', (req, res) => {
+        res.sendFile(path.join(__dirname, 'views/analytics.html'));
+    });
+
 // Serve webhook tester
 app.get('/webhook-tester', (req, res) => {
     res.sendFile(path.join(__dirname, 'views/webhookTester.html'));

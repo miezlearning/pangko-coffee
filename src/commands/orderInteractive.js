@@ -317,7 +317,7 @@ module.exports = {
             }
             responseText += `*TOTAL: Rp ${this.formatNumber(pricing.total)}*\n\n`;
             responseText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-            responseText += `💡 Ketik *!checkout* untuk lanjut pembayaran\n`;
+            responseText += `💡 Ketik *!co atau !checkout* untuk lanjut pembayaran\n`;
             responseText += `💡 Ketik *!cart* untuk edit keranjang`;
 
             await sock.sendMessage(from, { text: responseText });

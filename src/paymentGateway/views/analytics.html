@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pangko Coffee · Statistik</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: { sans: ['Manrope', 'system-ui', 'sans-serif'] },
+            colors: { matcha: '#74A662', cream: '#FFFDD0', charcoal: '#333333', peach: '#FFE5B4' },
+          },
+        },
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body class="min-h-screen bg-cream text-charcoal antialiased">
+    
+    <nav class="fixed inset-x-0 top-0 z-50 py-4">
+      <div class="mx-auto w-full max-w-[1180px] px-5">
+        <div class="flex items-center justify-between rounded-2xl border border-white/40 bg-white/60 px-6 py-3 backdrop-blur transition-all duration-300">
+          <div class="flex items-center gap-3">
+            <img src="https://media.discordapp.net/attachments/1403748644657828031/1434222820501487791/567458429_17844516144596099_4231043402342710190_n.jpg?ex=69078b96&is=69063a16&hm=501155baf10b69fcf042da9c625e7259b0cbf9e660fce9f608e542b884a46eb2&=&format=webp&width=805&height=805" alt="Pangko Coffee" class="h-14 w-14 rounded-full object-cover border-2 border-white shadow-sm sm:h-16 sm:w-16 md:h-20 md:w-20" />
+            <div class="flex flex-col">
+              <span class="text-sm uppercase tracking-[0.18em] text-matcha">Pangko Coffee</span>
+              <strong class="text-base">Simple coffee, gentle taste.</strong>
+            </div>
+          </div>
+          <div class="hidden items-center gap-5 text-sm font-semibold sm:flex">
+            <a href="/" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Dashboard</a>
+            <a href="/analytics" class="rounded-full px-4 py-2 transition bg-matcha text-white" aria-current="page">Statistik</a>
+            <a href="/search" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Cari Order</a>
+            <a href="/webhook-tester" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Webhook Tester</a>
+          </div>
+          <div class="sm:hidden flex items-center gap-2">
+            <a href="/search" class="rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Cari Order →</a>
+            <a href="/webhook-tester" class="rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Webhook Tester →</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <main class="mx-auto w-full max-w-[1180px] px-5 pt-32 pb-16">
+      
+      <section class="mb-6">
+        
+        <header class="mb-4">
+          <h1 class="text-3xl font-extrabold tracking-tight">Statistik & Analisis</h1>
+          <p class="mt-1 text-sm text-charcoal/70">Grafik orders dan pendapatan.</p>
+        </header>
+
+        <div class="flex flex-col gap-3 rounded-2xl border border-white/50 bg-white/90 p-4 shadow-sm md:flex-row md:items-end">
+          
+          <div class="flex-grow">
+            <label for="range" class="block text-xs font-semibold text-charcoal/70">Rentang</label>
+            <select id="range" class="mt-1 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-matcha">
+              <option value="7d">7 Hari</option>
+              <option value="30d" selected>30 Hari</option>
+              <option value="custom">Custom…</option>
+            </select>
+          </div>
+
+          <div class="flex flex-grow gap-2">
+            <div class="flex-1">
+              <label for="from" class="block text-xs font-semibold text-charcoal/70">Dari</label>
+              <input id="from" type="date" class="mt-1 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-matcha" />
+            </div>
+            <div class="flex-1">
+              <label for="to" class="block text-xs font-semibold text-charcoal/70">Sampai</label>
+              <input id="to" type="date" class="mt-1 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-matcha" />
+            </div>
+          </div>
+
+          <div class="flex-grow md:max-w-[180px]">
+            <label for="method" class="block text-xs font-semibold text-charcoal/70">Metode</label>
+            <select id="method" class="mt-1 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-matcha">
+              <option value="all">Semua</option>
+              <option value="CASH">Tunai</option>
+              <option value="QRIS">QRIS</option>
+            </select>
+          </div>
+
+          <div class="flex-shrink-0">
+            <button id="apply" class="flex w-full items-center justify-center gap-2 rounded-xl bg-matcha px-5 py-2 text-sm font-semibold text-white transition hover:bg-matcha/90">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6.66669 12.6667H9.33335" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M4 8H12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M2 3.33337H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>Terapkan</span>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      <section class="grid gap-6 lg:grid-cols-2">
+        <div class="rounded-2xl border border-white/50 bg-white/90 p-5 shadow-sm">
+          <h2 class="mb-4 flex items-center gap-2 text-lg font-semibold">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15.8333 15.8334V7.50004" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M10 15.8333V4.16663" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4.16669 15.8333V11.6666" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Orders per Hari</span>
+          </h2>
+          <canvas id="ordersChart" height="120"></canvas>
+        </div>
+        <div class="rounded-2xl border border-white/50 bg-white/90 p-5 shadow-sm">
+          <h2 class="mb-4 flex items-center gap-2 text-lg font-semibold">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10.0001 18.3334C14.6025 18.3334 18.3334 14.6024 18.3334 10C18.3334 5.39765 14.6025 1.66669 10.0001 1.66669C5.39771 1.66669 1.66675 5.39765 1.66675 10C1.66675 14.6024 5.39771 18.3334 10.0001 18.3334Z" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M10 13.3333V6.66663" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M12.5 8.33337H8.33333C8.33333 8.33337 7.5 8.33337 7.5 10C7.5 11.6667 8.33333 11.6667 8.33333 11.6667H11.6667C11.6667 11.6667 12.5 11.6667 12.5 10C12.5 8.33337 11.6667 8.33337 11.6667 8.33337" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Revenue per Hari</span>
+          </h2>
+          <canvas id="revenueChart" height="120"></canvas>
+        </div>
+      </section>
+
+      <section class="mt-6 rounded-2xl border border-white/50 bg-white/90 p-5 shadow-sm">
+        <h2 class="mb-4 text-lg font-semibold">Ringkasan Metode</h2>
+        
+        <div id="method-summary" class="grid gap-4 md:grid-cols-3">
+          
+          <div class="rounded-xl border border-charcoal/10 bg-white p-4">
+            <span class="text-sm font-semibold text-charcoal/70">Total Revenue</span>
+            <p class="mt-1 text-3xl font-extrabold text-charcoal">Rp 4.520.000</p>
+            <p class="mt-1 text-xs text-charcoal/60">dalam 30 hari terakhir</p>
+          </div>
+
+          <div class="rounded-xl border border-peach/50 bg-peach/30 p-4">
+            <span class="text-sm font-semibold text-charcoal/70">Revenue (QRIS)</span>
+            <p class="mt-1 text-3xl font-extrabold text-charcoal">Rp 3.100.000</p>
+            <p class="mt-1 text-xs text-charcoal/60">68.5% dari total</p>
+          </div>
+
+          <div class="rounded-xl border border-matcha/30 bg-matcha/10 p-4">
+            <span class="text-sm font-semibold text-charcoal/70">Revenue (Tunai)</span>
+            <p class="mt-1 text-3xl font-extrabold text-charcoal">Rp 1.420.000</p>
+            <p class="mt-1 text-xs text-charcoal/60">31.5% dari total</p>
+          </div>
+
+        </div>
+      </section>
+    </main>
+
+    <script src="/js/analytics.js"></script>
+  </body>
+</html>

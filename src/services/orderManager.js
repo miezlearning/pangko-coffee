@@ -10,10 +10,8 @@ class OrderManager {
     constructor() {
         // Cache untuk menyimpan orders (ttl: 24 hours)
         this.orders = new NodeCache({ stdTTL: 86400, checkperiod: 120 });
-        
-        // Cache untuk session ordering per user
-        this.sessions = new NodeCache({ stdTTL: 1800 }); // 30 minutes
-        
+        // Cache untuk session ordering per user (30 minutes)
+        this.sessions = new NodeCache({ stdTTL: 1800 });
         // Order status
         this.STATUS = {
             DRAFT: 'draft',
@@ -26,6 +24,16 @@ class OrderManager {
             CANCELLED: 'cancelled',
             EXPIRED: 'expired'
         };
+        // Load persisted orders (best-effort)
+        try {
+            const store = require('./orderStore');
+            const existing = store.loadOrders();
+            existing.forEach(o => {
+                if (o && o.orderId) this.orders.set(o.orderId, o);
+            });
+        } catch (e) {
+            console.error('Load persisted orders failed:', e.message);
+        }
     }
 
     /**
@@ -49,9 +57,20 @@ class OrderManager {
             createdAt: new Date(),
             step: 'menu_selection'
         };
-        
         this.sessions.set(userId, session);
         return session;
+    }
+
+    /** Persist helpers */
+    _persistAll() {
+        try {
+            const all = this.orders.keys().map(k => this.orders.get(k));
+            const store = require('./orderStore');
+            store.saveOrders(all);
+        } catch (e) {
+            // best-effort persistence
+            console.error('Persist orders failed:', e.message);
+        }
     }
 
     /**
@@ -66,19 +85,13 @@ class OrderManager {
      */
     addItemToCart(userId, item, quantity = 1) {
         const session = this.getSession(userId) || this.createSession(userId);
-        
         // Check if item already in cart
         const existingIndex = session.items.findIndex(i => i.id === item.id);
-        
         if (existingIndex > -1) {
             session.items[existingIndex].quantity += quantity;
         } else {
-            session.items.push({
-                ...item,
-                quantity
-            });
+            session.items.push({ ...item, quantity });
         }
-        
         this.sessions.set(userId, session);
         return session;
     }
@@ -168,7 +181,8 @@ class OrderManager {
             order.reopenCount = 0;
         }
 
-        this.orders.set(orderId, order);
+    this.orders.set(orderId, order);
+    this._persistAll();
         this.clearCart(userId);
         
         return order;
@@ -204,12 +218,16 @@ class OrderManager {
         // Add specific metadata based on status
         if (status === this.STATUS.PAID) {
             order.paidAt = new Date();
+        } else if (status === this.STATUS.PROCESSING) {
+            // Mark when processing started (used by dashboard duration)
+            if (!order.confirmedAt) order.confirmedAt = new Date();
         } else if (status === this.STATUS.COMPLETED) {
             order.completedAt = new Date();
         }
 
         Object.assign(order, metadata);
         this.orders.set(orderId, order);
+        this._persistAll();
         
         return order;
     }
@@ -228,6 +246,7 @@ class OrderManager {
         order.qrisGeneratedAt = new Date();
         
         this.orders.set(orderId, order);
+        this._persistAll();
         return order;
     }
 
@@ -270,8 +289,11 @@ class OrderManager {
         order.cashAcceptedAt = new Date();
         order.acceptedBy = acceptedBy;
         order.status = this.STATUS.PROCESSING;
+        // For duration on dashboard
+        order.confirmedAt = order.cashAcceptedAt;
         order.updatedAt = new Date();
         this.orders.set(orderId, order);
+        this._persistAll();
         return order;
     }
 
@@ -289,6 +311,7 @@ class OrderManager {
         order.status = this.STATUS.CANCELLED;
         order.updatedAt = new Date();
         this.orders.set(orderId, order);
+        this._persistAll();
         return order;
     }
 
@@ -320,9 +343,35 @@ class OrderManager {
         order.cashCancelledAt = null;
         order.cashCancelReason = null;
         order.cashExpiresAt = moment().add(cashTimeout, 'minutes').toDate();
+        // Kasir reopen tidak mengurangi jatah pelanggan
+        // (tidak menambah reopenCount)
+        order.updatedAt = new Date();
+        this.orders.set(orderId, order);
+        this._persistAll();
+        return order;
+    }
+
+    /**
+     * Reopen cancelled cash by cashier (ignore customer-only restrictions)
+     */
+    reopenCashByCashier(orderId) {
+        const order = this.getOrder(orderId);
+        if (!order) throw new Error('Order not found');
+        if (order.paymentMethod !== 'CASH') throw new Error('Not a cash order');
+        if (order.status !== this.STATUS.CANCELLED) throw new Error('Order is not cancelled');
+        // Respect window when defined
+        if (order.canReopenUntil && moment().isAfter(order.canReopenUntil)) {
+            throw new Error('Window buka kembali telah habis');
+        }
+        const cashTimeout = (config.order && (config.order.cashTimeout ?? config.order.paymentTimeout)) || 10;
+        order.status = this.STATUS.PENDING_CASH;
+        order.cashCancelledAt = null;
+        order.cashCancelReason = null;
+        order.cashExpiresAt = moment().add(cashTimeout, 'minutes').toDate();
         order.reopenCount = (order.reopenCount || 0) + 1;
         order.updatedAt = new Date();
         this.orders.set(orderId, order);
+        this._persistAll();
         return order;
     }
 

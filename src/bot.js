@@ -153,9 +153,9 @@ class WhatsAppBot {
             } catch (error) {
                 console.error('[Cleanup] Error:', error);
             }
-        }, 5 * 60 * 1000); // 5 minutes
+    }, 60 * 1000); // 1 minute
 
-        console.log('🧹 Cleanup job started (runs every 5 minutes)');
+    console.log('🧹 Cleanup job started (runs every 1 minute)');
     }
 
     /**

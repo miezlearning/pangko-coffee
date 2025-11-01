@@ -87,6 +87,7 @@ module.exports = {
             const expiryTime = moment(order.paymentExpiry)
                 .tz(config.bot.timezone)
                 .format('HH:mm');
+            const tzLabel = getTzLabel(config.bot.timezone);
             
             const minutesLeft = moment(order.paymentExpiry).diff(moment(), 'minutes');
 
@@ -94,7 +95,7 @@ module.exports = {
             let text = `💳 *Informasi Pembayaran*\n\n`;
             text += `Order ID: *${orderId}*\n`;
             text += `Total: *Rp ${this.formatNumber(order.pricing.total)}*\n\n`;
-            text += `⏰ Batas waktu: ${expiryTime} WIB\n`;
+            text += `⏰ Batas waktu: ${expiryTime} ${tzLabel}\n`;
             text += `   (${minutesLeft} menit lagi)\n\n`;
             text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
             text += `*Cara Pembayaran:*\n`;
@@ -140,3 +141,12 @@ module.exports = {
         return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     }
 };
+
+function getTzLabel(tz) {
+    if (!tz) return 'WIB';
+    const t = tz.toLowerCase();
+    if (t.includes('jakarta')) return 'WIB';
+    if (t.includes('makassar')) return 'WITA';
+    if (t.includes('jayapura')) return 'WIT';
+    return 'WIB';
+}
