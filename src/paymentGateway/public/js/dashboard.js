@@ -409,7 +409,7 @@ async function loadProcessingOrders() {
                           <span>•</span>
                           <span>Harga satuan: Rp ${formatNumber(item.price)}</span>
                         </div>
-                        ${item.notes ? `<div class="mt-2 rounded-lg bg-matcha/5 px-3 py-2"><p class="text-xs font-semibold text-charcoal/70">📝 Catatan: ${item.notes}</p></div>` : ''}
+                        ${item.notes ? `<div class="mt-2 rounded-lg bg-matcha/5 px-3 py-2"><p class="text-sm font-semibold text-charcoal">📝 Catatan: ${item.notes}</p></div>` : ''}
                       </div>
                       <div class="ml-4 text-right">
                         <p class="text-xs font-semibold text-charcoal/60">Subtotal</p>
@@ -530,7 +530,7 @@ async function loadPendingCash() {
                           <span>•</span>
                           <span>Harga satuan: Rp ${formatNumber(item.price)}</span>
                         </div>
-                        ${item.notes ? `<div class="mt-2 rounded-lg bg-matcha/5 px-3 py-2"><p class="text-xs font-semibold text-charcoal/70">📝 Catatan: ${item.notes}</p></div>` : ''}
+                        ${item.notes ? `<div class="mt-2 rounded-lg bg-matcha/5 px-3 py-2"><p class="text-sm font-semibold text-charcoal">📝 Catatan: ${item.notes}</p></div>` : ''}
                       </div>
                       <div class="ml-4 text-right">
                         <p class="text-xs font-semibold text-charcoal/60">Subtotal</p>
@@ -754,7 +754,7 @@ async function loadCancelledCash() {
                   <span class="font-medium text-charcoal/80">${item.name}</span>
                   <span class="text-charcoal/55">x${item.quantity} • Rp ${formatNumber(item.price * item.quantity)}</span>
                 </div>
-                ${item.notes ? `<p class="mt-1 text-xs text-charcoal/45">📝 ${item.notes}</p>` : ''}
+                ${item.notes ? `<p class="mt-1 text-sm font-semibold text-charcoal">📝 ${item.notes}</p>` : ''}
               </div>
             `).join('')}
           </div>
@@ -922,7 +922,7 @@ async function loadReadyOrders() {
                         <span>•</span>
                         <span>Harga satuan: Rp ${formatNumber(item.price)}</span>
                       </div>
-                      ${item.notes ? `<div class="mt-2 rounded-lg bg-matcha/5 px-3 py-2"><p class="text-xs font-semibold text-charcoal/70">📝 Catatan: ${item.notes}</p></div>` : ''}
+                      ${item.notes ? `<div class="mt-2 rounded-lg bg-matcha/5 px-3 py-2"><p class="text-sm font-semibold text-charcoal">📝 Catatan: ${item.notes}</p></div>` : ''}
                     </div>
                     <div class="ml-4 text-right">
                       <p class="text-xs font-semibold text-charcoal/60">Subtotal</p>
