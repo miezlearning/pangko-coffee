@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pangko Coffee · Import Data</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="bg-cream/20 font-[Inter] text-charcoal">
+  <nav class="fixed inset-x-0 top-0 z-50 py-4">
+    <div class="mx-auto max-w-6xl px-4">
+      <div class="flex items-center justify-between rounded-full border border-white/80 bg-white/80 px-4 py-2 shadow-md backdrop-blur supports-[backdrop-filter]:bg-white/60">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">☕</span>
+          <span class="font-extrabold tracking-tight">Pangko Coffee</span>
+        </div>
+        <div class="hidden gap-1 md:flex">
+          <a href="/" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Dashboard</a>
+          <a href="/analytics" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Statistik</a>
+          <a href="/import" class="rounded-full px-4 py-2 transition bg-matcha text-white" aria-current="page">Import</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="mx-auto max-w-5xl px-4 pt-28 pb-16">
+    <header class="mb-8">
+      <h1 class="text-3xl font-extrabold">Import Data Penjualan</h1>
+      <p class="mt-2 text-charcoal/70">Upload file JSON atau Excel untuk memasukkan data penjualan lama ke sistem analitik.</p>
+    </header>
+
+    <section class="rounded-3xl border border-white/70 bg-white/90 p-6 shadow">
+      <form id="import-form" class="space-y-5">
+        <div>
+          <label class="text-sm font-semibold">File</label>
+          <input type="file" id="file" name="file" accept=".json,.xlsx" class="mt-2 w-full rounded-xl border border-charcoal/20 p-3" required />
+          <p class="mt-1 text-xs text-charcoal/60">Dukungan: .json atau .xlsx (Excel). Gunakan template di bawah agar lebih mudah.</p>
+        </div>
+        <div>
+          <label class="text-sm font-semibold">Metode pembayaran default (opsional)</label>
+          <select id="method" name="method" class="mt-2 w-full rounded-xl border border-charcoal/20 p-3">
+            <option value="">(Ikuti data per baris)</option>
+            <option value="QRIS">QRIS</option>
+            <option value="CASH">CASH</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="submit" class="rounded-xl bg-matcha px-4 py-3 text-sm font-semibold text-white">📥 Import</button>
+          <span id="status" class="text-sm text-charcoal/70"></span>
+        </div>
+      </form>
+
+      <div id="result" class="mt-5 hidden rounded-xl border border-charcoal/10 bg-charcoal/2 p-4 text-sm"></div>
+    </section>
+
+    <section class="mt-8 grid gap-4 sm:grid-cols-2">
+      <a href="/api/import/template/json" class="rounded-2xl border border-charcoal/10 bg-white p-4 text-center font-semibold text-charcoal transition hover:-translate-y-0.5 hover:shadow">⬇️ Download Template JSON</a>
+      <a href="/api/import/template/excel" class="rounded-2xl border border-charcoal/10 bg-white p-4 text-center font-semibold text-charcoal transition hover:-translate-y-0.5 hover:shadow">⬇️ Download Template Excel</a>
+    </section>
+  </main>
+
+  <script src="/js/import.js"></script>
+</body>
+</html>

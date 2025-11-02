@@ -30,6 +30,7 @@ const ordersRouter = require('./routes/orders');
 const statsRouter = require('./routes/stats');
 const webhookRouter = require('./routes/webhook');
 const exportRouter = require('./routes/export');
+const importRouter = require('./routes/import');
 
 // Mount routes
 app.use('/api/payments', paymentsRouter);
@@ -37,6 +38,7 @@ app.use('/api/orders', ordersRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/webhook', webhookRouter);
 app.use('/api/export', exportRouter);
+app.use('/api/import', importRouter);
 
 // Serve dashboard
 app.get('/', (req, res) => {
@@ -56,6 +58,11 @@ app.get('/search', (req, res) => {
 // Serve webhook tester
 app.get('/webhook-tester', (req, res) => {
     res.sendFile(path.join(__dirname, 'views/webhookTester.html'));
+});
+
+// Serve import page
+app.get('/import', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views/import.html'));
 });
 
 /**

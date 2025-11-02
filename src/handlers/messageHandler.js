@@ -1,5 +1,6 @@
 const commands = require('../commands');
 const config = require('../config/config');
+const storeState = require('../services/storeState');
 
 /**
  * Message Handler
@@ -22,7 +23,7 @@ async function messageHandler(sock, msg) {
         // Ignore group messages (optional)
         // if (isGroup) return;
 
-        // Parse command
+    // Parse command
         const args = messageText.trim().split(/\s+/);
         const commandText = args[0].toLowerCase();
 
@@ -32,6 +33,12 @@ async function messageHandler(sock, msg) {
         // Check for interactive session only if NO prefix
         // This allows users to use commands even during interactive session
         if (!hasPrefix) {
+            // If store is closed, block interactive flows for non-privileged users
+            const isPrivileged = (config.shop.baristaNumbers || []).includes(from) || (config.shop.adminNumbers || []).includes(from);
+            if (!isPrivileged && !storeState.isOpen()) {
+                await sock.sendMessage(from, { text: storeState.getClosedMessage(`Maaf, toko sedang tutup. Jam operasional: ${config.shop.openHours}`) });
+                return;
+            }
             // Route to any active interactive command session
             const allCommands = Object.values(commands);
             for (const cmd of allCommands) {
@@ -55,6 +62,14 @@ async function messageHandler(sock, msg) {
         
         // Find command
         const command = commands[commandName];
+
+        // Gate commands when store is closed (except whitelisted)
+        const allowedWhenClosed = new Set(['help','menu','status','info','store']);
+        const isPrivileged = (config.shop.baristaNumbers || []).includes(from) || (config.shop.adminNumbers || []).includes(from);
+        if (!isPrivileged && !storeState.isOpen() && !allowedWhenClosed.has(commandName)) {
+            await sock.sendMessage(from, { text: storeState.getClosedMessage(`Maaf, toko sedang tutup. Jam operasional: ${config.shop.openHours}`) });
+            return;
+        }
 
         if (!command) {
             // Command not found

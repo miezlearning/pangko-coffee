@@ -32,6 +32,8 @@ module.exports = {
         text += `📊 *STATUS*\n`;
         text += `• *!status* - Lihat semua pesanan\n`;
         text += `• *!status [ORDER_ID]* - Detail pesanan\n\n`;
+    text += `🏪 *TOKO*\n`;
+    text += `• *!store status* - Cek status buka/tutup\n\n`;
         
         text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
         text += `💡 *CARA PESAN (MUDAH):*\n`;
@@ -57,6 +59,7 @@ module.exports = {
             text += `• *!confirm [ORDER_ID]* - Konfirmasi bayar\n`;
             text += `• *!ready [ORDER_ID]* - Tandai siap\n`;
             text += `• *!complete [ORDER_ID]* - Tandai selesai (sudah diambil)\n`;
+            text += `• *!store open/close* - Buka/Tutup akses bot\n`;
             text += `• *!history* - Riwayat hari ini\n`;
             text += `• *!cancel-order [ORDER_ID]* - Batalkan`;
         }
