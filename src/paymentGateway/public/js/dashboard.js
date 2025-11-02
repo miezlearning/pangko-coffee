@@ -164,33 +164,82 @@ async function loadPayments() {
       list.innerHTML = data.payments.map((payment) => {
         return `
           <div class="rounded-3xl border border-white/60 bg-white/95 p-6 shadow-[0_20px_45px_-38px_rgba(51,51,51,0.6)] transition hover:-translate-y-1 hover:shadow-[0_30px_65px_-40px_rgba(116,166,98,0.55)]">
-            <div class="flex flex-col gap-4 border-b border-charcoal/5 pb-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p class="text-xs uppercase tracking-[0.3em] text-charcoal/45">Order ID</p>
-                <h4 class="mt-2 text-xl font-semibold">📋 ${payment.orderId}</h4>
-                <p class="text-sm text-charcoal/55">Customer • ${payment.customerId.split('@')[0]}</p>
-              </div>
-              <div class="rounded-2xl bg-matcha/10 px-5 py-3 text-right">
-                <p class="text-xs uppercase tracking-[0.25em] text-matcha/80">Nominal</p>
-                <span class="text-3xl font-bold text-matcha">Rp ${formatNumber(payment.amount)}</span>
-              </div>
-            </div>
-            <div class="mt-5 rounded-2xl border border-charcoal/5 bg-charcoal/2 p-4">
-              <div class="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">Items (${payment.items.length})</div>
-              ${payment.items.map(item => `
-                <div class="flex items-center justify-between border-b border-charcoal/5 py-2 text-sm last:border-0">
-                  <span class="font-medium text-charcoal/80">${item.name}</span>
-                  <span class="text-charcoal/55">x${item.quantity} • Rp ${formatNumber(item.price * item.quantity)}</span>
+            <!-- Header: Order ID & Total -->
+            <div class="flex flex-col gap-4 border-b border-charcoal/5 pb-5 sm:flex-row sm:items-start sm:justify-between">
+              <div class="flex-1">
+                <div class="inline-flex items-center gap-2 rounded-full bg-matcha/10 px-3 py-1">
+                  <span class="text-xs font-bold uppercase tracking-[0.2em] text-matcha">Pembayaran Pending</span>
                 </div>
-              `).join('')}
+                <h4 class="mt-3 text-2xl font-bold text-charcoal">📋 ${payment.orderId}</h4>
+                <div class="mt-2 flex flex-col gap-1 text-sm">
+                  <div class="flex items-center gap-2">
+                    <span class="font-semibold text-charcoal/60">Nomor WhatsApp:</span>
+                    <span class="font-mono text-charcoal">${payment.customerId.split('@')[0]}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="rounded-2xl border-2 border-matcha/20 bg-matcha/10 px-6 py-4 text-right">
+                <p class="text-xs font-bold uppercase tracking-[0.25em] text-matcha/80">Total Pembayaran</p>
+                <span class="mt-1 block text-3xl font-extrabold text-matcha">Rp ${formatNumber(payment.amount)}</span>
+              </div>
             </div>
-            <div class="mt-4 flex flex-col gap-2 text-xs font-semibold text-charcoal/55 sm:flex-row sm:items-center sm:justify-between">
-              <span>⏰ Kadaluarsa: ${new Date(payment.expiresAt).toLocaleString('id-ID')}</span>
-              <span>🕐 Dibuat: ${new Date(payment.createdAt).toLocaleString('id-ID')}</span>
+
+            <!-- Detail Pesanan Section -->
+            <div class="mt-6">
+              <div class="mb-3 flex items-center gap-2 border-b border-charcoal/10 pb-2">
+                <span class="text-sm font-bold uppercase tracking-[0.2em] text-charcoal">📦 Detail Pesanan</span>
+                <span class="rounded-full bg-charcoal/5 px-2 py-0.5 text-xs font-semibold text-charcoal/70">${payment.items.length} Item</span>
+              </div>
+              <div class="space-y-2">
+                ${payment.items.map(item => `
+                  <div class="rounded-xl border border-charcoal/5 bg-white px-4 py-3">
+                    <div class="flex items-start justify-between">
+                      <div class="flex-1">
+                        <p class="font-semibold text-charcoal">${item.name}</p>
+                        <div class="mt-1 flex items-center gap-3 text-xs text-charcoal/60">
+                          <span class="font-semibold">Jumlah: <span class="text-matcha">${item.quantity}x</span></span>
+                          <span>•</span>
+                          <span>Harga satuan: Rp ${formatNumber(item.price)}</span>
+                        </div>
+                      </div>
+                      <div class="ml-4 text-right">
+                        <p class="text-xs font-semibold text-charcoal/60">Subtotal</p>
+                        <p class="text-lg font-bold text-charcoal">Rp ${formatNumber(item.price * item.quantity)}</p>
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
             </div>
-            <div class="mt-5 grid gap-3 sm:grid-cols-2">
-              <button class="rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="confirmPayment('${payment.orderId}')">✅ Konfirmasi & Kirim Notif</button>
-              <button class="rounded-2xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="rejectPayment('${payment.orderId}')">❌ Tolak Pembayaran</button>
+
+            <!-- Waktu Info -->
+            <div class="mt-5 grid gap-3 rounded-xl border border-charcoal/5 bg-charcoal/2 p-4 sm:grid-cols-2">
+              <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-xl">🕐</div>
+                <div>
+                  <p class="text-xs font-semibold text-charcoal/55">Waktu Dibuat</p>
+                  <p class="text-sm font-bold text-charcoal">${new Date(payment.createdAt).toLocaleString('id-ID')}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-xl">⏰</div>
+                <div>
+                  <p class="text-xs font-semibold text-rose-700/80">Batas Pembayaran</p>
+                  <p class="text-sm font-bold text-rose-700">${new Date(payment.expiresAt).toLocaleString('id-ID')}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-6 grid gap-3 sm:grid-cols-2">
+              <button class="flex items-center justify-center gap-2 rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="confirmPayment('${payment.orderId}')">
+                <span>✅</span>
+                <span>Konfirmasi Pembayaran</span>
+              </button>
+              <button class="flex items-center justify-center gap-2 rounded-2xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="rejectPayment('${payment.orderId}')">
+                <span>❌</span>
+                <span>Tolak Pembayaran</span>
+              </button>
             </div>
           </div>`;
       }).join('');
@@ -315,38 +364,83 @@ async function loadProcessingOrders() {
         const processingTime = Math.floor((Date.now() - new Date(order.confirmedAt)) / 60000);
         return `
           <div class="rounded-3xl border border-white/50 bg-white/95 p-6 shadow-[0_20px_45px_-38px_rgba(255,229,180,0.6)] transition hover:-translate-y-1 hover:shadow-[0_30px_65px_-40px_rgba(116,166,98,0.45)]">
-            <div class="flex flex-col gap-4 border-b border-charcoal/5 pb-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p class="text-xs uppercase tracking-[0.3em] text-charcoal/45">Order Process</p>
-                <h4 class="mt-2 text-xl font-semibold">📋 ${order.orderId}</h4>
-                <p class="text-sm text-matcha font-semibold">👤 ${order.customerName}</p>
-                <p class="mt-1 inline-flex items-center gap-2 text-xs font-semibold text-charcoal/60">
-                  <span class="rounded-full border border-charcoal/10 bg-charcoal/5 px-2 py-0.5">💳 ${order.paymentMethod === 'CASH' ? 'Tunai' : 'QRIS'}</span>
-                </p>
-                <p class="text-xs text-charcoal/55">📱 ${order.userId}</p>
-              </div>
-              <div class="rounded-2xl bg-peach/25 px-5 py-3 text-right">
-                <p class="text-xs uppercase tracking-[0.25em] text-peach-800">Total</p>
-                <span class="text-3xl font-bold text-charcoal">Rp ${formatNumber(order.pricing.total)}</span>
-              </div>
-            </div>
-            <div class="mt-5 rounded-2xl border border-charcoal/5 bg-charcoal/2 p-4">
-              <div class="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">Items (${order.items.length})</div>
-              ${order.items.map(item => `
-                <div class="border-b border-charcoal/5 py-2 text-sm last:border-0">
-                  <div class="flex items-center justify-between">
-                    <span class="font-medium text-charcoal/80">${item.name}</span>
-                    <span class="text-charcoal/55">x${item.quantity} • Rp ${formatNumber(item.price * item.quantity)}</span>
-                  </div>
-                  ${item.notes ? `<p class="mt-1 text-xs text-charcoal/45">📝 ${item.notes}</p>` : ''}
+            <!-- Header -->
+            <div class="flex flex-col gap-4 border-b border-charcoal/5 pb-5 sm:flex-row sm:items-start sm:justify-between">
+              <div class="flex-1">
+                <div class="inline-flex items-center gap-2 rounded-full bg-peach/20 px-3 py-1">
+                  <span class="text-xs font-bold uppercase tracking-[0.2em] text-peach-800">👨‍🍳 Sedang Diproses</span>
                 </div>
-              `).join('')}
+                <h4 class="mt-3 text-2xl font-bold text-charcoal">📋 ${order.orderId}</h4>
+                <div class="mt-2 space-y-1 text-sm">
+                  <div class="flex items-center gap-2">
+                    <span class="font-semibold text-charcoal/60">Nama Customer:</span>
+                    <span class="font-bold text-matcha">${order.customerName}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-semibold text-charcoal/60">WhatsApp:</span>
+                    <span class="font-mono text-charcoal">${order.userId}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-semibold text-charcoal/60">Metode Bayar:</span>
+                    <span class="rounded-full bg-charcoal/10 px-2 py-0.5 text-xs font-bold">${order.paymentMethod === 'CASH' ? '💵 Tunai' : '💳 QRIS'}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="rounded-2xl border-2 border-peach/30 bg-peach/15 px-6 py-4 text-right">
+                <p class="text-xs font-bold uppercase tracking-[0.25em] text-peach-800">Total Pesanan</p>
+                <span class="mt-1 block text-3xl font-extrabold text-charcoal">Rp ${formatNumber(order.pricing.total)}</span>
+              </div>
             </div>
-            <div class="mt-4 flex flex-col gap-2 text-xs font-semibold text-charcoal/55 sm:flex-row sm:items-center sm:justify-between">
-              <span>⏱️ Diproses: ${processingTime} menit yang lalu</span>
-              <span>👨‍🍳 Barista update realtime</span>
+
+            <!-- Detail Pesanan -->
+            <div class="mt-6">
+              <div class="mb-3 flex items-center gap-2 border-b border-charcoal/10 pb-2">
+                <span class="text-sm font-bold uppercase tracking-[0.2em] text-charcoal">📦 Detail Pesanan</span>
+                <span class="rounded-full bg-charcoal/5 px-2 py-0.5 text-xs font-semibold text-charcoal/70">${order.items.length} Item</span>
+              </div>
+              <div class="space-y-2">
+                ${order.items.map(item => `
+                  <div class="rounded-xl border border-charcoal/5 bg-white px-4 py-3">
+                    <div class="flex items-start justify-between">
+                      <div class="flex-1">
+                        <p class="font-semibold text-charcoal">${item.name}</p>
+                        <div class="mt-1 flex items-center gap-3 text-xs text-charcoal/60">
+                          <span class="font-semibold">Jumlah: <span class="text-matcha">${item.quantity}x</span></span>
+                          <span>•</span>
+                          <span>Harga satuan: Rp ${formatNumber(item.price)}</span>
+                        </div>
+                        ${item.notes ? `<div class="mt-2 rounded-lg bg-matcha/5 px-3 py-2"><p class="text-xs font-semibold text-charcoal/70">📝 Catatan: ${item.notes}</p></div>` : ''}
+                      </div>
+                      <div class="ml-4 text-right">
+                        <p class="text-xs font-semibold text-charcoal/60">Subtotal</p>
+                        <p class="text-lg font-bold text-charcoal">Rp ${formatNumber(item.price * item.quantity)}</p>
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
             </div>
-            <button class="mt-5 w-full rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="markOrderReady('${order.orderId}', '${order.customerName}')">✅ Tandai Siap - Atas Nama: ${order.customerName}</button>
+
+            <!-- Status Info -->
+            <div class="mt-5 flex items-center justify-between rounded-xl border border-charcoal/5 bg-charcoal/2 p-4">
+              <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-xl">⏱️</div>
+                <div>
+                  <p class="text-xs font-semibold text-charcoal/55">Waktu Pemrosesan</p>
+                  <p class="text-sm font-bold text-charcoal">${processingTime} menit yang lalu</p>
+                </div>
+              </div>
+              <div class="text-right text-xs font-semibold text-charcoal/50">
+                <p>Status diupdate otomatis</p>
+                <p>oleh sistem barista</p>
+              </div>
+            </div>
+
+            <!-- Action Button -->
+            <button class="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="markOrderReady('${order.orderId}', '${order.customerName}')">
+              <span>✅</span>
+              <span>Tandai Siap - Atas Nama: ${order.customerName}</span>
+            </button>
           </div>
         `;
       }).join('');
@@ -391,40 +485,91 @@ async function loadPendingCash() {
         const minutesLeft = order.cashExpiresAt ? Math.max(0, Math.floor((new Date(order.cashExpiresAt) - Date.now()) / 60000)) : '-';
         return `
           <div class="rounded-3xl border border-white/60 bg-white/95 p-6 shadow-[0_20px_45px_-38px_rgba(51,51,51,0.4)] transition hover:-translate-y-1">
-            <div class="flex flex-col gap-4 border-b border-charcoal/5 pb-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p class="text-xs uppercase tracking-[0.3em] text-charcoal/45">Cash Pending</p>
-                <h4 class="mt-2 text-xl font-semibold">📋 ${order.orderId}</h4>
-                <p class="text-sm text-matcha font-semibold">👤 ${order.customerName}</p>
-                <p class="mt-1 inline-flex items-center gap-2 text-xs font-semibold text-charcoal/60">
-                  <span class="rounded-full border border-charcoal/10 bg-charcoal/5 px-2 py-0.5">💵 Tunai</span>
-                </p>
-                <p class="text-xs text-charcoal/55">📱 ${order.userId}</p>
-              </div>
-              <div class="rounded-2xl bg-cream px-5 py-3 text-right">
-                <p class="text-xs uppercase tracking-[0.25em] text-charcoal/60">Total</p>
-                <span class="text-3xl font-bold text-charcoal">Rp ${formatNumber(order.pricing.total)}</span>
-              </div>
-            </div>
-            <div class="mt-5 rounded-2xl border border-charcoal/5 bg-charcoal/2 p-4">
-              <div class="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">Items (${order.items.length})</div>
-              ${order.items.map(item => `
-                <div class="border-b border-charcoal/5 py-2 text-sm last:border-0">
-                  <div class="flex items-center justify-between">
-                    <span class="font-medium text-charcoal/80">${item.name}</span>
-                    <span class="text-charcoal/55">x${item.quantity} • Rp ${formatNumber(item.price * item.quantity)}</span>
-                  </div>
-                  ${item.notes ? `<p class="mt-1 text-xs text-charcoal/45">📝 ${item.notes}</p>` : ''}
+            <!-- Header -->
+            <div class="flex flex-col gap-4 border-b border-charcoal/5 pb-5 sm:flex-row sm:items-start sm:justify-between">
+              <div class="flex-1">
+                <div class="inline-flex items-center gap-2 rounded-full bg-cream px-3 py-1 ring-2 ring-charcoal/10">
+                  <span class="text-xs font-bold uppercase tracking-[0.2em] text-charcoal">💵 Menunggu Tunai</span>
                 </div>
-              `).join('')}
+                <h4 class="mt-3 text-2xl font-bold text-charcoal">📋 ${order.orderId}</h4>
+                <div class="mt-2 space-y-1 text-sm">
+                  <div class="flex items-center gap-2">
+                    <span class="font-semibold text-charcoal/60">Nama Customer:</span>
+                    <span class="font-bold text-matcha">${order.customerName}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-semibold text-charcoal/60">WhatsApp:</span>
+                    <span class="font-mono text-charcoal">${order.userId}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-semibold text-charcoal/60">Metode:</span>
+                    <span class="rounded-full bg-charcoal/10 px-2 py-0.5 text-xs font-bold">💵 Bayar Tunai di Kasir</span>
+                  </div>
+                </div>
+              </div>
+              <div class="rounded-2xl border-2 border-cream bg-cream/50 px-6 py-4 text-right">
+                <p class="text-xs font-bold uppercase tracking-[0.25em] text-charcoal/70">Total yang Harus Dibayar</p>
+                <span class="mt-1 block text-3xl font-extrabold text-charcoal">Rp ${formatNumber(order.pricing.total)}</span>
+              </div>
             </div>
-            <div class="mt-4 flex flex-col gap-2 text-xs font-semibold text-charcoal/55 sm:flex-row sm:items-center sm:justify-between">
-              <span>⏰ Sisa waktu ke kasir: ${minutesLeft} menit</span>
-              <span>🕐 Dibuat: ${new Date(order.createdAt).toLocaleString('id-ID')}</span>
+
+            <!-- Detail Pesanan -->
+            <div class="mt-6">
+              <div class="mb-3 flex items-center gap-2 border-b border-charcoal/10 pb-2">
+                <span class="text-sm font-bold uppercase tracking-[0.2em] text-charcoal">📦 Detail Pesanan</span>
+                <span class="rounded-full bg-charcoal/5 px-2 py-0.5 text-xs font-semibold text-charcoal/70">${order.items.length} Item</span>
+              </div>
+              <div class="space-y-2">
+                ${order.items.map(item => `
+                  <div class="rounded-xl border border-charcoal/5 bg-white px-4 py-3">
+                    <div class="flex items-start justify-between">
+                      <div class="flex-1">
+                        <p class="font-semibold text-charcoal">${item.name}</p>
+                        <div class="mt-1 flex items-center gap-3 text-xs text-charcoal/60">
+                          <span class="font-semibold">Jumlah: <span class="text-matcha">${item.quantity}x</span></span>
+                          <span>•</span>
+                          <span>Harga satuan: Rp ${formatNumber(item.price)}</span>
+                        </div>
+                        ${item.notes ? `<div class="mt-2 rounded-lg bg-matcha/5 px-3 py-2"><p class="text-xs font-semibold text-charcoal/70">📝 Catatan: ${item.notes}</p></div>` : ''}
+                      </div>
+                      <div class="ml-4 text-right">
+                        <p class="text-xs font-semibold text-charcoal/60">Subtotal</p>
+                        <p class="text-lg font-bold text-charcoal">Rp ${formatNumber(item.price * item.quantity)}</p>
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
             </div>
-            <div class="mt-5 grid gap-3 sm:grid-cols-2">
-              <button class="rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="acceptCash('${order.orderId}')">✅ Terima Tunai & Proses</button>
-              <button class="rounded-2xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="cancelCash('${order.orderId}')">❌ Batalkan (No Show)</button>
+
+            <!-- Waktu Info -->
+            <div class="mt-5 grid gap-3 rounded-xl border border-charcoal/5 bg-charcoal/2 p-4 sm:grid-cols-2">
+              <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-xl">⏰</div>
+                <div>
+                  <p class="text-xs font-semibold text-rose-700/80">Batas Waktu ke Kasir</p>
+                  <p class="text-sm font-bold text-rose-700">${minutesLeft} menit lagi</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-xl">🕐</div>
+                <div>
+                  <p class="text-xs font-semibold text-charcoal/55">Waktu Order Dibuat</p>
+                  <p class="text-sm font-bold text-charcoal">${new Date(order.createdAt).toLocaleString('id-ID')}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-6 grid gap-3 sm:grid-cols-2">
+              <button class="flex items-center justify-center gap-2 rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="acceptCash('${order.orderId}')">
+                <span>✅</span>
+                <span>Terima Tunai & Mulai Proses</span>
+              </button>
+              <button class="flex items-center justify-center gap-2 rounded-2xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="cancelCash('${order.orderId}')">
+                <span>❌</span>
+                <span>Batalkan (No Show)</span>
+              </button>
             </div>
           </div>
         `;
@@ -736,35 +881,79 @@ async function loadReadyOrders() {
       const readyAt = order.readyAt ? new Date(order.readyAt).toLocaleString('id-ID') : '-';
       return `
         <div class="rounded-3xl border border-white/60 bg-white/95 p-6 transition hover:-translate-y-1">
-          <div class="flex flex-col gap-4 border-b border-charcoal/5 pb-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p class="text-xs uppercase tracking-[0.3em] text-charcoal/45">Ready for Pickup</p>
-              <h4 class="mt-2 text-xl font-semibold">📋 ${order.orderId}</h4>
-              <p class="text-sm text-matcha font-semibold">👤 ${order.customerName}</p>
-              <p class="text-xs text-charcoal/55">📱 ${order.userId}</p>
-            </div>
-            <div class="rounded-2xl bg-cream px-5 py-3 text-right">
-              <p class="text-xs uppercase tracking-[0.25em] text-charcoal/60">Total</p>
-              <span class="text-3xl font-bold text-charcoal">Rp ${formatNumber(order.pricing.total)}</span>
-            </div>
-          </div>
-          <div class="mt-5 rounded-2xl border border-charcoal/5 bg-charcoal/2 p-4">
-            <div class="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">Items (${order.items.length})</div>
-            ${order.items.map(item => `
-              <div class="border-b border-charcoal/5 py-2 text-sm last:border-0">
-                <div class="flex items-center justify-between">
-                  <span class="font-medium text-charcoal/80">${item.name}</span>
-                  <span class="text-charcoal/55">x${item.quantity} • Rp ${formatNumber(item.price * item.quantity)}</span>
-                </div>
-                ${item.notes ? `<p class="mt-1 text-xs text-charcoal/45">📝 ${item.notes}</p>` : ''}
+          <!-- Header -->
+          <div class="flex flex-col gap-4 border-b border-charcoal/5 pb-5 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex-1">
+              <div class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-3 py-1 ring-2 ring-matcha/20">
+                <span class="text-xs font-bold uppercase tracking-[0.2em] text-matcha">✅ Siap Diambil</span>
               </div>
-            `).join('')}
+              <h4 class="mt-3 text-2xl font-bold text-charcoal">📋 ${order.orderId}</h4>
+              <div class="mt-2 space-y-1 text-sm">
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold text-charcoal/60">Nama Customer:</span>
+                  <span class="font-bold text-matcha">${order.customerName}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold text-charcoal/60">WhatsApp:</span>
+                  <span class="font-mono text-charcoal">${order.userId}</span>
+                </div>
+              </div>
+            </div>
+            <div class="rounded-2xl border-2 border-cream bg-cream/50 px-6 py-4 text-right">
+              <p class="text-xs font-bold uppercase tracking-[0.25em] text-charcoal/70">Total Pesanan</p>
+              <span class="mt-1 block text-3xl font-extrabold text-charcoal">Rp ${formatNumber(order.pricing.total)}</span>
+            </div>
           </div>
-          <div class="mt-4 flex flex-col gap-2 text-xs font-semibold text-charcoal/55 sm:flex-row sm:items-center sm:justify-between">
-            <span>🎉 Siap sejak: ${readyAt}</span>
-            <span>📦 Setelah diambil, tandai selesai</span>
+
+          <!-- Detail Pesanan -->
+          <div class="mt-6">
+            <div class="mb-3 flex items-center gap-2 border-b border-charcoal/10 pb-2">
+              <span class="text-sm font-bold uppercase tracking-[0.2em] text-charcoal">📦 Detail Pesanan</span>
+              <span class="rounded-full bg-charcoal/5 px-2 py-0.5 text-xs font-semibold text-charcoal/70">${order.items.length} Item</span>
+            </div>
+            <div class="space-y-2">
+              ${order.items.map(item => `
+                <div class="rounded-xl border border-charcoal/5 bg-white px-4 py-3">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <p class="font-semibold text-charcoal">${item.name}</p>
+                      <div class="mt-1 flex items-center gap-3 text-xs text-charcoal/60">
+                        <span class="font-semibold">Jumlah: <span class="text-matcha">${item.quantity}x</span></span>
+                        <span>•</span>
+                        <span>Harga satuan: Rp ${formatNumber(item.price)}</span>
+                      </div>
+                      ${item.notes ? `<div class="mt-2 rounded-lg bg-matcha/5 px-3 py-2"><p class="text-xs font-semibold text-charcoal/70">📝 Catatan: ${item.notes}</p></div>` : ''}
+                    </div>
+                    <div class="ml-4 text-right">
+                      <p class="text-xs font-semibold text-charcoal/60">Subtotal</p>
+                      <p class="text-lg font-bold text-charcoal">Rp ${formatNumber(item.price * item.quantity)}</p>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
           </div>
-          <button class="mt-5 w-full rounded-2xl bg-charcoal px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="completeOrder('${order.orderId}', '${order.customerName}')">✔️ Tandai Selesai</button>
+
+          <!-- Status Info -->
+          <div class="mt-5 flex items-center justify-between rounded-xl border border-matcha/10 bg-matcha/5 p-4">
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-xl">🎉</div>
+              <div>
+                <p class="text-xs font-semibold text-matcha/80">Pesanan Siap Sejak</p>
+                <p class="text-sm font-bold text-matcha">${readyAt}</p>
+              </div>
+            </div>
+            <div class="text-right text-xs font-semibold text-charcoal/50">
+              <p>Customer sudah dinotifikasi</p>
+              <p>untuk mengambil pesanan</p>
+            </div>
+          </div>
+
+          <!-- Action Button -->
+          <button class="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-charcoal px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="completeOrder('${order.orderId}', '${order.customerName}')">
+            <span>✔️</span>
+            <span>Tandai Sudah Diambil & Selesai</span>
+          </button>
         </div>`;
     }).join('');
   } catch (e) {
