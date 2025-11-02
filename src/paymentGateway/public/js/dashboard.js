@@ -11,6 +11,7 @@ let statsInitialized = false;
 let processingInitialized = false;
 let pendingCashInitialized = false;
 let audioUnlocked = false;
+let currentTab = 'qris'; // Default active tab
 
 const soundOptions = [
   { name: 'Efek 1', file: '/sounds/sound1.mp3' },
@@ -73,6 +74,49 @@ function changeNotifSound(file) {
   } catch (_) {}
 }
 
+// Tab switching
+function switchTab(tabName) {
+  currentTab = tabName;
+  
+  // Hide all tab contents
+  const contents = document.querySelectorAll('.tab-content');
+  contents.forEach(content => content.classList.add('hidden'));
+  
+  // Remove active state from all tabs
+  const tabs = document.querySelectorAll('.tab-btn');
+  tabs.forEach(tab => {
+    tab.classList.remove('border-matcha', 'bg-white', 'text-matcha');
+    tab.classList.add('border-transparent');
+  });
+  
+  // Show active content
+  const activeContent = document.getElementById(`content-${tabName}`);
+  if (activeContent) activeContent.classList.remove('hidden');
+  
+  // Style active tab
+  const activeTab = document.getElementById(`tab-${tabName}`);
+  if (activeTab) {
+    activeTab.classList.remove('border-transparent');
+    activeTab.classList.add('border-matcha', 'bg-white', 'text-matcha');
+  }
+}
+
+// Update tab counters
+function updateTabCounters(counts) {
+  const counters = {
+    qris: counts.qris || 0,
+    cash: counts.cash || 0,
+    processing: counts.processing || 0,
+    ready: counts.ready || 0,
+    cancelled: counts.cancelled || 0
+  };
+  
+  Object.keys(counters).forEach(key => {
+    const el = document.getElementById(`count-${key}`);
+    if (el) el.textContent = counters[key];
+  });
+}
+
 // Toast notification
 function showNotification(text) {
   const notif = document.getElementById('notification');
@@ -98,10 +142,8 @@ async function loadStats() {
     const data = await res.json();
 
     if (data.success) {
-      document.getElementById('pending-count').textContent = data.stats.pendingCount;
       document.getElementById('today-orders').textContent = data.stats.todayOrders;
       document.getElementById('today-revenue').textContent = 'Rp ' + formatNumber(data.stats.todayRevenue);
-  // Dashboard difokuskan untuk data hari ini saja
 
       // Notify when pending increases after initial load
       if (statsInitialized && data.stats.pendingCount > previousPaymentCount) {
@@ -137,6 +179,9 @@ async function loadPayments() {
 
     const list = document.getElementById('payments-list');
     if (!list) return;
+
+    // Update tab counter
+    updateTabCounters({ qris: data.payments.length });
 
     if (data.payments.length === 0) {
       list.innerHTML = `
@@ -337,6 +382,9 @@ async function loadProcessingOrders() {
     const list = document.getElementById('processing-list');
     if (!list) return;
 
+    // Update tab counter
+    updateTabCounters({ processing: data.orders.length });
+
     // Notify on truly new processing orders (e.g., Tunai langsung PROCESSSING, atau QRIS sesudah dikonfirmasi)
     if (!processingInitialized) {
       knownProcessingIds = new Set(data.orders.map(o => o.orderId));
@@ -458,6 +506,9 @@ async function loadPendingCash() {
 
     const list = document.getElementById('pending-cash-list');
     if (!list) return;
+
+    // Update tab counter
+    updateTabCounters({ cash: data.orders.length });
 
     // Notify on new pending cash
     if (!pendingCashInitialized) {
@@ -681,6 +732,10 @@ window.addEventListener('DOMContentLoaded', () => {
     }, { once: true, passive: true });
   });
 
+  // Initialize default tab
+  switchTab('qris');
+
+  // Load all data (untuk update counters)
   loadPayments();
   loadProcessingOrders();
   loadReadyOrders();
@@ -717,6 +772,9 @@ async function loadCancelledCash() {
 
     const list = document.getElementById('cancelled-cash-list');
     if (!list) return;
+
+    // Update tab counter
+    updateTabCounters({ cancelled: data.orders ? data.orders.length : 0 });
 
     if (!data.orders || data.orders.length === 0) {
       list.innerHTML = `
@@ -868,6 +926,10 @@ async function loadReadyOrders() {
     const data = await res.json();
     const list = document.getElementById('ready-list');
     if (!list) return;
+
+    // Update tab counter
+    updateTabCounters({ ready: data.orders ? data.orders.length : 0 });
+
     if (!data.orders || data.orders.length === 0) {
       list.innerHTML = `
         <div class="rounded-3xl border border-dashed border-matcha/30 bg-matcha/5 px-6 py-10 text-center text-sm">

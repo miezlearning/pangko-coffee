@@ -7,13 +7,16 @@
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-        <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Twemoji to ensure emojis render consistently across platforms -->
+    <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js" crossorigin="anonymous"></script>
         <script>
             tailwind.config = {
                 theme: {
                     extend: {
                         fontFamily: {
-                            sans: ['Manrope', 'system-ui', 'sans-serif']
+                            // Add robust emoji fallbacks so emojis render on Windows/macOS/Linux
+                            sans: ['Manrope', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', 'system-ui', 'sans-serif']
                         },
                         colors: {
                             matcha: '#74A662',
@@ -28,14 +31,27 @@
                 }
             }
         </script>
+        <style>
+            /* Ensure emoji fonts are used where available (especially on Windows) */
+            body { font-family: Manrope, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui, sans-serif; }
+            /* Normalize emoji image sizing when Twemoji replaces glyphs */
+            img.emoji { height: 1em; width: 1em; margin: 0 .05em; vertical-align: -0.15em; }
+            .tab-content {
+                animation: fadeIn 0.3s ease-in-out;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        </style>
     </head>
     <body class="min-h-screen bg-cream text-charcoal antialiased">
         <!-- Floating Navbar -->
         <nav id="app-navbar" class="fixed inset-x-0 top-0 z-50 py-4">
             <div class="mx-auto w-full max-w-[1180px] px-5">
                 <div id="nav-shell" class="flex items-center justify-between rounded-2xl border border-white/40 bg-white/60 px-6 py-3 backdrop-blur transition-all duration-300">
-                    <div class="flex items-center gap-3">
-                        <img src="https://media.discordapp.net/attachments/1403748644657828031/1434222820501487791/567458429_17844516144596099_4231043402342710190_n.jpg?ex=69078b96&is=69063a16&hm=501155baf10b69fcf042da9c625e7259b0cbf9e660fce9f608e542b884a46eb2&=&format=webp&width=805&height=805" alt="Pangko Coffee" class="h-14 w-14 rounded-full object-cover border-2 border-white shadow-sm sm:h-16 sm:w-16 md:h-20 md:w-20" />
+                        <div class="flex items-center gap-3">
+                            <img src="https://media.discordapp.net/attachments/1403748644657828031/1434222820501487791/567458429_17844516144596099_4231043402342710190_n.jpg?ex=69078b96&is=69063a16&hm=501155baf10b69fcf042da9c625e7259b0cbf9e660fce9f608e542b884a46eb2&=&format=webp&width=805&height=805" alt="Pangko Coffee" class="h-14 w-14 rounded-full object-cover border-2 border-white shadow-sm sm:h-16 sm:w-16 md:h-20 md:w-20" />
                         <div class="flex flex-col">
                             <span class="text-sm uppercase tracking-[0.18em] text-matcha">Pangko Coffee</span>
                             <strong class="text-base">Simple coffee, gentle taste.</strong>
@@ -111,7 +127,12 @@
                                     <h2 class="text-lg font-semibold">Status Gateway</h2>
                                     <p class="mt-1 text-charcoal/60">Dashboard tetap sinkron dengan antrian kasir & bot WhatsApp.</p>
                                 </div>
-                                <span id="status-badge" class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-4 py-1 text-xs font-semibold text-matcha">🟢 ONLINE</span>
+                                <span id="status-badge" class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-4 py-1 text-xs font-semibold text-matcha">
+                                    <svg class="h-3 w-3 text-matcha" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                        <circle cx="8" cy="8" r="8" />
+                                    </svg>
+                                    <span>ONLINE</span>
+                                </span>
                             </div>
                             <div class="mt-6 grid gap-4 md:grid-cols-2">
                                 <div class="rounded-2xl border border-matcha/20 bg-matcha/10 p-4">
@@ -137,130 +158,215 @@
                 </div>
             </section>
 
-            <!-- Snapshot Stats -->
+            <!-- Quick Stats Bar -->
             <section class="relative">
-                <div class="absolute -top-10 -left-10 hidden h-28 w-28 rounded-full bg-matcha/20 blur-2xl lg:block"></div>
-                <div class="relative rounded-3xl border border-white/40 bg-white/90 p-8 shadow-[0_30px_70px_-45px_rgba(51,51,51,0.5)] backdrop-blur">
-                    <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                            <h2 class="text-2xl font-semibold">Snapshot Statistik</h2>
-                            <p class="text-sm text-charcoal/60">Semua metrik diperbarui otomatis tanpa perlu refresh manual.</p>
+                <div class="relative rounded-3xl border border-white/40 bg-white/90 p-6 shadow-[0_30px_70px_-45px_rgba(51,51,51,0.5)] backdrop-blur">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <div class="rounded-full bg-matcha/15 p-3">
+                                <svg class="h-6 w-6 text-matcha" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h2 class="text-lg font-bold text-charcoal">Ringkasan Hari Ini</h2>
+                                <p class="text-xs text-charcoal/60">Update otomatis setiap 3 detik</p>
+                            </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-charcoal/60">
-                            <span class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-3 py-1">
-                                <span class="text-matcha">●</span> Realtime Watcher
-                            </span>
-                            <span class="inline-flex items-center gap-2 rounded-full bg-peach/25 px-3 py-1">
-                                <span class="text-peach-800">🚀</span> Sinkron Order Manager
-                            </span>
-                            <a href="/analytics" class="inline-flex items-center gap-2 rounded-full border border-matcha/35 bg-white px-4 py-2 text-sm font-semibold text-matcha transition hover:bg-matcha hover:text-white">
-                                📈 Statistik
-                            </a>
-                            <a href="/api/export/finance" class="ml-auto inline-flex items-center gap-2 rounded-full border border-peach/40 bg-white px-4 py-2 text-sm font-semibold text-peach-800 transition hover:bg-peach hover:text-charcoal">
-                                📤 Export Excel
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="rounded-2xl border border-matcha/20 bg-cream/70 px-5 py-3">
+                                <p class="text-xs text-charcoal/55">📦 Pesanan</p>
+                                <span id="today-orders" class="mt-1 block text-2xl font-bold text-charcoal">-</span>
+                            </div>
+                            <div class="rounded-2xl border border-peach/25 bg-white px-5 py-3">
+                                <p class="text-xs text-charcoal/55">
+                                    <svg class="h-4 w-4 text-peach-800 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M12 8c-3.866 0-7 1.343-7 3s3.134 3 7 3 7-1.343 7-3-3.134-3-7-3z" />
+                                        <path d="M12 8v8" />
+                                        <path d="M5 12v4" />
+                                        <path d="M19 12v4" />
+                                    </svg>
+                                    Revenue
+                                </p>
+                                <span id="today-revenue" class="mt-1 block text-2xl font-bold text-charcoal">-</span>
+                            </div>
+                            <a href="/analytics" class="inline-flex items-center gap-2 rounded-full border border-matcha/35 bg-white px-4 py-2.5 text-sm font-semibold text-matcha transition hover:bg-matcha hover:text-white">
+                                <svg class="h-4 w-4 text-matcha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M3 3v18h18" />
+                                    <path d="M9 17V9" />
+                                    <path d="M13 17V5" />
+                                    <path d="M17 17v-7" />
+                                Export Excel
                             </a>
                         </div>
-                    </div>
-                    <div id="stats" class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        <article class="group rounded-2xl border border-matcha/20 bg-cream/70 p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-                            <p class="text-sm text-charcoal/55">⏳ Pending Payments</p>
-                            <span id="pending-count" class="mt-4 block text-4xl font-bold text-charcoal">-</span>
-                        </article>
-                        <article class="group rounded-2xl border border-matcha/10 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-                            <p class="text-sm text-charcoal/55">📦 Orders Hari Ini</p>
-                            <span id="today-orders" class="mt-4 block text-4xl font-bold text-charcoal">-</span>
-                        </article>
-                        <article class="group rounded-2xl border border-peach/25 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-                            <p class="text-sm text-charcoal/55">💰 Revenue Hari Ini</p>
-                            <span id="today-revenue" class="mt-4 block text-4xl font-bold text-charcoal">-</span>
-                        </article>
                     </div>
                 </div>
             </section>
 
-            <!-- Data Panels -->
-            <section class="grid gap-10 lg:grid-cols-[1.15fr_0.85fr]">
-                <article class="rounded-3xl border border-white/45 bg-white/90 p-7 shadow-[0_25px_60px_-45px_rgba(116,166,98,0.55)] backdrop-blur">
-                    <div class="flex flex-col gap-4 border-b border-white/60 pb-5 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h3 class="text-xl font-semibold">⏳ Pending Payments</h3>
-                            <p class="text-sm text-charcoal/60">Konfirmasi pembayaran langsung dari layar ini.</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="loadPayments()" class="inline-flex items-center gap-2 rounded-full border border-matcha/30 px-4 py-2 text-sm font-semibold text-matcha transition hover:bg-matcha hover:text-white">
-                                🔄 Refresh Data
-                            </button>
-                        </div>
-                    </div>
-                    <div id="payments-list" class="mt-6 space-y-4"></div>
-                </article>
-
-                <article class="rounded-3xl border border-white/45 bg-white/90 p-7 shadow-[0_25px_60px_-45px_rgba(255,229,180,0.6)] backdrop-blur">
-                    <div class="flex flex-col gap-4 border-b border-white/60 pb-5 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h3 class="text-xl font-semibold">👨‍🍳 Processing Orders</h3>
-                            <p class="text-sm text-charcoal/60">Monitor progres barista dan tandai pesanan siap.</p>
-                        </div>
-                        <button onclick="loadProcessingOrders()" class="inline-flex items-center gap-2 rounded-full border border-peach/40 px-4 py-2 text-sm font-semibold text-peach-800 transition hover:bg-peach hover:text-charcoal">
-                            🔄 Refresh Queue
+            <!-- Tab Navigation -->
+            <section class="relative">
+                <div class="relative rounded-3xl border border-white/40 bg-white/95 shadow-lg backdrop-blur overflow-hidden">
+                    <!-- Tab Buttons -->
+                    <div class="flex overflow-x-auto border-b border-charcoal/10 bg-gradient-to-r from-cream/30 to-peach/20">
+                        <button onclick="switchTab('qris')" id="tab-qris" class="tab-btn flex-1 min-w-[160px] px-6 py-5 text-sm font-semibold transition border-b-4 border-transparent hover:bg-white/60">
+                            <div class="flex flex-col items-center gap-2">
+                                <!-- Bell icon (inline SVG) -->
+                                <svg class="h-6 w-6 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5" />
+                                    <path d="M13.73 21a2 2 0 01-3.46 0" />
+                                </svg>
+                                <span>Pending QRIS</span>
+                                <span id="count-qris" class="rounded-full bg-red-500 px-3 py-0.5 text-xs text-white font-bold">0</span>
+                            </div>
+                        </button>
+                        <button onclick="switchTab('cash')" id="tab-cash" class="tab-btn flex-1 min-w-[160px] px-6 py-5 text-sm font-semibold transition border-b-4 border-transparent hover:bg-white/60">
+                            <div class="flex flex-col items-center gap-2">
+                                <!-- Cash / wallet icon -->
+                                <svg class="h-6 w-6 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                                    <path d="M1 10h22" />
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <span>Pending Tunai</span>
+                                <span id="count-cash" class="rounded-full bg-orange-500 px-3 py-0.5 text-xs text-white font-bold">0</span>
+                            </div>
+                        </button>
+                        <button onclick="switchTab('processing')" id="tab-processing" class="tab-btn flex-1 min-w-[160px] px-6 py-5 text-sm font-semibold transition border-b-4 border-transparent hover:bg-white/60">
+                            <div class="flex flex-col items-center gap-2">
+                                <!-- Coffee cup icon for processing -->
+                                <svg class="h-6 w-6 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M18 8v2a4 4 0 01-4 4H6a4 4 0 01-4-4V8"></path>
+                                    <path d="M3 3h18v2a4 4 0 01-4 4H7a4 4 0 01-4-4V3z"></path>
+                                    <path d="M16 18a2 2 0 01-2 2H6a2 2 0 01-2-2"></path>
+                                </svg>
+                                <span>Diproses</span>
+                                <span id="count-processing" class="rounded-full bg-blue-500 px-3 py-0.5 text-xs text-white font-bold">0</span>
+                            </div>
+                        </button>
+                        <button onclick="switchTab('ready')" id="tab-ready" class="tab-btn flex-1 min-w-[160px] px-6 py-5 text-sm font-semibold transition border-b-4 border-transparent hover:bg-white/60">
+                            <div class="flex flex-col items-center gap-2">
+                                <!-- Check circle -->
+                                <svg class="h-6 w-6 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M9 12l2 2 4-4"></path>
+                                    <circle cx="12" cy="12" r="9"></circle>
+                                </svg>
+                                <span>Siap Diambil</span>
+                                <span id="count-ready" class="rounded-full bg-green-500 px-3 py-0.5 text-xs text-white font-bold">0</span>
+                            </div>
+                        </button>
+                        <button onclick="switchTab('cancelled')" id="tab-cancelled" class="tab-btn flex-1 min-w-[160px] px-6 py-5 text-sm font-semibold transition border-b-4 border-transparent hover:bg-white/60">
+                            <div class="flex flex-col items-center gap-2">
+                                <!-- Pause icon -->
+                                <svg class="h-6 w-6 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <rect x="6" y="5" width="4" height="14"></rect>
+                                    <rect x="14" y="5" width="4" height="14"></rect>
+                                </svg>
+                                <span>Dibatalkan</span>
+                                <span id="count-cancelled" class="rounded-full bg-gray-500 px-3 py-0.5 text-xs text-white font-bold">0</span>
+                            </div>
                         </button>
                     </div>
-                    <div id="processing-list" class="mt-6 space-y-4"></div>
-                </article>
-            </section>
 
-            <!-- Ready Orders Panel -->
-            <section>
-                <article class="rounded-3xl border border-white/45 bg-white/90 p-7 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
-                    <div class="flex flex-col gap-4 border-b border-white/60 pb-5 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h3 class="text-xl font-semibold">✅ Siap Diambil</h3>
-                            <p class="text-sm text-charcoal/60">Tandai selesai jika customer sudah mengambil pesanan.</p>
+                    <!-- Tab Content -->
+                    <div class="p-8">
+                        <!-- QRIS Tab -->
+                        <div id="content-qris" class="tab-content hidden">
+                            <div class="flex flex-col gap-4 border-b border-charcoal/10 pb-5 mb-6 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h3 class="text-2xl font-bold flex items-center gap-3">
+                                        <span class="rounded-full bg-red-500/15 p-2">🔔</span>
+                                        Pending Payments (QRIS)
+                                    </h3>
+                                    <p class="text-sm text-charcoal/60 mt-1">Konfirmasi pembayaran QRIS langsung dari sini</p>
+                                </div>
+                                <button onclick="loadPayments()" class="inline-flex items-center gap-2 rounded-full border border-matcha/30 bg-matcha px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-matcha/90 shadow-md">
+                                    🔄 Refresh
+                                </button>
+                            </div>
+                            <div id="payments-list" class="space-y-4"></div>
                         </div>
-                        <button onclick="loadReadyOrders()" class="inline-flex items-center gap-2 rounded-full border border-charcoal/15 px-4 py-2 text-sm font-semibold text-charcoal/80 transition hover:bg-charcoal/5">
-                            🔄 Refresh Ready
-                        </button>
-                    </div>
-                    <div id="ready-list" class="mt-6 space-y-4"></div>
-                </article>
-            </section>
 
-            <!-- Cash Queue Panel -->
-            <section>
-                <article class="rounded-3xl border border-white/45 bg-white/90 p-7 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
-                    <div class="flex flex-col gap-4 border-b border-white/60 pb-5 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h3 class="text-xl font-semibold">💵 Menunggu Konfirmasi Tunai</h3>
-                            <p class="text-sm text-charcoal/60">Terima pembayaran tunai untuk mulai proses barista.</p>
+                        <!-- Cash Tab -->
+                        <div id="content-cash" class="tab-content hidden">
+                            <div class="flex flex-col gap-4 border-b border-charcoal/10 pb-5 mb-6 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h3 class="text-2xl font-bold flex items-center gap-3">
+                                        <span class="rounded-full bg-orange-500/15 p-2">💵</span>
+                                        Menunggu Konfirmasi Tunai
+                                    </h3>
+                                    <p class="text-sm text-charcoal/60 mt-1">Terima pembayaran tunai untuk mulai proses barista</p>
+                                </div>
+                                <button onclick="loadPendingCash()" class="inline-flex items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-500/90 shadow-md">
+                                    🔄 Refresh
+                                </button>
+                            </div>
+                            <div id="pending-cash-list" class="space-y-4"></div>
                         </div>
-                        <button onclick="loadPendingCash()" class="inline-flex items-center gap-2 rounded-full border border-charcoal/15 px-4 py-2 text-sm font-semibold text-charcoal/80 transition hover:bg-charcoal/5">
-                            🔄 Refresh Tunai
-                        </button>
-                    </div>
-                    <div id="pending-cash-list" class="mt-6 space-y-4"></div>
-                </article>
-            </section>
 
-            <!-- Cancelled Cash (Reopen) -->
-            <section>
-                <article class="rounded-3xl border border-white/45 bg-white/90 p-7">
-                    <div class="flex flex-col gap-4 border-b border-white/60 pb-5 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h3 class="text-xl font-semibold">⏸️ Dibatalkan (Tunai) - Bisa Dibuka Kembali</h3>
-                            <p class="text-sm text-charcoal/60">Hanya yang masih dalam window buka kembali.</p>
+                        <!-- Processing Tab -->
+                        <div id="content-processing" class="tab-content hidden">
+                            <div class="flex flex-col gap-4 border-b border-charcoal/10 pb-5 mb-6 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h3 class="text-2xl font-bold flex items-center gap-3">
+                                        <span class="rounded-full bg-blue-500/15 p-2">👨‍🍳</span>
+                                        Sedang Diproses
+                                    </h3>
+                                    <p class="text-sm text-charcoal/60 mt-1">Monitor progres barista dan tandai pesanan siap</p>
+                                </div>
+                                <button onclick="loadProcessingOrders()" class="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500/90 shadow-md">
+                                    🔄 Refresh
+                                </button>
+                            </div>
+                            <div id="processing-list" class="space-y-4"></div>
                         </div>
-                        <button onclick="loadCancelledCash()" class="inline-flex items-center gap-2 rounded-full border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50">
-                            🔄 Refresh Dibatalkan
-                        </button>
+
+                        <!-- Ready Tab -->
+                        <div id="content-ready" class="tab-content hidden">
+                            <div class="flex flex-col gap-4 border-b border-charcoal/10 pb-5 mb-6 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h3 class="text-2xl font-bold flex items-center gap-3">
+                                        <span class="rounded-full bg-green-500/15 p-2 ring-4 ring-green-500/20 animate-pulse">✅</span>
+                                        Siap Diambil
+                                    </h3>
+                                    <p class="text-sm text-charcoal/60 mt-1">Tandai selesai jika customer sudah mengambil pesanan</p>
+                                </div>
+                                <button onclick="loadReadyOrders()" class="inline-flex items-center gap-2 rounded-full border border-green-500/30 bg-green-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-green-500/90 shadow-md">
+                                    🔄 Refresh
+                                </button>
+                            </div>
+                            <div id="ready-list" class="space-y-4"></div>
+                        </div>
+
+                        <!-- Cancelled Tab -->
+                        <div id="content-cancelled" class="tab-content hidden">
+                            <div class="flex flex-col gap-4 border-b border-charcoal/10 pb-5 mb-6 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h3 class="text-2xl font-bold flex items-center gap-3">
+                                        <span class="rounded-full bg-gray-500/15 p-2">⏸️</span>
+                                        Dibatalkan (Tunai) - Bisa Dibuka Kembali
+                                    </h3>
+                                    <p class="text-sm text-charcoal/60 mt-1">Hanya yang masih dalam window buka kembali</p>
+                                </div>
+                                <button onclick="loadCancelledCash()" class="inline-flex items-center gap-2 rounded-full border border-gray-500/30 bg-gray-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-500/90 shadow-md">
+                                    🔄 Refresh
+                                </button>
+                            </div>
+                            <div id="cancelled-cash-list" class="space-y-4"></div>
+                        </div>
                     </div>
-                    <div id="cancelled-cash-list" class="mt-6 space-y-4"></div>
-                </article>
+                </div>
             </section>
         </main>
 
         <!-- Toast Notification -->
         <div id="notification" class="fixed right-6 top-6 hidden w-full max-w-xs -translate-y-2 rounded-3xl border border-matcha/20 bg-white/95 p-5 text-sm opacity-0 shadow-2xl shadow-matcha/20 transition-all duration-300 backdrop-blur">
-            <p class="font-semibold">🔔 Pembayaran Baru!</p>
+            <p class="font-semibold inline-flex items-center gap-2">
+                <svg class="h-5 w-5 text-matcha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5" />
+                    <path d="M13.73 21a2 2 0 01-3.46 0" />
+                </svg>
+                Pembayaran Baru!
+            </p>
             <p id="notification-text" class="mt-1 text-charcoal/70"></p>
         </div>
 
@@ -294,5 +400,18 @@
         </script>
 
         <script src="/js/dashboard.js"></script>
+        <script>
+            // Parse emojis using Twemoji initially and whenever DOM updates (lists refresh every 3s)
+            document.addEventListener('DOMContentLoaded', function () {
+                if (window.twemoji) {
+                    const parseAll = () => {
+                        try { twemoji.parse(document.body, { folder: 'svg', ext: '.svg' }); } catch (_) {}
+                    };
+                    parseAll();
+                    const obs = new MutationObserver(() => parseAll());
+                    obs.observe(document.body, { childList: true, subtree: true });
+                }
+            });
+        </script>
     </body>
 </html>
