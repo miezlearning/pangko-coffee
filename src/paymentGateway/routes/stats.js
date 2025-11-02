@@ -105,8 +105,15 @@ router.get('/summary', (req, res) => {
         if (scope === 'today') {
             const start = moment().tz(tz).startOf('day');
             filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSame(start, 'day'));
+        } else if (scope === 'week') {
+            const start = moment().tz(tz).startOf('isoWeek');
+            const end = start.clone().endOf('isoWeek');
+            filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isBetween(start, end, 'day', '[]'));
         } else if (scope === 'month') {
             const start = moment().tz(tz).startOf('month');
+            filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSameOrAfter(start));
+        } else if (scope === 'year') {
+            const start = moment().tz(tz).startOf('year');
             filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSameOrAfter(start));
         }
         const count = filtered.length;
@@ -181,8 +188,15 @@ router.get('/method-breakdown', (req, res) => {
         if (scope === 'today') {
             const start = moment().tz(tz).startOf('day');
             filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSame(start, 'day'));
+        } else if (scope === 'week') {
+            const start = moment().tz(tz).startOf('isoWeek');
+            const end = start.clone().endOf('isoWeek');
+            filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isBetween(start, end, 'day', '[]'));
         } else if (scope === 'month') {
             const start = moment().tz(tz).startOf('month');
+            filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSameOrAfter(start));
+        } else if (scope === 'year') {
+            const start = moment().tz(tz).startOf('year');
             filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSameOrAfter(start));
         }
         const summary = {};
@@ -193,6 +207,106 @@ router.get('/method-breakdown', (req, res) => {
             summary[m].sum += (o?.pricing?.total || 0);
         });
         res.json({ success: true, summary });
+    } catch (e) {
+        res.status(500).json({ success:false, message: e.message });
+    }
+});
+
+/**
+ * GET /api/stats/overview
+ * Returns summary for today, week, month, year, and all-time in one call
+ */
+router.get('/overview', (req, res) => {
+    const config = require('../../config/config');
+    const tz = (config && config.bot && config.bot.timezone) || 'Asia/Makassar';
+    try {
+        const orderStore = require(path.resolve(__dirname, '..', '..', 'services', 'orderStore'));
+        const orders = orderStore.loadOrders() || [];
+        const revenueStatuses = new Set(['paid','processing','ready','completed']);
+        const calc = (scope) => {
+            let filtered = orders;
+            if (scope === 'today') {
+                const start = moment().tz(tz).startOf('day');
+                filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSame(start, 'day'));
+            } else if (scope === 'week') {
+                const start = moment().tz(tz).startOf('isoWeek');
+                const end = start.clone().endOf('isoWeek');
+                filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isBetween(start, end, 'day', '[]'));
+            } else if (scope === 'month') {
+                const start = moment().tz(tz).startOf('month');
+                filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSameOrAfter(start));
+            } else if (scope === 'year') {
+                const start = moment().tz(tz).startOf('year');
+                filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSameOrAfter(start));
+            } else if (scope === 'all') {
+                filtered = orders;
+            }
+            return {
+                count: filtered.length,
+                revenue: filtered.filter(o => revenueStatuses.has((o.status||'').toLowerCase()))
+                                 .reduce((s,o)=> s + (o?.pricing?.total||0), 0)
+            };
+        };
+        res.json({ success: true, overview: {
+            today: calc('today'),
+            week: calc('week'),
+            month: calc('month'),
+            year: calc('year'),
+            all: calc('all')
+        }});
+    } catch (e) {
+        res.status(500).json({ success:false, message: e.message });
+    }
+});
+
+/**
+ * GET /api/stats/top-items?scope=today|week|month|year&limit=10&method=all|CASH|QRIS
+ */
+router.get('/top-items', (req, res) => {
+    const config = require('../../config/config');
+    const tz = (config && config.bot && config.bot.timezone) || 'Asia/Makassar';
+    const scope = (req.query.scope || 'month').toLowerCase();
+    const methodFilter = (req.query.method || 'all').toUpperCase();
+    const limit = Math.max(1, Math.min(parseInt(req.query.limit || '10', 10), 50));
+    try {
+        const orderStore = require(path.resolve(__dirname, '..', '..', 'services', 'orderStore'));
+        let orders = orderStore.loadOrders() || [];
+        if (methodFilter !== 'ALL') orders = orders.filter(o => (o.paymentMethod || '').toUpperCase() === methodFilter);
+        const revenueStatuses = new Set(['paid','processing','ready','completed']);
+        let filtered = orders;
+        if (scope === 'today') {
+            const start = moment().tz(tz).startOf('day');
+            filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSame(start, 'day'));
+        } else if (scope === 'week') {
+            const start = moment().tz(tz).startOf('isoWeek');
+            const end = start.clone().endOf('isoWeek');
+            filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isBetween(start, end, 'day', '[]'));
+        } else if (scope === 'month') {
+            const start = moment().tz(tz).startOf('month');
+            filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSameOrAfter(start));
+        } else if (scope === 'year') {
+            const start = moment().tz(tz).startOf('year');
+            filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSameOrAfter(start));
+        }
+        // Aggregate items
+        const map = new Map();
+        filtered.forEach(o => {
+            if (!Array.isArray(o.items)) return;
+            o.items.forEach(it => {
+                const key = it.id || it.name;
+                if (!map.has(key)) map.set(key, { id: it.id || null, name: it.name || 'Item', qty: 0, revenue: 0 });
+                const acc = map.get(key);
+                acc.qty += Number(it.quantity || 0);
+                // Count revenue only if order contributes to revenue
+                if (revenueStatuses.has((o.status||'').toLowerCase())) {
+                    acc.revenue += Number(it.price || 0) * Number(it.quantity || 0);
+                }
+            });
+        });
+        const arr = Array.from(map.values())
+            .sort((a,b)=> b.qty - a.qty || b.revenue - a.revenue)
+            .slice(0, limit);
+        res.json({ success: true, items: arr });
     } catch (e) {
         res.status(500).json({ success:false, message: e.message });
     }

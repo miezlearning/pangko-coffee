@@ -336,9 +336,37 @@ router.get('/search', (req, res) => {
 });
 
 /**
+ * GET /api/orders/ready-list
+ * List orders currently READY (for dashboard to mark completed)
+ * IMPORTANT: This must be placed BEFORE the catch-all GET '/:orderId'
+ */
+router.get('/ready-list', (req, res) => {
+    const orderManager = require('../../services/orderManager');
+    const list = [];
+    for (const orderId of orderManager.orders.keys()) {
+        const o = orderManager.getOrder(orderId);
+        if (o && o.status === orderManager.STATUS.READY) {
+            list.push({
+                orderId: o.orderId,
+                customerName: o.customerName || 'Customer',
+                userId: (o.userId || '').split('@')[0],
+                items: o.items || [],
+                pricing: o.pricing,
+                readyAt: o.readyAt || o.updatedAt || o.createdAt,
+                paymentMethod: o.paymentMethod || 'QRIS'
+            });
+        }
+    }
+    // Newest ready first
+    list.sort((a,b) => new Date(b.readyAt||0) - new Date(a.readyAt||0));
+    res.json({ success: true, count: list.length, orders: list });
+});
+
+/**
  * GET /api/orders/:orderId
  * Get detailed order or pending payment info by orderId
  */
+// NOTE: Keep this catch-all GET by ID at the bottom, after any more specific GET routes (e.g., /ready-list)
 router.get('/:orderId', (req, res) => {
     const { orderId } = req.params;
     const orderManager = require('../../services/orderManager');
@@ -387,6 +415,34 @@ router.delete('/:orderId', async (req, res) => {
     } catch (error) {
         console.error('Delete order error:', error);
         res.status(500).json({ success: false, message: 'Failed to delete order', error: error.message });
+    }
+});
+
+/**
+ * POST /api/orders/complete/:orderId
+ * Mark order as COMPLETED (customer picked-up)
+ */
+router.post('/complete/:orderId', async (req, res) => {
+    const { orderId } = req.params;
+    const { completedBy } = req.body;
+    const orderManager = require('../../services/orderManager');
+    const order = orderManager.getOrder(orderId);
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (order.status !== orderManager.STATUS.READY) {
+        return res.status(400).json({ success: false, message: `Order status is ${order.status}, must be READY to complete` });
+    }
+    try {
+        const updated = orderManager.updateOrderStatus(orderId, orderManager.STATUS.COMPLETED, { completedBy: completedBy || 'kasir' });
+        // Optional: notify customer
+        try {
+            const bot = dataStore.getBotInstance();
+            if (bot && bot.sock) {
+                await bot.sock.sendMessage(updated.userId, { text: `✅ Pesanan *${updated.orderId}* selesai. Terima kasih! ☕️` });
+            }
+        } catch (_) {}
+        res.json({ success: true, order: { orderId: updated.orderId, status: updated.status } });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
     }
 });
 

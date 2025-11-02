@@ -538,6 +538,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   loadPayments();
   loadProcessingOrders();
+  loadReadyOrders();
   loadPendingCash();
   loadCancelledCash();
 
@@ -553,6 +554,7 @@ window.addEventListener('DOMContentLoaded', () => {
 autoRefresh = setInterval(() => {
   loadPayments();
   loadProcessingOrders();
+  loadReadyOrders();
   loadPendingCash();
   loadCancelledCash();
 }, 3000);
@@ -712,4 +714,82 @@ function renderSearchResult(r) {
       </div>
     </div>
   `;
+}
+
+// Load READY orders and render a panel with Complete buttons
+async function loadReadyOrders() {
+  try {
+    const res = await fetch('/api/orders/ready-list/');
+    const data = await res.json();
+    const list = document.getElementById('ready-list');
+    if (!list) return;
+    if (!data.orders || data.orders.length === 0) {
+      list.innerHTML = `
+        <div class="rounded-3xl border border-dashed border-matcha/30 bg-matcha/5 px-6 py-10 text-center text-sm">
+          <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-3xl shadow-inner">🧺</div>
+          <h3 class="mt-5 text-lg font-semibold">Tidak ada pesanan siap diambil</h3>
+          <p class="mt-2 text-charcoal/60">Pesanan yang sudah siap akan muncul di sini untuk ditandai selesai.</p>
+        </div>`;
+      return;
+    }
+    list.innerHTML = data.orders.map(order => {
+      const readyAt = order.readyAt ? new Date(order.readyAt).toLocaleString('id-ID') : '-';
+      return `
+        <div class="rounded-3xl border border-white/60 bg-white/95 p-6 transition hover:-translate-y-1">
+          <div class="flex flex-col gap-4 border-b border-charcoal/5 pb-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p class="text-xs uppercase tracking-[0.3em] text-charcoal/45">Ready for Pickup</p>
+              <h4 class="mt-2 text-xl font-semibold">📋 ${order.orderId}</h4>
+              <p class="text-sm text-matcha font-semibold">👤 ${order.customerName}</p>
+              <p class="text-xs text-charcoal/55">📱 ${order.userId}</p>
+            </div>
+            <div class="rounded-2xl bg-cream px-5 py-3 text-right">
+              <p class="text-xs uppercase tracking-[0.25em] text-charcoal/60">Total</p>
+              <span class="text-3xl font-bold text-charcoal">Rp ${formatNumber(order.pricing.total)}</span>
+            </div>
+          </div>
+          <div class="mt-5 rounded-2xl border border-charcoal/5 bg-charcoal/2 p-4">
+            <div class="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">Items (${order.items.length})</div>
+            ${order.items.map(item => `
+              <div class="border-b border-charcoal/5 py-2 text-sm last:border-0">
+                <div class="flex items-center justify-between">
+                  <span class="font-medium text-charcoal/80">${item.name}</span>
+                  <span class="text-charcoal/55">x${item.quantity} • Rp ${formatNumber(item.price * item.quantity)}</span>
+                </div>
+                ${item.notes ? `<p class="mt-1 text-xs text-charcoal/45">📝 ${item.notes}</p>` : ''}
+              </div>
+            `).join('')}
+          </div>
+          <div class="mt-4 flex flex-col gap-2 text-xs font-semibold text-charcoal/55 sm:flex-row sm:items-center sm:justify-between">
+            <span>🎉 Siap sejak: ${readyAt}</span>
+            <span>📦 Setelah diambil, tandai selesai</span>
+          </div>
+          <button class="mt-5 w-full rounded-2xl bg-charcoal px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="completeOrder('${order.orderId}', '${order.customerName}')">✔️ Tandai Selesai</button>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    console.error('Failed to load ready orders:', e);
+  }
+}
+
+async function completeOrder(orderId, customerName) {
+  const proceed = confirm(`Tandai pesanan sudah diambil dan selesai?\n\nOrder: ${orderId}\nAtas Nama: ${customerName}`);
+  if (!proceed) return;
+  try {
+    const res = await fetch(`/api/orders/complete/${orderId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completedBy: 'kasir' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showNotification('✔️ Pesanan ditandai selesai');
+      loadReadyOrders();
+      loadStats();
+    } else {
+      showNotification('❌ Gagal tanda selesai: ' + (data.message || 'Unknown error'));
+    }
+  } catch (e) {
+    showNotification('❌ Error: ' + e.message);
+  }
 }

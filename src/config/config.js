@@ -24,7 +24,7 @@ module.exports = {
     // Coffee Shop Configuration
     shop: {
         name: 'Pangko Coffee',
-        address: 'Samarinda', // TODO: ganti dengan alamat lengkap sesuai website Pangko
+        address: 'Kolam Taman UNMUL Hub | https://maps.app.goo.gl/WmPLWhwaPPzKBwHBA', // TODO: ganti dengan alamat lengkap sesuai website Pangko
         openHours: '08:00 - 20:00 WITA', // jam operasional dengan label WITA
         contact: '6281345028895',
         

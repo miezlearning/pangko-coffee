@@ -1,4 +1,5 @@
 const orderManager = require('../services/orderManager');
+const orderStore = require('../services/orderStore');
 const moment = require('moment-timezone');
 
 module.exports = {
@@ -16,7 +17,14 @@ module.exports = {
         }
 
         const orderId = args[0].toUpperCase();
-        const order = orderManager.getOrder(orderId);
+        let order = orderManager.getOrder(orderId);
+        if (!order) {
+            // Fallback to SQLite for parity with web
+            order = orderStore.getOrderById(orderId);
+            if (order) {
+                try { orderManager.orders.set(orderId, order); } catch (_) {}
+            }
+        }
 
         if (!order) {
             await sock.sendMessage(from, {
@@ -70,7 +78,8 @@ module.exports = {
         const from = msg.key.remoteJid;
         const userId = msg.key.remoteJid;
 
-        const userOrders = orderManager.getUserOrders(userId);
+    // Read from SQLite to ensure consistency with web
+    const userOrders = orderStore.getOrdersByUserId(userId, 50);
 
         if (userOrders.length === 0) {
             await sock.sendMessage(from, {

@@ -80,5 +80,55 @@ function deleteOrder(orderId) {
     return false;
   }
 }
+/**
+ * Get a single order by ID from SQLite
+ */
+function getOrderById(orderId) {
+  try {
+    const db = initDb();
+    const row = db.prepare('SELECT data FROM orders WHERE orderId = ?').get(String(orderId));
+    if (!row) return null;
+    try { return JSON.parse(row.data); } catch (_) { return null; }
+  } catch (e) {
+    console.error('Failed to get order by id from sqlite:', e.message);
+    return null;
+  }
+}
 
-module.exports = { loadOrders, saveOrders, deleteOrder };
+/**
+ * Get orders filtered by statuses. If statuses is empty/undefined, returns empty array.
+ */
+function getOrdersByStatuses(statuses = []) {
+  try {
+    if (!Array.isArray(statuses) || statuses.length === 0) return [];
+    const db = initDb();
+    const placeholders = statuses.map(() => '?').join(',');
+    const stmt = db.prepare(`SELECT data FROM orders WHERE status IN (${placeholders}) ORDER BY datetime(createdAt) ASC`);
+    const rows = stmt.all(...statuses.map(String));
+    return rows.map(r => {
+      try { return JSON.parse(r.data); } catch (_) { return null; }
+    }).filter(Boolean);
+  } catch (e) {
+    console.error('Failed to get orders by statuses from sqlite:', e.message);
+    return [];
+  }
+}
+
+/**
+ * Get orders by user id, most recent first. If limit provided, apply it.
+ */
+function getOrdersByUserId(userId, limit = 50) {
+  try {
+    const db = initDb();
+    const stmt = db.prepare(`SELECT data FROM orders WHERE userId = ? ORDER BY datetime(createdAt) DESC ${limit ? 'LIMIT ?' : ''}`);
+    const rows = limit ? stmt.all(String(userId), Number(limit)) : stmt.all(String(userId));
+    return rows.map(r => {
+      try { return JSON.parse(r.data); } catch (_) { return null; }
+    }).filter(Boolean);
+  } catch (e) {
+    console.error('Failed to get orders by user id from sqlite:', e.message);
+    return [];
+  }
+}
+
+module.exports = { loadOrders, saveOrders, deleteOrder, getOrderById, getOrdersByStatuses, getOrdersByUserId };

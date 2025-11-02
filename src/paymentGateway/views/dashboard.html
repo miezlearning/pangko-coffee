@@ -205,6 +205,22 @@
                 </article>
             </section>
 
+            <!-- Ready Orders Panel -->
+            <section>
+                <article class="rounded-3xl border border-white/45 bg-white/90 p-7 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
+                    <div class="flex flex-col gap-4 border-b border-white/60 pb-5 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 class="text-xl font-semibold">✅ Siap Diambil</h3>
+                            <p class="text-sm text-charcoal/60">Tandai selesai jika customer sudah mengambil pesanan.</p>
+                        </div>
+                        <button onclick="loadReadyOrders()" class="inline-flex items-center gap-2 rounded-full border border-charcoal/15 px-4 py-2 text-sm font-semibold text-charcoal/80 transition hover:bg-charcoal/5">
+                            🔄 Refresh Ready
+                        </button>
+                    </div>
+                    <div id="ready-list" class="mt-6 space-y-4"></div>
+                </article>
+            </section>
+
             <!-- Cash Queue Panel -->
             <section>
                 <article class="rounded-3xl border border-white/45 bg-white/90 p-7 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">

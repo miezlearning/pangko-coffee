@@ -56,6 +56,7 @@ module.exports = {
             text += `• *!detail [ORDER_ID]* - Detail pesanan\n`;
             text += `• *!confirm [ORDER_ID]* - Konfirmasi bayar\n`;
             text += `• *!ready [ORDER_ID]* - Tandai siap\n`;
+            text += `• *!complete [ORDER_ID]* - Tandai selesai (sudah diambil)\n`;
             text += `• *!history* - Riwayat hari ini\n`;
             text += `• *!cancel-order [ORDER_ID]* - Batalkan`;
         }

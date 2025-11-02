@@ -62,13 +62,51 @@ async function loadSeries(range, method, from, to){
 
 function formatNumber(num){ return (num||0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 
+async function loadOverview(){
+  try {
+    const res = await fetch('/api/stats/overview');
+    const data = await res.json();
+    if (!data.success) return;
+    const ov = data.overview || {};
+    const set = (id, val)=>{ const el = document.getElementById(id); if (el) el.textContent = formatNumber(val||0); };
+    set('m-today-revenue', ov.today?.revenue || 0); set('m-today-orders', ov.today?.count || 0);
+    set('m-week-revenue', ov.week?.revenue || 0); set('m-week-orders', ov.week?.count || 0);
+    set('m-month-revenue', ov.month?.revenue || 0); set('m-month-orders', ov.month?.count || 0);
+    set('m-year-revenue', ov.year?.revenue || 0); set('m-year-orders', ov.year?.count || 0);
+  } catch (_) {}
+}
+
+async function loadTopItems(scope, method){
+  const params = new URLSearchParams({ scope, method, limit: '9' });
+  const res = await fetch(`/api/stats/top-items?${params.toString()}`);
+  const data = await res.json();
+  const wrap = document.getElementById('top-items');
+  if (!wrap) return;
+  if (!data.success){ wrap.innerHTML = '<p class="text-sm text-rose-700">Gagal memuat top produk</p>'; return; }
+  const items = (data.items||[]).map(it=>{
+    return `<div class="rounded-xl border border-charcoal/10 bg-white p-4">
+      <div class="text-sm font-semibold">${it.name}</div>
+      <div class="mt-1 text-xs text-charcoal/60">Terjual</div>
+      <div class="text-2xl font-bold">${formatNumber(it.qty)}</div>
+      <div class="mt-1 text-xs text-charcoal/60">Revenue</div>
+      <div class="text-xl font-bold">Rp ${formatNumber(it.revenue||0)}</div>
+    </div>`;
+  }).join('');
+  wrap.innerHTML = items || '<p class="text-sm text-charcoal/60">Tidak ada data</p>';
+}
+
 async function applyFilters(){
   const range = document.getElementById('range').value;
   const method = document.getElementById('method').value;
   const from = parseDateInput('from');
   const to = parseDateInput('to');
   await loadSeries(range, method, from, to);
-  await loadSummary(range === '7d' || range === '30d' ? 'month' : 'custom', method);
+  const scopeSel = document.getElementById('methodScope');
+  const scope = scopeSel ? scopeSel.value : 'month';
+  await loadSummary(scope, method);
+  const topScopeSel = document.getElementById('topScope');
+  const topScope = topScopeSel ? topScopeSel.value : 'month';
+  await loadTopItems(topScope, method);
 }
 
 window.addEventListener('DOMContentLoaded', ()=>{
@@ -80,5 +118,9 @@ window.addEventListener('DOMContentLoaded', ()=>{
   });
   // Disable custom dates initially
   ['from','to'].forEach(id => document.getElementById(id).disabled = true);
+  // Change of scopes for method and top-items
+  const ms = document.getElementById('methodScope'); if (ms) ms.addEventListener('change', applyFilters);
+  const ts = document.getElementById('topScope'); if (ts) ts.addEventListener('change', applyFilters);
+  loadOverview();
   applyFilters();
 });
