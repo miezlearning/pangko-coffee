@@ -48,34 +48,10 @@
       }
     </style>
   </head>
-  <body class="min-h-screen bg-cream text-charcoal antialiased">
+  <body class="min-h-screen bg-cream text-charcoal antialiased" data-page="menu">
     
-    <!-- Navbar -->
-    <nav id="app-navbar" class="fixed inset-x-0 top-0 z-50 py-4">
-      <div class="mx-auto w-full max-w-[1180px] px-5">
-        <div class="flex items-center justify-between rounded-2xl border border-white/40 bg-white/60 px-6 py-3 backdrop-blur transition-all duration-300">
-          <div class="flex items-center gap-3">
-            <img src="https://media.discordapp.net/attachments/1403748644657828031/1434222820501487791/567458429_17844516144596099_4231043402342710190_n.jpg?ex=69078b96&is=69063a16&hm=501155baf10b69fcf042da9c625e7259b0cbf9e660fce9f608e542b884a46eb2&=&format=webp&width=805&height=805" alt="Pangko Coffee" class="h-14 w-14 rounded-full object-cover border-2 border-white shadow-sm sm:h-16 sm:w-16 md:h-20 md:w-20" />
-            <div class="flex flex-col">
-              <span class="text-sm uppercase tracking-[0.18em] text-matcha">Pangko Coffee</span>
-              <strong class="text-base">Simple coffee, gentle taste.</strong>
-            </div>
-          </div>
-          <div class="hidden items-center gap-5 text-sm font-semibold sm:flex">
-            <a href="/" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Dashboard</a>
-            <a href="/analytics" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Statistik</a>
-            <a href="/menu" class="rounded-full px-4 py-2 transition bg-matcha text-white" aria-current="page">Menu</a>
-            <a href="/import" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Import</a>
-            <a href="/search" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Cari Order</a>
-            <a href="/webhook-tester" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Webhook Tester</a>
-          </div>
-          <div class="sm:hidden flex items-center gap-2">
-            <a href="/search" class="rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Cari →</a>
-            <a href="/analytics" class="rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Analisis →</a>
-          </div>
-        </div>
-      </div>
-    </nav>
+    <!-- Navbar will be injected here by navbar.js -->
+    <div id="navbar-container"></div>
 
     <main class="relative mx-auto flex w-full max-w-[1180px] flex-col gap-12 px-5 pt-40 pb-20">
       
@@ -252,6 +228,7 @@
       </div>
     </div>
 
+    <script src="/js/navbar.js"></script>
     <script src="/js/menu.js"></script>
   </body>
 </html>
