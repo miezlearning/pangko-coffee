@@ -109,6 +109,100 @@ async function applyFilters(){
   await loadTopItems(topScope, method);
 }
 
+async function exportDailyReport(){
+  try {
+    const btn = document.getElementById('export-daily');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Membuat...';
+    
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    
+    const response = await fetch('/api/stats/export-daily', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: dateStr })
+    });
+    
+    if (!response.ok) throw new Error('Export failed');
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Laporan_Harian_${dateStr}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+    showToast('✅ Laporan harian berhasil diunduh', 'success');
+  } catch (error) {
+    console.error('Export daily failed:', error);
+    const btn = document.getElementById('export-daily');
+    btn.disabled = false;
+    btn.innerHTML = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> Export Harian';
+    showToast('❌ Gagal export laporan harian', 'error');
+  }
+}
+
+async function exportMonthlyReport(){
+  try {
+    const btn = document.getElementById('export-monthly');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Membuat...';
+    
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1; // 1-12
+    
+    const response = await fetch('/api/stats/export-monthly', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ year, month })
+    });
+    
+    if (!response.ok) throw new Error('Export failed');
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Laporan_Bulanan_${year}-${String(month).padStart(2,'0')}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+    showToast('✅ Laporan bulanan berhasil diunduh', 'success');
+  } catch (error) {
+    console.error('Export monthly failed:', error);
+    const btn = document.getElementById('export-monthly');
+    btn.disabled = false;
+    btn.innerHTML = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> Export Bulanan';
+    showToast('❌ Gagal export laporan bulanan', 'error');
+  }
+}
+
+function showToast(message, type = 'info'){
+  const toast = document.createElement('div');
+  const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-matcha';
+  toast.className = `fixed bottom-6 right-6 ${bgColor} text-white px-6 py-4 rounded-xl shadow-2xl z-50 animate-slide-up`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(20px)';
+    setTimeout(() => document.body.removeChild(toast), 300);
+  }, 3000);
+}
+
 window.addEventListener('DOMContentLoaded', ()=>{
   // Default: 30d, all methods
   document.getElementById('apply').addEventListener('click', applyFilters);
@@ -121,6 +215,11 @@ window.addEventListener('DOMContentLoaded', ()=>{
   // Change of scopes for method and top-items
   const ms = document.getElementById('methodScope'); if (ms) ms.addEventListener('change', applyFilters);
   const ts = document.getElementById('topScope'); if (ts) ts.addEventListener('change', applyFilters);
+  
+  // Export buttons
+  document.getElementById('export-daily').addEventListener('click', exportDailyReport);
+  document.getElementById('export-monthly').addEventListener('click', exportMonthlyReport);
+  
   loadOverview();
   applyFilters();
 });

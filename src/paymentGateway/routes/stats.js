@@ -328,4 +328,257 @@ router.get('/top-items', (req, res) => {
     }
 });
 
+/**
+ * POST /api/stats/export-daily
+ * Export laporan keuangan harian ke Excel
+ * Body: { date: 'YYYY-MM-DD' }
+ */
+router.post('/export-daily', async (req, res) => {
+    const ExcelJS = require('exceljs');
+    const config = require('../../config/config');
+    const tz = (config && config.bot && config.bot.timezone) || 'Asia/Makassar';
+    
+    try {
+        const dateStr = req.body.date || moment().tz(tz).format('YYYY-MM-DD');
+        const targetDate = moment.tz(dateStr, tz);
+        const start = targetDate.clone().startOf('day');
+        const end = targetDate.clone().endOf('day');
+        
+        const orderStore = require(path.resolve(__dirname, '..', '..', 'services', 'orderStore'));
+        const allOrders = orderStore.loadOrders() || [];
+        
+        // Filter orders for the specific day
+        const orders = allOrders.filter(o => {
+            if (!o.createdAt) return false;
+            const orderMoment = moment(o.createdAt).tz(tz);
+            return orderMoment.isBetween(start, end, null, '[]');
+        });
+        
+        const revenueStatuses = new Set(['paid','processing','ready','completed']);
+        
+        // Create workbook
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Laporan Harian');
+        
+        // Header info
+        worksheet.mergeCells('A1:G1');
+        worksheet.getCell('A1').value = 'LAPORAN KEUANGAN HARIAN';
+        worksheet.getCell('A1').font = { size: 16, bold: true };
+        worksheet.getCell('A1').alignment = { horizontal: 'center' };
+        
+        worksheet.mergeCells('A2:G2');
+        worksheet.getCell('A2').value = `Tanggal: ${targetDate.format('DD MMMM YYYY')}`;
+        worksheet.getCell('A2').font = { size: 12 };
+        worksheet.getCell('A2').alignment = { horizontal: 'center' };
+        
+        worksheet.addRow([]);
+        
+        // Summary section
+        const totalOrders = orders.length;
+        const totalRevenue = orders.filter(o => revenueStatuses.has((o.status||'').toLowerCase()))
+            .reduce((sum, o) => sum + (o?.pricing?.total || 0), 0);
+        const qrisOrders = orders.filter(o => (o.paymentMethod||'').toUpperCase() === 'QRIS');
+        const cashOrders = orders.filter(o => (o.paymentMethod||'').toUpperCase() === 'CASH');
+        const qrisRevenue = qrisOrders.filter(o => revenueStatuses.has((o.status||'').toLowerCase()))
+            .reduce((sum, o) => sum + (o?.pricing?.total || 0), 0);
+        const cashRevenue = cashOrders.filter(o => revenueStatuses.has((o.status||'').toLowerCase()))
+            .reduce((sum, o) => sum + (o?.pricing?.total || 0), 0);
+        
+        worksheet.addRow(['RINGKASAN']);
+        worksheet.addRow(['Total Pesanan', totalOrders]);
+        worksheet.addRow(['Total Pendapatan', `Rp ${totalRevenue.toLocaleString('id-ID')}`]);
+        worksheet.addRow(['Pesanan QRIS', qrisOrders.length, `Rp ${qrisRevenue.toLocaleString('id-ID')}`]);
+        worksheet.addRow(['Pesanan Tunai', cashOrders.length, `Rp ${cashRevenue.toLocaleString('id-ID')}`]);
+        worksheet.addRow([]);
+        
+        // Orders table header
+        worksheet.addRow(['DETAIL PESANAN']);
+        const headerRow = worksheet.addRow(['No', 'Order ID', 'Waktu', 'Pelanggan', 'Metode', 'Total', 'Status']);
+        headerRow.font = { bold: true };
+        headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF74A662' } };
+        
+        // Orders data
+        orders.forEach((order, idx) => {
+            worksheet.addRow([
+                idx + 1,
+                order.orderId,
+                moment(order.createdAt).tz(tz).format('HH:mm:ss'),
+                order.customerName || order.userId || '-',
+                order.paymentMethod || '-',
+                `Rp ${(order?.pricing?.total || 0).toLocaleString('id-ID')}`,
+                order.status || '-'
+            ]);
+        });
+        
+        // Auto-fit columns
+        worksheet.columns.forEach(column => {
+            let maxLength = 0;
+            column.eachCell({ includeEmpty: true }, cell => {
+                const length = cell.value ? cell.value.toString().length : 10;
+                if (length > maxLength) maxLength = length;
+            });
+            column.width = Math.min(maxLength + 2, 50);
+        });
+        
+        // Send file
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=Laporan_Harian_${dateStr}.xlsx`);
+        
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (e) {
+        console.error('Export daily failed:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+/**
+ * POST /api/stats/export-monthly
+ * Export laporan keuangan bulanan ke Excel
+ * Body: { year: 2025, month: 1 }
+ */
+router.post('/export-monthly', async (req, res) => {
+    const ExcelJS = require('exceljs');
+    const config = require('../../config/config');
+    const tz = (config && config.bot && config.bot.timezone) || 'Asia/Makassar';
+    
+    try {
+        const now = moment().tz(tz);
+        const year = req.body.year || now.year();
+        const month = req.body.month || (now.month() + 1);
+        
+        const start = moment.tz([year, month - 1, 1], tz).startOf('month');
+        const end = start.clone().endOf('month');
+        
+        const orderStore = require(path.resolve(__dirname, '..', '..', 'services', 'orderStore'));
+        const allOrders = orderStore.loadOrders() || [];
+        
+        // Filter orders for the specific month
+        const orders = allOrders.filter(o => {
+            if (!o.createdAt) return false;
+            const orderMoment = moment(o.createdAt).tz(tz);
+            return orderMoment.isBetween(start, end, null, '[]');
+        });
+        
+        const revenueStatuses = new Set(['paid','processing','ready','completed']);
+        
+        // Create workbook
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Laporan Bulanan');
+        
+        // Header info
+        worksheet.mergeCells('A1:H1');
+        worksheet.getCell('A1').value = 'LAPORAN KEUANGAN BULANAN';
+        worksheet.getCell('A1').font = { size: 16, bold: true };
+        worksheet.getCell('A1').alignment = { horizontal: 'center' };
+        
+        worksheet.mergeCells('A2:H2');
+        worksheet.getCell('A2').value = `Periode: ${start.format('MMMM YYYY')}`;
+        worksheet.getCell('A2').font = { size: 12 };
+        worksheet.getCell('A2').alignment = { horizontal: 'center' };
+        
+        worksheet.addRow([]);
+        
+        // Summary section
+        const totalOrders = orders.length;
+        const totalRevenue = orders.filter(o => revenueStatuses.has((o.status||'').toLowerCase()))
+            .reduce((sum, o) => sum + (o?.pricing?.total || 0), 0);
+        const qrisOrders = orders.filter(o => (o.paymentMethod||'').toUpperCase() === 'QRIS');
+        const cashOrders = orders.filter(o => (o.paymentMethod||'').toUpperCase() === 'CASH');
+        const qrisRevenue = qrisOrders.filter(o => revenueStatuses.has((o.status||'').toLowerCase()))
+            .reduce((sum, o) => sum + (o?.pricing?.total || 0), 0);
+        const cashRevenue = cashOrders.filter(o => revenueStatuses.has((o.status||'').toLowerCase()))
+            .reduce((sum, o) => sum + (o?.pricing?.total || 0), 0);
+        
+        worksheet.addRow(['RINGKASAN BULANAN']);
+        worksheet.addRow(['Total Pesanan', totalOrders]);
+        worksheet.addRow(['Total Pendapatan', `Rp ${totalRevenue.toLocaleString('id-ID')}`]);
+        worksheet.addRow(['Pesanan QRIS', qrisOrders.length, `Rp ${qrisRevenue.toLocaleString('id-ID')}`]);
+        worksheet.addRow(['Pesanan Tunai', cashOrders.length, `Rp ${cashRevenue.toLocaleString('id-ID')}`]);
+        worksheet.addRow([]);
+        
+        // Daily breakdown
+        worksheet.addRow(['RINGKASAN HARIAN']);
+        const dailyHeader = worksheet.addRow(['Tanggal', 'Pesanan', 'Pendapatan', 'QRIS', 'Tunai']);
+        dailyHeader.font = { bold: true };
+        dailyHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF74A662' } };
+        
+        const cursor = start.clone();
+        while (cursor.isSameOrBefore(end, 'day')) {
+            const dayOrders = orders.filter(o => {
+                const orderMoment = moment(o.createdAt).tz(tz);
+                return orderMoment.isSame(cursor, 'day');
+            });
+            const dayRevenue = dayOrders.filter(o => revenueStatuses.has((o.status||'').toLowerCase()))
+                .reduce((sum, o) => sum + (o?.pricing?.total || 0), 0);
+            const dayQris = dayOrders.filter(o => (o.paymentMethod||'').toUpperCase() === 'QRIS').length;
+            const dayCash = dayOrders.filter(o => (o.paymentMethod||'').toUpperCase() === 'CASH').length;
+            
+            worksheet.addRow([
+                cursor.format('DD/MM/YYYY'),
+                dayOrders.length,
+                `Rp ${dayRevenue.toLocaleString('id-ID')}`,
+                dayQris,
+                dayCash
+            ]);
+            cursor.add(1, 'day');
+        }
+        
+        worksheet.addRow([]);
+        
+        // Top items
+        worksheet.addRow(['PRODUK TERLARIS']);
+        const itemHeader = worksheet.addRow(['No', 'Nama Produk', 'Terjual', 'Revenue']);
+        itemHeader.font = { bold: true };
+        itemHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE5B4' } };
+        
+        const itemMap = new Map();
+        orders.forEach(o => {
+            if (!Array.isArray(o.items)) return;
+            o.items.forEach(it => {
+                const key = it.id || it.name;
+                if (!itemMap.has(key)) itemMap.set(key, { name: it.name || 'Item', qty: 0, revenue: 0 });
+                const acc = itemMap.get(key);
+                acc.qty += Number(it.quantity || 0);
+                if (revenueStatuses.has((o.status||'').toLowerCase())) {
+                    acc.revenue += Number(it.price || 0) * Number(it.quantity || 0);
+                }
+            });
+        });
+        
+        const topItems = Array.from(itemMap.values())
+            .sort((a,b)=> b.qty - a.qty)
+            .slice(0, 20);
+        
+        topItems.forEach((item, idx) => {
+            worksheet.addRow([
+                idx + 1,
+                item.name,
+                item.qty,
+                `Rp ${item.revenue.toLocaleString('id-ID')}`
+            ]);
+        });
+        
+        // Auto-fit columns
+        worksheet.columns.forEach(column => {
+            let maxLength = 0;
+            column.eachCell({ includeEmpty: true }, cell => {
+                const length = cell.value ? cell.value.toString().length : 10;
+                if (length > maxLength) maxLength = length;
+            });
+            column.width = Math.min(maxLength + 2, 50);
+        });
+        
+        // Send file
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=Laporan_Bulanan_${year}-${String(month).padStart(2,'0')}.xlsx`);
+        
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (e) {
+        console.error('Export monthly failed:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 module.exports = router;

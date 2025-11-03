@@ -28,12 +28,36 @@
       #cart-list::-webkit-scrollbar-thumb { background: #74A662; border-radius: 10px; }
       #cart-list::-webkit-scrollbar-thumb:hover { background: #5a8350; }
       
+      /* Category chips scrollbar */
+      #category-chips::-webkit-scrollbar { height: 4px; }
+      #category-chips::-webkit-scrollbar-track { background: transparent; }
+      #category-chips::-webkit-scrollbar-thumb { background: #74A662; border-radius: 10px; }
+      
       /* Line clamp utility */
       .line-clamp-2 {
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
+      }
+      
+      /* Category chip styles */
+      .category-chip {
+        background: white;
+        color: #333;
+        border-color: #33333320;
+        cursor: pointer;
+      }
+      .category-chip:hover {
+        border-color: #74A662;
+        background: #74A66210;
+        transform: translateY(-1px);
+      }
+      .category-chip.active {
+        background: #74A662;
+        color: white;
+        border-color: #74A662;
+        box-shadow: 0 2px 8px rgba(116, 166, 98, 0.3);
       }
       
       /* Smooth transitions */
@@ -55,12 +79,32 @@
       <div class="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-5">
         <!-- Menu & Categories -->
         <section>
-          <div class="mb-4 rounded-2xl border border-white/40 bg-white/90 p-4 shadow-sm backdrop-blur">
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <input id="search-input" type="text" placeholder="🔍 Cari menu..." class="flex-1 px-4 py-2.5 rounded-xl border border-charcoal/15 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-matcha/30" />
-              <select id="category-select" class="px-4 py-2.5 rounded-xl border border-charcoal/15 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-matcha/30">
-                <option value="all">📂 Semua Kategori</option>
-              </select>
+          <div class="mb-4 rounded-2xl border border-white/40 bg-white/90 p-4 shadow-sm backdrop-blur space-y-3">
+            <!-- Search Bar -->
+            <div class="relative">
+              <input id="search-input" type="text" placeholder="🔍 Cari menu atau deskripsi..." class="w-full px-4 py-3 pr-10 rounded-xl border border-charcoal/15 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-matcha/40 focus:border-matcha/40 transition" />
+              <button id="clear-search" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal transition">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            
+            <!-- Category Filter Chips -->
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-charcoal/60 whitespace-nowrap">Filter:</span>
+              <div id="category-chips" class="flex flex-wrap gap-2 overflow-x-auto pb-1">
+                <button data-category="all" class="category-chip active px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all whitespace-nowrap">
+                  📂 Semua
+                </button>
+              </div>
+            </div>
+            
+            <!-- Results count -->
+            <div class="flex items-center justify-between text-xs text-charcoal/60">
+              <span id="results-count">Memuat menu...</span>
+              <button id="refresh-menu" class="inline-flex items-center gap-1 hover:text-matcha transition">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Refresh
+              </button>
             </div>
           </div>
 

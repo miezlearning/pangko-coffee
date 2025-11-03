@@ -85,7 +85,66 @@ function showNotification(title, text) {
 }
 
 async function loadCategories(){
-  try{ const res = await fetch('/api/menu/categories'); const j=await res.json(); if(j.success){ CATEGORIES=j.categories||[]; const sel=el('category-select'); sel.innerHTML='<option value="all">Semua Kategori</option>'+CATEGORIES.map(c=>`<option value="${c.id}">${c.emoji||''} ${c.name}</option>`).join(''); } }catch(e){ }
+  try{ 
+    const res = await fetch('/api/menu/categories'); 
+    const j=await res.json(); 
+    if(j.success){ 
+      CATEGORIES=j.categories||[]; 
+      renderCategoryChips();
+    } 
+  }catch(e){ }
+}
+
+function renderCategoryChips(){
+  const container = el('category-chips');
+  if(!container) return;
+  
+  const chips = [
+    { id: 'all', name: 'Semua', emoji: '📂' },
+    ...CATEGORIES.map(c => ({ id: c.id, name: c.name, emoji: c.emoji || '☕' }))
+  ];
+  
+  container.innerHTML = chips.map(c => 
+    `<button data-category="${c.id}" class="category-chip ${c.id==='all'?'active':''} px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all whitespace-nowrap">
+      ${c.emoji} ${c.name}
+    </button>`
+  ).join('');
+  
+  // Add click handlers
+  container.querySelectorAll('.category-chip').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      const category = e.currentTarget.dataset.category;
+      setActiveCategory(category);
+    });
+  });
+}
+
+function setActiveCategory(categoryId){
+  // Update active state
+  document.querySelectorAll('.category-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.category === categoryId);
+  });
+  renderMenu();
+  updateResultsCount();
+}
+
+function updateResultsCount(){
+  const q = (el('search-input').value||'').toLowerCase();
+  const activeChip = document.querySelector('.category-chip.active');
+  const cat = activeChip ? activeChip.dataset.category : 'all';
+  
+  const items = MENU_ITEMS.filter(it=>{
+    const matchSearch = !q || 
+      (it.name||'').toLowerCase().includes(q) || 
+      (it.description||'').toLowerCase().includes(q);
+    const matchCategory = cat==='all' || it.category===cat;
+    return matchSearch && matchCategory && it.available;
+  });
+  
+  const countEl = el('results-count');
+  if(countEl){
+    countEl.textContent = `Menampilkan ${items.length} menu${q ? ` untuk "${q}"` : ''}`;
+  }
 }
 async function loadMenu(){
   try{ const res = await fetch('/api/menu/items?available=true'); const j=await res.json(); if(j.success){ MENU_ITEMS=j.items||[]; renderMenu(); } }catch(e){ }
@@ -94,35 +153,93 @@ async function loadMenu(){
 function renderMenu(){
   const grid = el('menu-grid');
   const q = (el('search-input').value||'').toLowerCase();
-  const cat = el('category-select').value;
-  const items = MENU_ITEMS.filter(it=>
-    (!q || (it.name||'').toLowerCase().includes(q)) && (cat==='all' || it.category===cat)
-  );
+  const activeChip = document.querySelector('.category-chip.active');
+  const cat = activeChip ? activeChip.dataset.category : 'all';
+  
+  // Enhanced filtering - search in name AND description
+  const items = MENU_ITEMS.filter(it=>{
+    const matchSearch = !q || 
+      (it.name||'').toLowerCase().includes(q) || 
+      (it.description||'').toLowerCase().includes(q);
+    const matchCategory = cat==='all' || it.category===cat;
+    return matchSearch && matchCategory && it.available; // Only show available items
+  });
   
   if(items.length===0){
-    grid.innerHTML = '<div class="col-span-full text-center py-12 text-charcoal/50">Tidak ada menu yang cocok</div>';
+    grid.innerHTML = `<div class="col-span-full text-center py-16">
+      <div class="text-5xl mb-3">🔍</div>
+      <div class="text-charcoal/60 font-semibold">Tidak ada menu yang cocok</div>
+      <div class="text-xs text-charcoal/40 mt-1">Coba kata kunci lain atau ubah kategori</div>
+    </div>`;
     return;
   }
   
   grid.innerHTML = items.map(it=>{
     const price = fmt(it.price);
-    // Get category emoji if available
+    const finalPrice = it.discount_percent > 0 
+      ? it.price - (it.price * it.discount_percent / 100) 
+      : it.price;
+    
+    // Get category info
     const catObj = CATEGORIES.find(c=>c.id===it.category);
     const emoji = catObj?.emoji || '☕';
+    const catName = catObj?.name || 'Menu';
     
-    return `<div class="group rounded-xl border border-charcoal/10 bg-white/90 p-3.5 hover:shadow-lg hover:border-matcha/30 transition-all duration-200 cursor-pointer">
+    // Stock badge if using stock tracking
+    const stockBadge = it.use_stock && it.stock_quantity !== undefined
+      ? `<div class="absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-bold ${
+          it.stock_quantity > 10 ? 'bg-green-100 text-green-700' : 
+          it.stock_quantity > 0 ? 'bg-orange-100 text-orange-700' : 
+          'bg-red-100 text-red-700'
+        }">
+          ${it.stock_quantity > 0 ? `Stok: ${it.stock_quantity}` : 'Habis'}
+        </div>`
+      : '';
+    
+    return `<div class="group relative rounded-xl border border-charcoal/10 bg-white shadow-sm hover:shadow-xl hover:border-matcha/40 transition-all duration-200">
+      ${stockBadge}
       <div class="flex flex-col h-full">
-        <div class="flex items-start justify-between mb-2">
-          <div class="text-2xl">${emoji}</div>
-          <div class="text-xs px-2 py-0.5 rounded-full bg-cream text-charcoal/60 font-medium">${catObj?.name||'Menu'}</div>
+        ${it.image 
+          ? `<div class="relative w-full h-32 rounded-t-xl overflow-hidden bg-gradient-to-br from-cream to-peach/20">
+              <img src="${it.image}" alt="${it.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full text-5xl\\'>${emoji}</div>'">
+              ${it.discount_percent > 0 
+                ? `<div class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-lg">-${it.discount_percent}%</div>`
+                : ''}
+            </div>`
+          : `<div class="relative w-full h-32 rounded-t-xl bg-gradient-to-br from-cream to-peach/20 flex items-center justify-center border-b border-charcoal/5">
+              <div class="text-5xl group-hover:scale-110 transition-transform">${emoji}</div>
+              ${it.discount_percent > 0 
+                ? `<div class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-lg">-${it.discount_percent}%</div>`
+                : ''}
+            </div>`
+        }
+        <div class="flex flex-col flex-1 p-3">
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <div class="flex-1 min-w-0">
+              <div class="font-bold text-sm leading-tight mb-1 line-clamp-2 group-hover:text-matcha transition">${it.name}</div>
+              <div class="text-xs px-2 py-0.5 rounded-full bg-matcha/10 text-matcha/80 font-medium inline-block">${catName}</div>
+            </div>
+          </div>
+          ${it.description 
+            ? `<div class="text-xs text-charcoal/60 mb-2 line-clamp-2">${it.description}</div>`
+            : ''
+          }
+          <div class="mt-auto">
+            ${it.discount_percent > 0
+              ? `<div class="flex items-baseline gap-2 mb-2">
+                  <span class="text-xs text-red-500 line-through">Rp ${price}</span>
+                  <span class="text-lg font-extrabold text-matcha">Rp ${fmt(finalPrice)}</span>
+                </div>`
+              : `<div class="text-lg font-extrabold text-matcha mb-2">Rp ${price}</div>`
+            }
+            <button class="w-full bg-matcha text-white rounded-lg py-2.5 text-sm font-bold hover:bg-matcha/90 active:scale-95 transition-all shadow-md hover:shadow-lg" onclick='addToCart(${JSON.stringify({id:it.id,name:it.name,price:finalPrice,originalPrice:it.price,discount:it.discount_percent||0}).replace(/"/g,"&quot;")})'>
+              <span class="inline-flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                Tambah ke Keranjang
+              </span>
+            </button>
+          </div>
         </div>
-        <div class="flex-1 min-h-0">
-          <div class="font-bold text-sm mb-1 line-clamp-2 group-hover:text-matcha transition">${it.name}</div>
-          <div class="text-base font-extrabold text-matcha">Rp ${price}</div>
-        </div>
-        <button class="mt-3 w-full bg-matcha text-white rounded-lg py-2 text-sm font-semibold hover:bg-matcha/90 active:scale-95 transition-all" onclick='addToCart(${JSON.stringify({id:it.id,name:it.name,price:it.price}).replace(/"/g,"&quot;")})'>
-          + Tambah
-        </button>
       </div>
     </div>`;
   }).join('');
@@ -402,8 +519,35 @@ function stopPolling(){
 }
 
 function bindEvents(){
-  el('search-input').addEventListener('input', renderMenu);
-  el('category-select').addEventListener('change', renderMenu);
+  // Search with clear button and debounce
+  const searchInput = el('search-input');
+  const clearBtn = el('clear-search');
+  
+  searchInput.addEventListener('input', (e) => {
+    if(e.target.value.trim()){
+      clearBtn.classList.remove('hidden');
+    } else {
+      clearBtn.classList.add('hidden');
+    }
+    renderMenu();
+    updateResultsCount();
+  });
+  
+  clearBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    clearBtn.classList.add('hidden');
+    renderMenu();
+    updateResultsCount();
+    searchInput.focus();
+  });
+  
+  // Refresh menu button
+  el('refresh-menu')?.addEventListener('click', async () => {
+    await loadMenu();
+    renderMenu();
+    updateResultsCount();
+  });
+  
   el('create-order-btn').addEventListener('click', createOrder);
   // Discounts
   const drp = el('discount-rp');
@@ -496,5 +640,6 @@ function updateDraftIndicator(saved, ts){
   await loadMenu();
   loadDraft();
   renderCart();
+  updateResultsCount();
   bindEvents();
 })();
