@@ -1,5 +1,6 @@
 const config = require('../config/config');
 const orderManager = require('../services/orderManager');
+const menuStore = require('../services/menuStore');
 
 module.exports = {
     name: 'order',
@@ -24,8 +25,8 @@ module.exports = {
         text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
         text += `*Menu Cepat:*\n`;
         
-        // Show top 5 items
-        const topItems = config.menu.items.filter(item => item.available).slice(0, 5);
+        // Show top 5 items from database
+        const topItems = menuStore.getMenuItems({ available: true }).slice(0, 5);
         topItems.forEach(item => {
             text += `• ${item.name}\n`;
             text += `  ID: \`${item.id}\` - Rp ${this.formatNumber(item.price)}\n`;
@@ -52,8 +53,8 @@ module.exports = {
             return;
         }
 
-        // Find item
-        const item = config.menu.items.find(i => i.id === itemId);
+        // Find item from database
+        const item = menuStore.getMenuItemById(itemId);
         
         if (!item) {
             await sock.sendMessage(from, {

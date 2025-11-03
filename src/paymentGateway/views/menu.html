@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pangko Coffee · Kelola Menu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js" crossorigin="anonymous"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Manrope', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', 'system-ui', 'sans-serif']
+            },
+            colors: {
+              matcha: '#74A662',
+              cream: '#FFFDD0',
+              charcoal: '#333333',
+              peach: '#FFE5B4'
+            },
+            boxShadow: {
+              glow: '0 35px 80px -45px rgba(116, 166, 98, 0.65)'
+            }
+          }
+        }
+      };
+    </script>
+    <style>
+      body { font-family: Manrope, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui, sans-serif; }
+      img.emoji { height: 1em; width: 1em; margin: 0 .05em; vertical-align: -0.15em; }
+      .fade-in {
+        animation: fadeIn 0.3s ease-in-out;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-slide-in {
+        animation: slideIn 0.3s ease-out;
+      }
+      @keyframes slideIn {
+        from { opacity: 0; transform: translateX(100px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen bg-cream text-charcoal antialiased">
+    
+    <!-- Navbar -->
+    <nav id="app-navbar" class="fixed inset-x-0 top-0 z-50 py-4">
+      <div class="mx-auto w-full max-w-[1180px] px-5">
+        <div class="flex items-center justify-between rounded-2xl border border-white/40 bg-white/60 px-6 py-3 backdrop-blur transition-all duration-300">
+          <div class="flex items-center gap-3">
+            <img src="https://media.discordapp.net/attachments/1403748644657828031/1434222820501487791/567458429_17844516144596099_4231043402342710190_n.jpg?ex=69078b96&is=69063a16&hm=501155baf10b69fcf042da9c625e7259b0cbf9e660fce9f608e542b884a46eb2&=&format=webp&width=805&height=805" alt="Pangko Coffee" class="h-14 w-14 rounded-full object-cover border-2 border-white shadow-sm sm:h-16 sm:w-16 md:h-20 md:w-20" />
+            <div class="flex flex-col">
+              <span class="text-sm uppercase tracking-[0.18em] text-matcha">Pangko Coffee</span>
+              <strong class="text-base">Simple coffee, gentle taste.</strong>
+            </div>
+          </div>
+          <div class="hidden items-center gap-5 text-sm font-semibold sm:flex">
+            <a href="/" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Dashboard</a>
+            <a href="/analytics" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Statistik</a>
+            <a href="/menu" class="rounded-full px-4 py-2 transition bg-matcha text-white" aria-current="page">Menu</a>
+            <a href="/import" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Import</a>
+            <a href="/search" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Cari Order</a>
+            <a href="/webhook-tester" class="rounded-full px-4 py-2 transition hover:bg-matcha hover:text-white">Webhook Tester</a>
+          </div>
+          <div class="sm:hidden flex items-center gap-2">
+            <a href="/search" class="rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Cari →</a>
+            <a href="/analytics" class="rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Analisis →</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <main class="relative mx-auto flex w-full max-w-[1180px] flex-col gap-12 px-5 pt-40 pb-20">
+      
+      <!-- Header with Add Button -->
+      <section class="relative">
+        <div class="relative overflow-hidden rounded-3xl bg-white/90 px-10 py-12 shadow-glow">
+          <div class="pointer-events-none absolute -left-16 -top-16 h-64 w-64 rounded-full bg-matcha/25 blur-3xl"></div>
+          <div class="pointer-events-none absolute -right-12 bottom-0 h-56 w-56 rounded-full bg-peach/40 blur-3xl"></div>
+          
+          <div class="relative flex items-center justify-between">
+            <div>
+              <h1 class="text-4xl font-bold text-charcoal mb-3">☕ Kelola Menu</h1>
+              <p class="text-charcoal/60 text-lg">Tambah, edit, atau hapus item menu coffee shop</p>
+            </div>
+            <button onclick="openAddItemModal()" class="px-6 py-3 bg-matcha text-white font-semibold rounded-full hover:bg-matcha/90 transition-all shadow-md hover:shadow-lg">
+              + Tambah Item
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Category Tabs -->
+      <section class="relative">
+        <div class="bg-white/60 backdrop-blur rounded-2xl border border-white/40 p-2 inline-flex gap-2 shadow-md">
+          <button onclick="filterCategory('all')" class="category-tab active px-6 py-3 rounded-xl text-sm font-semibold transition-all">
+            Semua
+          </button>
+          <button onclick="filterCategory('coffee')" class="category-tab px-6 py-3 rounded-xl text-sm font-semibold transition-all">
+            ☕ Kopi
+          </button>
+          <button onclick="filterCategory('nonCoffee')" class="category-tab px-6 py-3 rounded-xl text-sm font-semibold transition-all">
+            🥤 Non-Kopi
+          </button>
+          <button onclick="filterCategory('food')" class="category-tab px-6 py-3 rounded-xl text-sm font-semibold transition-all">
+            🍰 Makanan
+          </button>
+        </div>
+      </section>
+
+      <!-- Menu Items Table -->
+      <section class="relative">
+        <div class="relative overflow-hidden rounded-3xl bg-white/90 shadow-glow">
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-matcha/10 border-b border-matcha/20">
+                <tr>
+                  <th class="px-6 py-4 text-left text-sm font-bold text-charcoal uppercase tracking-wider">ID</th>
+                  <th class="px-6 py-4 text-left text-sm font-bold text-charcoal uppercase tracking-wider">Nama</th>
+                  <th class="px-6 py-4 text-left text-sm font-bold text-charcoal uppercase tracking-wider">Kategori</th>
+                  <th class="px-6 py-4 text-left text-sm font-bold text-charcoal uppercase tracking-wider">Harga</th>
+                  <th class="px-6 py-4 text-left text-sm font-bold text-charcoal uppercase tracking-wider">Status</th>
+                  <th class="px-6 py-4 text-left text-sm font-bold text-charcoal uppercase tracking-wider">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="menu-items-tbody" class="divide-y divide-charcoal/10">
+                <!-- Items will be loaded here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Empty State -->
+      <div id="empty-state" class="hidden relative">
+        <div class="relative overflow-hidden rounded-3xl bg-white/90 px-10 py-16 shadow-glow text-center">
+          <div class="pointer-events-none absolute -left-16 -top-16 h-64 w-64 rounded-full bg-matcha/25 blur-3xl"></div>
+          <div class="relative">
+            <p class="text-charcoal/60 text-lg mb-6">Tidak ada item menu</p>
+            <button onclick="openAddItemModal()" class="px-8 py-4 bg-matcha text-white font-semibold rounded-full hover:bg-matcha/90 transition-all shadow-md hover:shadow-lg">
+              + Tambah Item Pertama
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Add/Edit Item Modal -->
+    <div id="item-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+      <div class="flex min-h-screen items-center justify-center p-4">
+        <div class="fixed inset-0 bg-charcoal/60 backdrop-blur-sm transition-opacity" onclick="closeItemModal()"></div>
+        
+        <div class="relative bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-10 border border-matcha/20">
+          <div class="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-matcha/20 blur-3xl"></div>
+          <div class="pointer-events-none absolute -left-8 bottom-0 h-40 w-40 rounded-full bg-peach/30 blur-3xl"></div>
+          
+          <div class="relative flex items-center justify-between mb-8">
+            <h2 id="modal-title" class="text-3xl font-bold text-charcoal">Tambah Item Menu</h2>
+            <button onclick="closeItemModal()" class="text-charcoal/40 hover:text-charcoal transition-colors">
+              <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <form id="item-form" onsubmit="saveItem(event)" class="relative space-y-5">
+            <div class="grid grid-cols-2 gap-5">
+              <div>
+                <label class="block text-sm font-semibold text-charcoal mb-2">ID Menu *</label>
+                <input type="text" id="item-id" required class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha focus:ring-4 focus:ring-matcha/10 transition-all" placeholder="C001">
+              </div>
+              
+              <div>
+                <label class="block text-sm font-semibold text-charcoal mb-2">Nama Item *</label>
+                <input type="text" id="item-name" required class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha focus:ring-4 focus:ring-matcha/10 transition-all" placeholder="Espresso">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-5">
+              <div>
+                <label class="block text-sm font-semibold text-charcoal mb-2">Kategori *</label>
+                <select id="item-category" required class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha focus:ring-4 focus:ring-matcha/10 transition-all">
+                  <option value="">Pilih Kategori</option>
+                  <option value="coffee">☕ Kopi</option>
+                  <option value="nonCoffee">🥤 Non-Kopi</option>
+                  <option value="food">🍰 Makanan</option>
+                </select>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-semibold text-charcoal mb-2">Harga (Rp) *</label>
+                <input type="number" id="item-price" required min="0" step="1000" class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha focus:ring-4 focus:ring-matcha/10 transition-all" placeholder="15000">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-charcoal mb-2">Deskripsi</label>
+              <textarea id="item-description" rows="3" class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha focus:ring-4 focus:ring-matcha/10 transition-all resize-none" placeholder="Deskripsi singkat menu (opsional)"></textarea>
+            </div>
+
+            <div class="flex items-center gap-3 p-4 bg-matcha/5 rounded-xl">
+              <input type="checkbox" id="item-available" checked class="w-5 h-5 text-matcha rounded focus:ring-matcha">
+              <label for="item-available" class="text-sm font-semibold text-charcoal">Tersedia (Available)</label>
+            </div>
+
+            <input type="hidden" id="item-edit-mode" value="false">
+            <input type="hidden" id="item-original-id" value="">
+
+            <div class="flex gap-4 pt-6">
+              <button type="button" onclick="closeItemModal()" class="flex-1 px-6 py-3 border-2 border-charcoal/20 text-charcoal font-semibold rounded-full hover:bg-charcoal/5 transition-all">
+                Batal
+              </button>
+              <button type="submit" class="flex-1 px-6 py-3 bg-matcha text-white font-semibold rounded-full hover:bg-matcha/90 transition-all shadow-md hover:shadow-lg">
+                Simpan
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+      <div class="flex min-h-screen items-center justify-center p-4">
+        <div class="fixed inset-0 bg-charcoal/60 backdrop-blur-sm transition-opacity" onclick="closeDeleteModal()"></div>
+        
+        <div class="relative bg-white rounded-3xl shadow-2xl max-w-md w-full p-10 border border-red-200">
+          <div class="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-red-500/20 blur-3xl"></div>
+          
+          <div class="relative">
+            <h2 class="text-3xl font-bold text-charcoal mb-4">Hapus Item?</h2>
+            <p class="text-charcoal/70 text-lg mb-8">Apakah Anda yakin ingin menghapus item <strong id="delete-item-name" class="text-charcoal"></strong>? Tindakan ini tidak dapat dibatalkan.</p>
+            
+            <div class="flex gap-4">
+              <button onclick="closeDeleteModal()" class="flex-1 px-6 py-3 border-2 border-charcoal/20 text-charcoal font-semibold rounded-full hover:bg-charcoal/5 transition-all">
+                Batal
+              </button>
+              <button onclick="confirmDelete()" class="flex-1 px-6 py-3 bg-red-600 text-white font-semibold rounded-full hover:bg-red-700 transition-all shadow-md hover:shadow-lg">
+                Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/js/menu.js"></script>
+  </body>
+</html>

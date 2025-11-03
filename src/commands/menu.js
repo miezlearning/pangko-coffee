@@ -1,4 +1,5 @@
 const config = require('../config/config');
+const menuStore = require('../services/menuStore');
 
 module.exports = {
     name: 'menu',
@@ -7,22 +8,24 @@ module.exports = {
     
     async execute(sock, msg, args) {
         const from = msg.key.remoteJid;
-        const menuItems = config.menu.items;
-        const categories = config.menu.categories;
+        
+        // Get menu from database
+        const menuItems = menuStore.getMenuItems({ available: true });
+        const categories = menuStore.getCategories();
 
         // Filter by category if specified
         let category = args[0] ? args[0].toLowerCase() : null;
         let filteredItems = menuItems;
 
         if (category) {
-            const validCategory = Object.keys(categories).find(
-                cat => cat.toLowerCase() === category || 
-                       categories[cat].name.toLowerCase().includes(category)
+            const validCategory = categories.find(
+                cat => cat.id.toLowerCase() === category || 
+                       cat.name.toLowerCase().includes(category)
             );
             
             if (validCategory) {
-                filteredItems = menuItems.filter(item => item.category === validCategory);
-                category = validCategory;
+                filteredItems = menuItems.filter(item => item.category === validCategory.id);
+                category = validCategory.id;
             }
         }
 
@@ -32,19 +35,22 @@ module.exports = {
 
         if (category) {
             // Show specific category
-            const cat = categories[category];
+            const cat = categories.find(c => c.id === category);
             menuText += `${cat.emoji} *${cat.name}*\n\n`;
             
             filteredItems.forEach((item, index) => {
                 const available = item.available ? '' : ' ❌ (Habis)';
                 menuText += `${index + 1}. *${item.name}*${available}\n`;
                 menuText += `   💰 Rp ${this.formatNumber(item.price)}\n`;
-                menuText += `   📝 Pesan: \`!order ${item.id} 1\`\n\n`;
+                if (item.description) {
+                    menuText += `   � ${item.description}\n`;
+                }
+                menuText += `   �📝 Pesan: \`!order ${item.id} 1\`\n\n`;
             });
         } else {
             // Show all categories
-            Object.entries(categories).forEach(([catKey, cat]) => {
-                const items = menuItems.filter(item => item.category === catKey);
+            categories.forEach(cat => {
+                const items = menuItems.filter(item => item.category === cat.id);
                 
                 if (items.length > 0) {
                     menuText += `${cat.emoji} *${cat.name}*\n`;

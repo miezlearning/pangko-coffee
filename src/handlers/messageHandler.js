@@ -53,7 +53,6 @@ async function messageHandler(sock, msg) {
                     } catch (_) { /* ignore */ }
                 }
             }
-            // No interactive session and no prefix - ignore
             return;
         }
 

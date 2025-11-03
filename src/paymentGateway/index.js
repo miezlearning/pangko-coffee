@@ -31,12 +31,14 @@ const statsRouter = require('./routes/stats');
 const webhookRouter = require('./routes/webhook');
 const exportRouter = require('./routes/export');
 const importRouter = require('./routes/import');
+const menuRouter = require('./routes/menu');
 
 // Mount routes
 app.use('/api/payments', paymentsRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/webhook', webhookRouter);
+app.use('/api/menu', menuRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/import', importRouter);
 
@@ -54,6 +56,11 @@ app.get('/search', (req, res) => {
     app.get('/analytics', (req, res) => {
         res.sendFile(path.join(__dirname, 'views/analytics.html'));
     });
+
+// Serve menu management page
+app.get('/menu', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views/menu.html'));
+});
 
 // Serve webhook tester
 app.get('/webhook-tester', (req, res) => {

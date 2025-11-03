@@ -46,6 +46,9 @@ module.exports = {
     },
 
     // Menu Configuration
+    // NOTE: Menu sekarang disimpan di database (src/data/database.db)
+    // Gunakan dashboard untuk mengelola menu: http://localhost:3000/menu
+    // Data di bawah ini hanya sebagai default untuk inisialisasi awal
     menu: {
         categories: {
             coffee: {

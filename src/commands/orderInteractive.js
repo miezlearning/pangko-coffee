@@ -1,5 +1,6 @@
 const config = require('../config/config');
 const orderManager = require('../services/orderManager');
+const menuStore = require('../services/menuStore');
 
 /**
  * Interactive Order System
@@ -127,19 +128,25 @@ module.exports = {
         session.step = 'select_item';
         interactiveSessions.set(userId, session);
 
-        // Show items in category
-        const items = config.menu.items.filter(item => 
-            item.category === categoryKey && item.available
-        );
+        // Show items in category from database
+        const items = menuStore.getMenuItems({ 
+            category: categoryKey, 
+            available: true 
+        });
 
-        const categoryName = config.menu.categories[categoryKey].name;
+        const category = menuStore.getCategoryById(categoryKey);
+        const categoryName = category ? category.name : 'Menu';
+        const categoryEmoji = category ? category.emoji : '📋';
         
-        let responseText = `${config.menu.categories[categoryKey].emoji} *${categoryName}*\n\n`;
+        let responseText = `${categoryEmoji} *${categoryName}*\n\n`;
         responseText += `Pilih menu:\n\n`;
         
         items.forEach((item, index) => {
             responseText += `${index + 1}. *${item.name}*\n`;
             responseText += `   Rp ${this.formatNumber(item.price)}\n`;
+            if (item.description) {
+                responseText += `   ${item.description}\n`;
+            }
             responseText += `   ID: ${item.id}\n\n`;
         });
         
@@ -155,10 +162,11 @@ module.exports = {
         const from = msg.key.remoteJid;
         const userId = msg.key.remoteJid;
 
-        // Get items in selected category
-        const items = config.menu.items.filter(item => 
-            item.category === session.category && item.available
-        );
+        // Get items in selected category from database
+        const items = menuStore.getMenuItems({ 
+            category: session.category, 
+            available: true 
+        });
 
         let selectedItem;
 

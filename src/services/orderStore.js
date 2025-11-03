@@ -16,6 +16,8 @@ function initDb() {
   ensureDir();
   const db = new Database(DB_FILE);
   db.pragma('journal_mode = WAL');
+  
+  // Orders table
   db.exec(`
     CREATE TABLE IF NOT EXISTS orders (
       orderId TEXT PRIMARY KEY,
@@ -27,6 +29,34 @@ function initDb() {
       total INTEGER
     );
   `);
+  
+  // Menu categories table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS menu_categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      emoji TEXT,
+      sortOrder INTEGER DEFAULT 0,
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  
+  // Menu items table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS menu_items (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      price INTEGER NOT NULL,
+      available INTEGER DEFAULT 1,
+      description TEXT,
+      image TEXT,
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  
   return db;
 }
 
