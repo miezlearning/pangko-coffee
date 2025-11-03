@@ -98,14 +98,32 @@ function renderMenu(){
   const items = MENU_ITEMS.filter(it=>
     (!q || (it.name||'').toLowerCase().includes(q)) && (cat==='all' || it.category===cat)
   );
+  
+  if(items.length===0){
+    grid.innerHTML = '<div class="col-span-full text-center py-12 text-charcoal/50">Tidak ada menu yang cocok</div>';
+    return;
+  }
+  
   grid.innerHTML = items.map(it=>{
     const price = fmt(it.price);
-    const img = it.image ? `<img src="${it.image}" class="w-full h-28 object-cover rounded-xl mb-2" onerror="this.style.display='none'"/>` : '';
-    return `<div class="rounded-2xl border border-charcoal/10 bg-white/80 p-3 hover:shadow-md transition">
-      ${img}
-      <div class="font-semibold">${it.name}</div>
-      <div class="text-sm text-charcoal/70">Rp ${price}</div>
-      <button class="mt-2 w-full bg-matcha text-cream rounded-lg py-2" onclick='addToCart(${JSON.stringify({id:it.id,name:it.name,price:it.price}).replace(/"/g,"&quot;")})'>Tambah</button>
+    // Get category emoji if available
+    const catObj = CATEGORIES.find(c=>c.id===it.category);
+    const emoji = catObj?.emoji || '☕';
+    
+    return `<div class="group rounded-xl border border-charcoal/10 bg-white/90 p-3.5 hover:shadow-lg hover:border-matcha/30 transition-all duration-200 cursor-pointer">
+      <div class="flex flex-col h-full">
+        <div class="flex items-start justify-between mb-2">
+          <div class="text-2xl">${emoji}</div>
+          <div class="text-xs px-2 py-0.5 rounded-full bg-cream text-charcoal/60 font-medium">${catObj?.name||'Menu'}</div>
+        </div>
+        <div class="flex-1 min-h-0">
+          <div class="font-bold text-sm mb-1 line-clamp-2 group-hover:text-matcha transition">${it.name}</div>
+          <div class="text-base font-extrabold text-matcha">Rp ${price}</div>
+        </div>
+        <button class="mt-3 w-full bg-matcha text-white rounded-lg py-2 text-sm font-semibold hover:bg-matcha/90 active:scale-95 transition-all" onclick='addToCart(${JSON.stringify({id:it.id,name:it.name,price:it.price}).replace(/"/g,"&quot;")})'>
+          + Tambah
+        </button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -139,21 +157,27 @@ function calcTotals(){
 
 function renderCart(){
   const list = el('cart-list');
-  if(CART.length===0){ list.innerHTML='<div class="text-sm text-charcoal/60">Keranjang kosong</div>'; }
+  if(CART.length===0){ 
+    list.innerHTML='<div class="text-center py-8 text-sm text-charcoal/50">🛒 Keranjang masih kosong</div>'; 
+  }
   else{
     list.innerHTML = CART.map(i=>
-      `<div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <div class="font-medium truncate">${i.name}</div>
-          <div class="text-xs text-charcoal/60">Rp ${fmt(i.price)}</div>
-          ${i.notes ? `<div class="text-xs text-charcoal/60 mt-1">📝 ${i.notes.replace(/</g,'&lt;')}</div>` : ''}
+      `<div class="flex items-start gap-3 p-2.5 rounded-lg bg-cream/50 border border-charcoal/5 hover:bg-cream/80 transition">
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-sm truncate">${i.name}</div>
+          <div class="text-xs text-charcoal/60 mt-0.5">Rp ${fmt(i.price)} × ${i.quantity} = <span class="font-semibold text-matcha">Rp ${fmt(i.price * i.quantity)}</span></div>
+          ${i.notes ? `<div class="text-xs text-charcoal/70 mt-1.5 bg-white/80 px-2 py-1 rounded border border-charcoal/10">📝 ${i.notes.replace(/</g,'&lt;')}</div>` : ''}
         </div>
-        <div class="flex items-center gap-2">
-          <button class="px-2 py-1 border rounded" onclick="changeQty('${i.id}',-1)">-</button>
-          <div class="w-6 text-center">${i.quantity}</div>
-          <button class="px-2 py-1 border rounded" onclick="changeQty('${i.id}',1)">+</button>
-          <button class="px-2 py-1" title="Catatan" onclick="editNote('${i.id}')">📝</button>
-          <button class="px-2 py-1 text-red-600" onclick="removeItem('${i.id}')">×</button>
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center gap-1 bg-white rounded-lg border border-charcoal/10">
+            <button class="px-2 py-1 hover:bg-charcoal/5 rounded-l-lg transition" onclick="changeQty('${i.id}',-1)">−</button>
+            <div class="w-8 text-center font-bold text-sm">${i.quantity}</div>
+            <button class="px-2 py-1 hover:bg-charcoal/5 rounded-r-lg transition" onclick="changeQty('${i.id}',1)">+</button>
+          </div>
+          <div class="flex gap-1">
+            <button class="px-2 py-1 text-xs hover:bg-white rounded border border-charcoal/10 transition" title="Catatan" onclick="editNote('${i.id}')">📝</button>
+            <button class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded border border-red-200 transition" title="Hapus" onclick="removeItem('${i.id}')">🗑</button>
+          </div>
         </div>
       </div>`
     ).join('');
@@ -161,7 +185,7 @@ function renderCart(){
   const t = calcTotals();
   el('subtotal').textContent = 'Rp '+fmt(t.subtotal);
   el('fee').textContent = 'Rp '+fmt(t.fee);
-  el('discount').textContent = (t.discount>0? '- ':'- ') + 'Rp ' + fmt(t.discount);
+  el('discount').textContent = (t.discount>0? '− ':'− ') + 'Rp ' + fmt(t.discount);
   el('total').textContent = 'Rp '+fmt(t.total);
   saveDraft();
 }
@@ -217,38 +241,50 @@ async function createOrder(){
 function showPaymentPanel(order, payment){
   const panel = el('payment-panel');
   panel.classList.remove('hidden');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  
   if(order.paymentMethod==='QRIS'){
     const q = encodeURIComponent(payment.qrisCode);
     const expiresAt = new Date(payment.expiresAt).toLocaleTimeString('id-ID');
     panel.innerHTML = `
-      <div>
-        <div class="flex items-center justify-between mb-2">
-          <div class="text-sm text-charcoal/60">Order ID: <strong>${order.orderId}</strong></div>
-          <span id="status-badge-${order.orderId}" class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">⏳ PENDING</span>
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="text-xs text-charcoal/60">Order <span class="font-mono font-bold">#${order.orderId}</span></div>
+          <span id="status-badge-${order.orderId}" class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">⏳ PENDING</span>
         </div>
-        <div class="text-lg font-bold mt-1">Total: Rp ${fmt(order.pricing.total)}</div>
-        <div class="mt-3 flex flex-col items-center">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${q}" alt="QRIS" class="rounded-xl border" />
-          <div class="text-xs text-charcoal/60 mt-2">Kadaluarsa: ${expiresAt}</div>
+        <div class="text-2xl font-extrabold text-matcha">Rp ${fmt(order.pricing.total)}</div>
+        <div class="bg-gradient-to-br from-matcha/5 to-peach/5 rounded-xl p-4 flex flex-col items-center border border-matcha/10">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${q}" alt="QRIS" class="rounded-lg border-2 border-white shadow-lg" />
+          <div class="text-xs text-charcoal/60 mt-3 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>Kadaluarsa: ${expiresAt}</span>
+          </div>
         </div>
-        <div class="mt-4 flex gap-2">
-          <button class="flex-1 bg-matcha text-cream rounded-lg py-2" onclick="confirmPayment('${order.orderId}')">Tandai Sudah Bayar</button>
-          <button class="flex-1 bg-red-600 text-cream rounded-lg py-2" onclick="rejectPayment('${order.orderId}')">Batalkan</button>
+        <div class="flex gap-2">
+          <button class="flex-1 bg-matcha text-white rounded-lg py-2.5 font-bold hover:bg-matcha/90 transition active:scale-95" onclick="confirmPayment('${order.orderId}')">✓ Sudah Bayar</button>
+          <button class="flex-1 bg-red-500 text-white rounded-lg py-2.5 font-bold hover:bg-red-600 transition active:scale-95" onclick="rejectPayment('${order.orderId}')">✕ Batal</button>
         </div>
       </div>`;
   } else {
     const until = order.cashExpiresAt ? new Date(order.cashExpiresAt).toLocaleTimeString('id-ID') : '';
     panel.innerHTML = `
-      <div>
-        <div class="flex items-center justify-between mb-2">
-          <div class="text-sm text-charcoal/60">Order ID: <strong>${order.orderId}</strong></div>
-          <span id="status-badge-${order.orderId}" class="px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">⏳ PENDING</span>
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="text-xs text-charcoal/60">Order <span class="font-mono font-bold">#${order.orderId}</span></div>
+          <span id="status-badge-${order.orderId}" class="px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">⏳ PENDING</span>
         </div>
-        <div class="text-lg font-bold mt-1">Total: Rp ${fmt(order.pricing.total)}</div>
-        <div class="text-xs text-charcoal/60 mt-2">Tunggu di kasir hingga ${until}</div>
-        <div class="mt-4 flex gap-2">
-          <button class="flex-1 bg-matcha text-cream rounded-lg py-2" onclick="acceptCash('${order.orderId}')">Terima Tunai</button>
-          <button class="flex-1 bg-red-600 text-cream rounded-lg py-2" onclick="cancelCash('${order.orderId}')">Batalkan</button>
+        <div class="text-2xl font-extrabold text-matcha">Rp ${fmt(order.pricing.total)}</div>
+        <div class="bg-gradient-to-br from-orange-50 to-peach/20 rounded-xl p-6 text-center border border-orange-100">
+          <div class="text-5xl mb-2">💵</div>
+          <div class="text-sm font-semibold text-charcoal/70">Tunggu pembayaran tunai</div>
+          <div class="text-xs text-charcoal/50 mt-1.5 flex items-center justify-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>Sampai ${until}</span>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button class="flex-1 bg-matcha text-white rounded-lg py-2.5 font-bold hover:bg-matcha/90 transition active:scale-95" onclick="acceptCash('${order.orderId}')">✓ Terima Tunai</button>
+          <button class="flex-1 bg-red-500 text-white rounded-lg py-2.5 font-bold hover:bg-red-600 transition active:scale-95" onclick="cancelCash('${order.orderId}')">✕ Batal</button>
         </div>
       </div>`;
   }
