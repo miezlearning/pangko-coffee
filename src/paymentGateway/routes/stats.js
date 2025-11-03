@@ -52,7 +52,29 @@ router.get('/', (req, res) => {
     }
 
     const revenueStatuses = new Set(['paid', 'processing', 'ready', 'completed']);
-    const todayOrders = orders.filter(o => o && o.createdAt && moment(o.createdAt).tz(tz).isSame(today, 'day'));
+    
+    // Filter orders created today using configured timezone
+    const nowInTz = moment().tz(tz);
+    const todayStart = nowInTz.clone().startOf('day');
+    const todayEnd = nowInTz.clone().endOf('day');
+    
+    const todayOrders = orders.filter(o => {
+        if (!o || !o.createdAt) return false;
+        try {
+            const orderMoment = moment(o.createdAt).tz(tz);
+            const isToday = orderMoment.isBetween(todayStart, todayEnd, null, '[]');
+            return isToday;
+        } catch (err) {
+            console.warn(`[Stats] Invalid date for order ${o.orderId}: ${o.createdAt}`);
+            return false;
+        }
+    });
+    
+    console.log(`[Stats] Total orders in DB: ${orders.length}, Today's orders: ${todayOrders.length}, Timezone: ${tz}`);
+    if (todayOrders.length > 0) {
+        console.log(`[Stats] Today's order IDs:`, todayOrders.map(o => `${o.orderId} (${o.status})`).join(', '));
+    }
+    
     const todayRevenue = todayOrders
         .filter(o => revenueStatuses.has((o.status || '').toLowerCase()))
         .reduce((sum, o) => sum + (o?.pricing?.total || 0), 0);

@@ -101,19 +101,30 @@ function switchTab(tabName) {
   }
 }
 
-// Update tab counters
+// Global counter state - prevents resetting other counters when updating one
+const tabCounterState = {
+  qris: 0,
+  cash: 0,
+  processing: 0,
+  ready: 0,
+  cancelled: 0
+};
+
+// Update tab counters (only updates provided counters, keeps others intact)
 function updateTabCounters(counts) {
-  const counters = {
-    qris: counts.qris || 0,
-    cash: counts.cash || 0,
-    processing: counts.processing || 0,
-    ready: counts.ready || 0,
-    cancelled: counts.cancelled || 0
-  };
+  // Merge new counts with existing state (only update what's provided)
+  Object.keys(counts).forEach(key => {
+    if (counts[key] !== undefined) {
+      tabCounterState[key] = counts[key];
+    }
+  });
   
-  Object.keys(counters).forEach(key => {
+  console.log('[Dashboard] Tab counters updated:', tabCounterState);
+  
+  // Update DOM with current state
+  Object.keys(tabCounterState).forEach(key => {
     const el = document.getElementById(`count-${key}`);
-    if (el) el.textContent = counters[key];
+    if (el) el.textContent = tabCounterState[key];
   });
 }
 
@@ -142,6 +153,7 @@ async function loadStats() {
     const data = await res.json();
 
     if (data.success) {
+      console.log('[Dashboard] Stats updated:', data.stats);
       document.getElementById('today-orders').textContent = data.stats.todayOrders;
       document.getElementById('today-revenue').textContent = 'Rp ' + formatNumber(data.stats.todayRevenue);
 
@@ -384,6 +396,9 @@ async function loadProcessingOrders() {
 
     // Update tab counter
     updateTabCounters({ processing: data.orders.length });
+    
+    // Update stats setiap kali load processing orders
+    loadStats();
 
     // Notify on truly new processing orders (e.g., Tunai langsung PROCESSSING, atau QRIS sesudah dikonfirmasi)
     if (!processingInitialized) {
@@ -509,6 +524,9 @@ async function loadPendingCash() {
 
     // Update tab counter
     updateTabCounters({ cash: data.orders.length });
+    
+    // Update stats setiap kali load pending cash
+    loadStats();
 
     // Notify on new pending cash
     if (!pendingCashInitialized) {
@@ -646,6 +664,7 @@ async function acceptCash(orderId) {
       knownPendingCashIds.delete(orderId);
       loadPendingCash();
       loadProcessingOrders();
+      loadStats();
     } else {
       showNotification('❌ Gagal terima tunai: ' + (data.message || 'Unknown error'));
     }
@@ -668,6 +687,8 @@ async function cancelCash(orderId) {
       showNotification('⏸️ Tunai dibatalkan. Customer diberi instruksi !lanjut');
       knownPendingCashIds.delete(orderId);
       loadPendingCash();
+      loadCancelledCash();
+      loadStats();
     } else {
       showNotification('❌ Gagal batalkan: ' + (data.message || 'Unknown error'));
     }
@@ -693,6 +714,7 @@ async function markOrderReady(orderId, customerName) {
     if (data.success) {
       showNotification(`✅ Pesanan siap untuk ${customerName}`);
       loadProcessingOrders();
+      loadReadyOrders();
       loadStats();
     } else {
       showNotification('❌ Gagal: ' + data.message);
@@ -775,6 +797,9 @@ async function loadCancelledCash() {
 
     // Update tab counter
     updateTabCounters({ cancelled: data.orders ? data.orders.length : 0 });
+    
+    // Update stats setiap kali load cancelled cash
+    loadStats();
 
     if (!data.orders || data.orders.length === 0) {
       list.innerHTML = `
@@ -844,6 +869,7 @@ async function reopenCash(orderId) {
       showNotification('🔁 Pesanan tunai dibuka kembali');
       loadCancelledCash();
       loadPendingCash();
+      loadStats();
     } else {
       showNotification('❌ Gagal buka kembali: ' + (data.message || 'Unknown error'));
     }
@@ -929,6 +955,9 @@ async function loadReadyOrders() {
 
     // Update tab counter
     updateTabCounters({ ready: data.orders ? data.orders.length : 0 });
+    
+    // Update stats setiap kali load ready orders
+    loadStats();
 
     if (!data.orders || data.orders.length === 0) {
       list.innerHTML = `
