@@ -172,6 +172,11 @@ function getMenuItems(filters = {}) {
       params.push(filters.available ? 1 : 0);
     }
     
+    if (filters.item_type) {
+      conditions.push('item_type = ?');
+      params.push(filters.item_type);
+    }
+    
     if (conditions.length > 0) {
       query += ' WHERE ' + conditions.join(' AND ');
     }
@@ -181,10 +186,12 @@ function getMenuItems(filters = {}) {
     const items = db.prepare(query).all(...params);
     db.close();
     
-    // Convert available back to boolean
+    // Convert boolean fields back
     return items.map(item => ({
       ...item,
-      available: item.available === 1
+      available: item.available === 1,
+      use_stock: item.use_stock === 1,
+      show_in_transaction: item.show_in_transaction === 1
     }));
   } catch (e) {
     console.error('Failed to get menu items:', e.message);
@@ -205,11 +212,49 @@ function getMenuItemById(id) {
     
     return {
       ...item,
-      available: item.available === 1
+      available: item.available === 1,
+      use_stock: item.use_stock === 1,
+      show_in_transaction: item.show_in_transaction === 1
     };
   } catch (e) {
     console.error('Failed to get menu item:', e.message);
     return null;
+  }
+}
+
+/**
+ * Migrate existing menu_items table to add new columns if they don't exist
+ */
+function migrateMenuItemsTable() {
+  try {
+    const db = getDb();
+    const newColumns = [
+      { name: 'item_type', type: 'TEXT DEFAULT "product"' },
+      { name: 'use_stock', type: 'INTEGER DEFAULT 0' },
+      { name: 'show_in_transaction', type: 'INTEGER DEFAULT 1' },
+      { name: 'stock_quantity', type: 'INTEGER DEFAULT 0' },
+      { name: 'weight', type: 'REAL DEFAULT 0' },
+      { name: 'unit', type: 'TEXT DEFAULT "pcs"' },
+      { name: 'discount_percent', type: 'REAL DEFAULT 0' },
+      { name: 'rack_location', type: 'TEXT' },
+      { name: 'notes', type: 'TEXT' }
+    ];
+    
+    newColumns.forEach(col => {
+      try {
+        db.prepare(`ALTER TABLE menu_items ADD COLUMN ${col.name} ${col.type}`).run();
+        console.log(`✅ Added column: ${col.name}`);
+      } catch (e) {
+        // Column already exists, ignore
+        if (!e.message.includes('duplicate column')) {
+          console.error(`Failed to add column ${col.name}:`, e.message);
+        }
+      }
+    });
+    
+    db.close();
+  } catch (e) {
+    console.error('Migration failed:', e.message);
   }
 }
 
@@ -220,8 +265,12 @@ function saveMenuItem(itemData) {
   try {
     const db = getDb();
     const stmt = db.prepare(`
-      INSERT INTO menu_items (id, name, category, price, available, description, image, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      INSERT INTO menu_items (
+        id, name, category, price, available, description, image,
+        item_type, use_stock, show_in_transaction, stock_quantity,
+        weight, unit, discount_percent, rack_location, notes, updatedAt
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
         category = excluded.category,
@@ -229,6 +278,15 @@ function saveMenuItem(itemData) {
         available = excluded.available,
         description = excluded.description,
         image = excluded.image,
+        item_type = excluded.item_type,
+        use_stock = excluded.use_stock,
+        show_in_transaction = excluded.show_in_transaction,
+        stock_quantity = excluded.stock_quantity,
+        weight = excluded.weight,
+        unit = excluded.unit,
+        discount_percent = excluded.discount_percent,
+        rack_location = excluded.rack_location,
+        notes = excluded.notes,
         updatedAt = CURRENT_TIMESTAMP
     `);
     
@@ -239,7 +297,16 @@ function saveMenuItem(itemData) {
       itemData.price,
       itemData.available ? 1 : 0,
       itemData.description || null,
-      itemData.image || null
+      itemData.image || null,
+      itemData.item_type || 'product',
+      itemData.use_stock ? 1 : 0,
+      itemData.show_in_transaction !== false ? 1 : 0,
+      itemData.stock_quantity || 0,
+      itemData.weight || 0,
+      itemData.unit || 'pcs',
+      itemData.discount_percent || 0,
+      itemData.rack_location || null,
+      itemData.notes || null
     );
     
     db.close();
@@ -289,7 +356,8 @@ function getMenuGrouped() {
   }
 }
 
-// Initialize default menu on module load
+// Run migrations and initialize default menu on module load
+migrateMenuItemsTable();
 initializeDefaultMenu();
 
 module.exports = {
@@ -302,5 +370,6 @@ module.exports = {
   saveMenuItem,
   deleteMenuItem,
   getMenuGrouped,
-  initializeDefaultMenu
+  initializeDefaultMenu,
+  migrateMenuItemsTable
 };

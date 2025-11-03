@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pangko Coffee · Kasir</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: { sans: ['Manrope','system-ui','sans-serif'] },
+            colors: { matcha:'#74A662', cream:'#FFFDD0', charcoal:'#333333', peach:'#FFE5B4' },
+            boxShadow: { glow: '0 35px 80px -45px rgba(116, 166, 98, 0.65)' }
+          }
+        }
+      }
+    </script>
+    <style>
+      body { font-family: Manrope, system-ui, sans-serif; }
+    </style>
+  </head>
+  <body class="min-h-screen bg-cream text-charcoal antialiased" data-page="cashier">
+    <div id="navbar-container"></div>
+
+    <main class="mx-auto w-full max-w-[1180px] px-5 pt-32 pb-16">
+      <header class="mb-6 flex items-center justify-between">
+        <div>
+          <h1 class="text-4xl font-extrabold tracking-tight">🧾 Kasir</h1>
+          <p class="mt-1 text-charcoal/70">Buat pesanan pelanggan langsung dari dashboard kasir</p>
+        </div>
+      </header>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Menu & Categories -->
+        <section class="lg:col-span-2">
+          <div class="mb-4 flex items-center gap-3">
+            <input id="search-input" type="text" placeholder="Cari menu..." class="flex-1 px-4 py-3 rounded-xl border border-charcoal/20 bg-white/80" />
+            <select id="category-select" class="px-4 py-3 rounded-xl border border-charcoal/20 bg-white/80">
+              <option value="all">Semua Kategori</option>
+            </select>
+          </div>
+
+          <div id="menu-grid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </section>
+
+        <!-- Cart / Order Summary -->
+        <aside class="lg:col-span-1">
+          <div class="rounded-3xl border border-white/45 bg-white/90 p-5 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
+            <h2 class="text-xl font-bold mb-3">Keranjang</h2>
+            <div id="cart-list" class="space-y-3 max-h-[380px] overflow-auto"></div>
+            <div class="mt-4 border-t pt-3">
+              <div class="flex justify-between text-sm text-charcoal/70">
+                <span>Subtotal</span><span id="subtotal">Rp 0</span>
+              </div>
+              <div class="flex justify-between text-sm text-charcoal/70">
+                <span>Biaya Layanan</span><span id="fee">Rp 0</span>
+              </div>
+              <div class="flex justify-between text-lg font-bold mt-2">
+                <span>Total</span><span id="total">Rp 0</span>
+              </div>
+            </div>
+
+            <div class="mt-4 space-y-3">
+              <input id="customer-name" type="text" placeholder="Nama pelanggan (opsional)" class="w-full px-4 py-3 rounded-xl border border-charcoal/20 bg-white/80" />
+              <input id="customer-id" type="text" placeholder="No. WA/ID (opsional)" class="w-full px-4 py-3 rounded-xl border border-charcoal/20 bg-white/80" />
+              <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2"><input type="radio" name="pm" value="QRIS" checked /> <span>QRIS</span></label>
+                <label class="flex items-center gap-2"><input type="radio" name="pm" value="CASH" /> <span>Tunai</span></label>
+              </div>
+              <button id="create-order-btn" class="w-full bg-matcha text-cream px-4 py-3 rounded-xl font-semibold">Buat Pesanan</button>
+            </div>
+          </div>
+
+          <!-- Payment Panel -->
+          <div id="payment-panel" class="hidden mt-6 rounded-3xl border border-white/45 bg-white/90 p-5"></div>
+        </aside>
+      </div>
+    </main>
+
+    <script src="/js/navbar.js"></script>
+    <script src="/js/cashier.js"></script>
+  </body>
+</html>

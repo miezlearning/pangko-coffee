@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pangko Coffee · Simulasi HPP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js" crossorigin="anonymous"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Manrope', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', 'system-ui', 'sans-serif']
+            },
+            colors: {
+              matcha: '#74A662',
+              cream: '#FFFDD0',
+              charcoal: '#333333',
+              peach: '#FFE5B4'
+            },
+            boxShadow: {
+              glow: '0 35px 80px -45px rgba(116, 166, 98, 0.65)'
+            }
+          }
+        }
+      };
+    </script>
+    <style>
+      body { font-family: Manrope, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui, sans-serif; }
+      img.emoji { height: 1em; width: 1em; margin: 0 .05em; vertical-align: -0.15em; }
+      .fade-in { animation: fadeIn 0.3s ease-in-out; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      .animate-slide-in { animation: slideIn 0.3s ease-out; }
+      @keyframes slideIn { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
+    </style>
+  </head>
+  <body class="min-h-screen bg-cream text-charcoal antialiased" data-page="hpp-simulator">
+    <div id="navbar-container"></div>
+    <main id="main-content" class="relative mx-auto flex w-full max-w-[900px] flex-col gap-12 px-5 pt-40 pb-20">
+      <section class="relative">
+        <div class="relative overflow-hidden rounded-3xl bg-white/90 px-10 py-12 shadow-glow">
+          <div class="pointer-events-none absolute -left-16 -top-16 h-64 w-64 rounded-full bg-matcha/25 blur-3xl"></div>
+          <div class="pointer-events-none absolute -right-12 bottom-0 h-56 w-56 rounded-full bg-peach/40 blur-3xl"></div>
+          <div class="relative">
+            <h1 class="text-4xl font-bold text-charcoal mb-3">🧮 Simulasi HPP Menu</h1>
+            <p class="text-charcoal/60 text-lg mb-6">Hitung HPP, margin, dan profit menu secara interaktif</p>
+
+            <!-- Saved Simulations -->
+            <div class="mb-6">
+              <div class="flex items-center justify-between mb-3">
+                <h2 class="text-xl font-bold text-charcoal">Simulasi Tersimpan</h2>
+                <div class="flex gap-3 items-center">
+                  <input id="sim-name" type="text" placeholder="Nama simulasi (contoh: Coffee Cream)" class="px-3 py-2 border rounded w-64" />
+                  <button id="save-sim-btn" class="bg-matcha text-cream px-3 py-2 rounded font-semibold">Simpan</button>
+                </div>
+              </div>
+              <div id="saved-simulations" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
+
+            <!-- Tabel Bahan Baku -->
+            <div class="mb-10">
+              <h2 class="text-xl font-bold text-matcha mb-2">Daftar Bahan Baku & Kemasan</h2>
+              <table class="w-full text-sm rounded-xl overflow-hidden border border-charcoal/10 mb-2">
+                <thead class="bg-matcha/10">
+                  <tr>
+                    <th class="p-2">Nama</th>
+                    <th class="p-2">Harga</th>
+                    <th class="p-2">Netto</th>
+                    <th class="p-2">Satuan</th>
+                    <th class="p-2">Harga/Satuan</th>
+                    <th class="p-2">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="hpp-bahan-list"></tbody>
+              </table>
+              <button id="add-bahan-btn" class="bg-matcha text-cream px-3 py-1 rounded font-semibold shadow hover:bg-matcha/80">+ Tambah Bahan</button>
+            </div>
+
+            <!-- Tabel Simulasi Resep -->
+            <div class="mb-10">
+              <h2 class="text-xl font-bold text-peach mb-2">Simulasi Resep Menu</h2>
+              <table class="w-full text-sm rounded-xl overflow-hidden border border-charcoal/10 mb-2">
+                <thead class="bg-peach/10">
+                  <tr>
+                    <th class="p-2">Bahan</th>
+                    <th class="p-2">Jumlah</th>
+                    <th class="p-2">Satuan</th>
+                    <th class="p-2">Harga/Satuan</th>
+                    <th class="p-2">Subtotal</th>
+                    <th class="p-2">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="hpp-resep-list"></tbody>
+              </table>
+              <button id="add-resep-btn" class="bg-peach text-charcoal px-3 py-1 rounded font-semibold shadow hover:bg-peach/80">+ Tambah Bahan ke Resep</button>
+            </div>
+
+            <!-- Ringkasan Simulasi -->
+            <div class="mb-6">
+              <h2 class="text-lg font-bold text-charcoal mb-2">Ringkasan Simulasi</h2>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="bg-peach/30 rounded-xl p-4">
+                  <div class="text-charcoal/70">Total HPP</div>
+                  <div id="hpp-total" class="text-2xl font-bold text-matcha"></div>
+                </div>
+                <div class="bg-matcha/10 rounded-xl p-4">
+                  <div class="text-charcoal/70">Total Volume</div>
+                  <div id="hpp-volume" class="text-2xl font-bold text-charcoal"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex gap-4 mt-6">
+              <button id="hpp-export-btn" class="bg-matcha text-cream px-4 py-2 rounded-lg font-semibold shadow hover:bg-matcha/80">Export Simulasi</button>
+              <button id="hpp-reset-btn" class="bg-charcoal text-cream px-4 py-2 rounded-lg font-semibold shadow hover:bg-charcoal/80">Reset</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script src="/js/navbar.js"></script>
+    <script src="/js/hpp-simulator.js"></script>
+  </body>
+</html>

@@ -65,15 +65,9 @@ router.get('/', (req, res) => {
             const isToday = orderMoment.isBetween(todayStart, todayEnd, null, '[]');
             return isToday;
         } catch (err) {
-            console.warn(`[Stats] Invalid date for order ${o.orderId}: ${o.createdAt}`);
             return false;
         }
     });
-    
-    console.log(`[Stats] Total orders in DB: ${orders.length}, Today's orders: ${todayOrders.length}, Timezone: ${tz}`);
-    if (todayOrders.length > 0) {
-        console.log(`[Stats] Today's order IDs:`, todayOrders.map(o => `${o.orderId} (${o.status})`).join(', '));
-    }
     
     const todayRevenue = todayOrders
         .filter(o => revenueStatuses.has((o.status || '').toLowerCase()))

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pangko Coffee · Tools</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: { sans: ['Manrope','system-ui','sans-serif'] },
+            colors: { matcha:'#74A662', cream:'#FFFDD0', charcoal:'#333333', peach:'#FFE5B4' },
+            boxShadow: { glow: '0 35px 80px -45px rgba(116, 166, 98, 0.65)' }
+          }
+        }
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body class="min-h-screen bg-cream text-charcoal antialiased" data-page="tools">
+    <!-- Navbar Container -->
+    <div id="navbar-container"></div>
+
+    <main class="mx-auto w-full max-w-[1180px] px-5 pt-32 pb-16">
+      <!-- Header -->
+      <header class="mb-8">
+        <h1 class="text-4xl font-extrabold tracking-tight">🛠️ Tools & Utilities</h1>
+        <p class="mt-2 text-lg text-charcoal/70">Kumpulan alat bantu untuk manajemen data dan testing sistem.</p>
+      </header>
+
+      <!-- Tools Grid -->
+      <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        
+        <!-- Import Data Tool -->
+        <a href="/import" class="group rounded-3xl border border-white/45 bg-white/90 p-7 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur transition hover:-translate-y-2 hover:shadow-[0_35px_80px_-45px_rgba(116,166,98,0.45)]">
+          <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-matcha/10 text-4xl">
+            📥
+          </div>
+          <h3 class="mt-5 text-xl font-bold">Import Data</h3>
+          <p class="mt-2 text-sm text-charcoal/70">Upload file JSON atau Excel untuk import data penjualan historis ke sistem.</p>
+          <div class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-matcha transition group-hover:gap-3">
+            Buka Tool <span>→</span>
+          </div>
+        </a>
+
+        <!-- Webhook Tester Tool -->
+        <a href="/webhook-tester" class="group rounded-3xl border border-white/45 bg-white/90 p-7 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur transition hover:-translate-y-2 hover:shadow-[0_35px_80px_-45px_rgba(255,229,180,0.45)]">
+          <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-peach/20 text-4xl">
+            🔗
+          </div>
+          <h3 class="mt-5 text-xl font-bold">Webhook Tester</h3>
+          <p class="mt-2 text-sm text-charcoal/70">Simulasi dan test webhook pembayaran untuk development dan debugging.</p>
+          <div class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-peach-800 transition group-hover:gap-3">
+            Buka Tool <span>→</span>
+          </div>
+        </a>
+
+        <!-- Salary Calculator Tool -->
+        <a href="/tools/salary-calculator" class="group rounded-3xl border border-white/45 bg-white/90 p-7 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur transition hover:-translate-y-2 hover:shadow-[0_35px_80px_-45px_rgba(116,166,98,0.45)]">
+          <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-matcha/20 to-peach/20 text-4xl">
+            💰
+          </div>
+          <h3 class="mt-5 text-xl font-bold">Kalkulator Gaji</h3>
+          <p class="mt-2 text-sm text-charcoal/70">Hitung pembagian gaji karyawan berdasarkan persentase dari pendapatan.</p>
+          <div class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-matcha transition group-hover:gap-3">
+            Buka Tool <span>→</span>
+          </div>
+        </a>
+
+        <!-- HPP Calculator Tool (Coming Soon) -->
+        <a href="/tools/hpp-simulator" class="group rounded-3xl border border-white/45 bg-white/90 p-7 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur transition hover:-translate-y-2 hover:shadow-[0_35px_80px_-45px_rgba(116,166,98,0.45)]">
+          <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-charcoal/10 text-4xl">
+            🧮
+          </div>
+          <h3 class="mt-5 text-xl font-bold">Kalkulator HPP</h3>
+          <p class="mt-2 text-sm text-charcoal/70">Hitung Harga Pokok Penjualan untuk setiap produk menu secara interaktif.</p>
+          <div class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-matcha transition group-hover:gap-3">
+            Buka Tool <span>→</span>
+          </div>
+        </a>
+
+        <!-- Inventory Management (Coming Soon) -->
+        <div class="rounded-3xl border border-dashed border-charcoal/20 bg-charcoal/5 p-7 opacity-60">
+          <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-charcoal/10 text-4xl">
+            📦
+          </div>
+          <h3 class="mt-5 text-xl font-bold">Manajemen Stok</h3>
+          <p class="mt-2 text-sm text-charcoal/70">Pantau dan kelola inventory bahan baku coffee shop.</p>
+          <div class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-charcoal/50">
+            <span class="rounded-full bg-charcoal/10 px-3 py-1 text-xs">Coming Soon</span>
+          </div>
+        </div>
+
+        <!-- Recipe Manager (Coming Soon) -->
+        <div class="rounded-3xl border border-dashed border-charcoal/20 bg-charcoal/5 p-7 opacity-60">
+          <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-charcoal/10 text-4xl">
+            📝
+          </div>
+          <h3 class="mt-5 text-xl font-bold">Manajemen Resep</h3>
+          <p class="mt-2 text-sm text-charcoal/70">Kelola resep dan komposisi setiap menu item.</p>
+          <div class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-charcoal/50">
+            <span class="rounded-full bg-charcoal/10 px-3 py-1 text-xs">Coming Soon</span>
+          </div>
+        </div>
+
+        <!-- Profit Analyzer (Coming Soon) -->
+        <div class="rounded-3xl border border-dashed border-charcoal/20 bg-charcoal/5 p-7 opacity-60">
+          <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-charcoal/10 text-4xl">
+            💰
+          </div>
+          <h3 class="mt-5 text-xl font-bold">Analisis Profit</h3>
+          <p class="mt-2 text-sm text-charcoal/70">Analisa margin keuntungan per produk dan periode.</p>
+          <div class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-charcoal/50">
+            <span class="rounded-full bg-charcoal/10 px-3 py-1 text-xs">Coming Soon</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Quick Access Section -->
+      <section class="mt-12 rounded-3xl border border-white/45 bg-white/90 p-8 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
+        <h2 class="text-2xl font-bold">📌 Shortcut</h2>
+        <p class="mt-2 text-sm text-charcoal/70">Akses cepat ke fitur yang sering digunakan</p>
+        
+        <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <a href="/import" class="rounded-2xl border border-matcha/20 bg-matcha/5 px-5 py-4 text-center transition hover:bg-matcha/10">
+            <div class="text-3xl">📥</div>
+            <div class="mt-2 text-sm font-semibold text-matcha">Import Data</div>
+          </a>
+          
+          <a href="/webhook-tester" class="rounded-2xl border border-peach/30 bg-peach/10 px-5 py-4 text-center transition hover:bg-peach/20">
+            <div class="text-3xl">🔗</div>
+            <div class="mt-2 text-sm font-semibold text-peach-800">Test Webhook</div>
+          </a>
+          
+          <a href="/analytics" class="rounded-2xl border border-charcoal/10 bg-white px-5 py-4 text-center transition hover:bg-charcoal/5">
+            <div class="text-3xl">📊</div>
+            <div class="mt-2 text-sm font-semibold text-charcoal">Statistik</div>
+          </a>
+          
+          <a href="/search" class="rounded-2xl border border-charcoal/10 bg-white px-5 py-4 text-center transition hover:bg-charcoal/5">
+            <div class="text-3xl">🔍</div>
+            <div class="mt-2 text-sm font-semibold text-charcoal">Cari Order</div>
+          </a>
+        </div>
+      </section>
+
+    </main>
+
+    <script src="/js/navbar.js"></script>
+  </body>
+</html>

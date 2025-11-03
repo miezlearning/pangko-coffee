@@ -11,9 +11,8 @@ function generateNavbar(activePage = 'dashboard') {
     { id: 'dashboard', label: 'Dashboard', href: '/' },
     { id: 'analytics', label: 'Statistik', href: '/analytics' },
     { id: 'menu', label: 'Menu', href: '/menu' },
-    { id: 'import', label: 'Import', href: '/import' },
     { id: 'search', label: 'Cari Order', href: '/search' },
-    { id: 'webhook', label: 'Webhook Tester', href: '/webhook-tester' }
+    { id: 'tools', label: 'Tools', href: '/tools' }
   ];
 
   const navHTML = navItems.map(item => {

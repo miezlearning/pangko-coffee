@@ -73,6 +73,7 @@
         </div>
       </section>
 
+
       <!-- Category Tabs -->
       <section class="relative">
         <div class="bg-white/60 backdrop-blur rounded-2xl border border-white/40 p-2 inline-flex gap-2 shadow-md">
@@ -98,12 +99,14 @@
             <table class="w-full">
               <thead class="bg-matcha/10 border-b border-matcha/20">
                 <tr>
-                  <th class="px-6 py-4 text-left text-sm font-bold text-charcoal uppercase tracking-wider">ID</th>
-                  <th class="px-6 py-4 text-left text-sm font-bold text-charcoal uppercase tracking-wider">Nama</th>
-                  <th class="px-6 py-4 text-left text-sm font-bold text-charcoal uppercase tracking-wider">Kategori</th>
-                  <th class="px-6 py-4 text-left text-sm font-bold text-charcoal uppercase tracking-wider">Harga</th>
-                  <th class="px-6 py-4 text-left text-sm font-bold text-charcoal uppercase tracking-wider">Status</th>
-                  <th class="px-6 py-4 text-left text-sm font-bold text-charcoal uppercase tracking-wider">Aksi</th>
+                  <th class="px-4 py-4 text-left text-xs font-bold text-charcoal uppercase">Gambar</th>
+                  <th class="px-4 py-4 text-left text-xs font-bold text-charcoal uppercase">Nama</th>
+                  <th class="px-4 py-4 text-left text-xs font-bold text-charcoal uppercase">Tipe</th>
+                  <th class="px-4 py-4 text-left text-xs font-bold text-charcoal uppercase">Kategori</th>
+                  <th class="px-4 py-4 text-left text-xs font-bold text-charcoal uppercase">Harga</th>
+                  <th class="px-4 py-4 text-left text-xs font-bold text-charcoal uppercase">Stok</th>
+                  <th class="px-4 py-4 text-left text-xs font-bold text-charcoal uppercase">Status</th>
+                  <th class="px-4 py-4 text-left text-xs font-bold text-charcoal uppercase">Aksi</th>
                 </tr>
               </thead>
               <tbody id="menu-items-tbody" class="divide-y divide-charcoal/10">
@@ -134,11 +137,11 @@
       <div class="flex min-h-screen items-center justify-center p-4">
         <div class="fixed inset-0 bg-charcoal/60 backdrop-blur-sm transition-opacity" onclick="closeItemModal()"></div>
         
-        <div class="relative bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-10 border border-matcha/20">
+        <div class="relative bg-white rounded-3xl shadow-2xl max-w-4xl w-full p-10 border border-matcha/20">
           <div class="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-matcha/20 blur-3xl"></div>
           <div class="pointer-events-none absolute -left-8 bottom-0 h-40 w-40 rounded-full bg-peach/30 blur-3xl"></div>
           
-          <div class="relative flex items-center justify-between mb-8">
+          <div class="relative flex items-center justify-between mb-6">
             <h2 id="modal-title" class="text-3xl font-bold text-charcoal">Tambah Item Menu</h2>
             <button onclick="closeItemModal()" class="text-charcoal/40 hover:text-charcoal transition-colors">
               <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -147,23 +150,40 @@
             </button>
           </div>
 
-          <form id="item-form" onsubmit="saveItem(event)" class="relative space-y-5">
-            <div class="grid grid-cols-2 gap-5">
-              <div>
-                <label class="block text-sm font-semibold text-charcoal mb-2">ID Menu *</label>
-                <input type="text" id="item-id" required class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha focus:ring-4 focus:ring-matcha/10 transition-all" placeholder="C001">
-              </div>
-              
-              <div>
-                <label class="block text-sm font-semibold text-charcoal mb-2">Nama Item *</label>
-                <input type="text" id="item-name" required class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha focus:ring-4 focus:ring-matcha/10 transition-all" placeholder="Espresso">
+          <form id="item-form" onsubmit="saveItem(event)" class="relative space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+            
+            <!-- Image Upload -->
+            <div class="p-5 bg-gradient-to-br from-matcha/5 to-peach/5 rounded-2xl border-2 border-dashed border-matcha/30">
+              <label class="block text-sm font-semibold text-charcoal mb-3">🖼️ Gambar Produk</label>
+              <div class="flex items-center gap-4">
+                <div id="image-preview" class="w-24 h-24 rounded-xl bg-white border-2 border-matcha/20 flex items-center justify-center overflow-hidden">
+                  <span class="text-charcoal/30 text-xs">No Image</span>
+                </div>
+                <div class="flex-1">
+                  <input type="text" id="item-image" class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha transition-all" placeholder="https://example.com/image.jpg">
+                  <p class="text-xs text-charcoal/50 mt-2">Masukkan URL gambar produk</p>
+                </div>
               </div>
             </div>
 
+            <!-- Basic Info -->
             <div class="grid grid-cols-2 gap-5">
               <div>
-                <label class="block text-sm font-semibold text-charcoal mb-2">Kategori *</label>
-                <select id="item-category" required class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha focus:ring-4 focus:ring-matcha/10 transition-all">
+                <label class="block text-sm font-semibold text-charcoal mb-2">🆔 ID Menu *</label>
+                <input type="text" id="item-id" required class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha transition-all" placeholder="C001">
+              </div>
+              
+              <div>
+                <label class="block text-sm font-semibold text-charcoal mb-2">📝 Nama Item *</label>
+                <input type="text" id="item-name" required class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha transition-all" placeholder="Espresso">
+              </div>
+            </div>
+
+            <!-- Category & Type -->
+            <div class="grid grid-cols-2 gap-5">
+              <div>
+                <label class="block text-sm font-semibold text-charcoal mb-2">📁 Kategori *</label>
+                <select id="item-category" required class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha transition-all">
                   <option value="">Pilih Kategori</option>
                   <option value="coffee">☕ Kopi</option>
                   <option value="nonCoffee">🥤 Non-Kopi</option>
@@ -172,19 +192,87 @@
               </div>
               
               <div>
-                <label class="block text-sm font-semibold text-charcoal mb-2">Harga (Rp) *</label>
-                <input type="number" id="item-price" required min="0" step="1000" class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha focus:ring-4 focus:ring-matcha/10 transition-all" placeholder="15000">
+                <label class="block text-sm font-semibold text-charcoal mb-2">🏷️ Tipe Barang *</label>
+                <select id="item-type" required class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha transition-all">
+                  <option value="product">Produk Jadi</option>
+                  <option value="ingredient">Bahan Baku</option>
+                  <option value="packaging">Kemasan</option>
+                </select>
               </div>
             </div>
 
-            <div>
-              <label class="block text-sm font-semibold text-charcoal mb-2">Deskripsi</label>
-              <textarea id="item-description" rows="3" class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha focus:ring-4 focus:ring-matcha/10 transition-all resize-none" placeholder="Deskripsi singkat menu (opsional)"></textarea>
+            <!-- Price & Discount -->
+            <div class="grid grid-cols-2 gap-5">
+              <div>
+                <label class="block text-sm font-semibold text-charcoal mb-2">💰 Harga (Rp) *</label>
+                <input type="number" id="item-price" required min="0" step="1000" class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha transition-all" placeholder="15000">
+              </div>
+              
+              <div>
+                <label class="block text-sm font-semibold text-charcoal mb-2">🏷️ Diskon (%)</label>
+                <input type="number" id="item-discount" min="0" max="100" step="0.1" value="0" class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha transition-all" placeholder="0">
+              </div>
             </div>
 
-            <div class="flex items-center gap-3 p-4 bg-matcha/5 rounded-xl">
-              <input type="checkbox" id="item-available" checked class="w-5 h-5 text-matcha rounded focus:ring-matcha">
-              <label for="item-available" class="text-sm font-semibold text-charcoal">Tersedia (Available)</label>
+            <!-- Stock Management -->
+            <div class="grid grid-cols-3 gap-5">
+              <div>
+                <label class="block text-sm font-semibold text-charcoal mb-2">⚖️ Berat</label>
+                <input type="number" id="item-weight" min="0" step="0.01" value="0" class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha transition-all" placeholder="0">
+              </div>
+              
+              <div>
+                <label class="block text-sm font-semibold text-charcoal mb-2">📦 Satuan</label>
+                <select id="item-unit" class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha transition-all">
+                  <option value="pcs">pcs (Pieces)</option>
+                  <option value="kg">kg (Kilogram)</option>
+                  <option value="gr">gr (Gram)</option>
+                  <option value="liter">Liter</option>
+                  <option value="ml">ml (Mililiter)</option>
+                  <option value="pack">Pack</option>
+                  <option value="box">Box</option>
+                </select>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-semibold text-charcoal mb-2">📊 Jumlah Stok</label>
+                <input type="number" id="item-stock" min="0" value="0" class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha transition-all" placeholder="0">
+              </div>
+            </div>
+
+            <!-- Rack Location -->
+            <div>
+              <label class="block text-sm font-semibold text-charcoal mb-2">📍 Letak Rak</label>
+              <input type="text" id="item-rack" class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha transition-all" placeholder="Rak A-12 atau kosongkan">
+            </div>
+
+            <!-- Description -->
+            <div>
+              <label class="block text-sm font-semibold text-charcoal mb-2">📄 Deskripsi & Keterangan</label>
+              <textarea id="item-description" rows="3" class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha transition-all resize-none" placeholder="Deskripsi singkat menu"></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-charcoal mb-2">📋 Notes Internal</label>
+              <textarea id="item-notes" rows="2" class="w-full px-4 py-3 border-2 border-matcha/20 rounded-xl focus:outline-none focus:border-matcha transition-all resize-none" placeholder="Catatan internal (tidak tampil di customer)"></textarea>
+            </div>
+
+            <!-- Toggles -->
+            <div class="grid grid-cols-3 gap-4">
+              <div class="flex items-center gap-3 p-4 bg-matcha/5 rounded-xl border border-matcha/20">
+                <input type="checkbox" id="item-available" checked class="w-5 h-5 text-matcha rounded focus:ring-matcha">
+                <label for="item-available" class="text-sm font-semibold text-charcoal">✅ Tersedia</label>
+              </div>
+              
+              <div class="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                <input type="checkbox" id="item-use-stock" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-600">
+                <label for="item-use-stock" class="text-sm font-semibold text-charcoal">📦 Pakai Stok</label>
+              </div>
+              
+              <div class="flex items-center gap-3 p-4 bg-purple-50 rounded-xl border border-purple-200">
+                <input type="checkbox" id="item-show-transaction" checked class="w-5 h-5 text-purple-600 rounded focus:ring-purple-600">
+                <label for="item-show-transaction" class="text-sm font-semibold text-charcoal">🛒 Tampil</label>
+              </div>
             </div>
 
             <input type="hidden" id="item-edit-mode" value="false">

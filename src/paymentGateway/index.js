@@ -72,6 +72,26 @@ app.get('/import', (req, res) => {
     res.sendFile(path.join(__dirname, 'views/import.html'));
 });
 
+// Serve tools page
+app.get('/tools', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views/tools.html'));
+});
+
+// Serve salary calculator
+app.get('/tools/salary-calculator', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views/salary-calculator.html'));
+});
+
+// Serve HPP Simulator page
+app.get('/tools/hpp-simulator', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views/hpp-simulator.html'));
+});
+
+// Serve cashier page
+app.get('/cashier', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views/cashier.html'));
+});
+
 /**
  * Set bot instance (called by main bot)
  */

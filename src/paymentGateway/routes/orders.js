@@ -5,6 +5,8 @@
 const express = require('express');
 const router = express.Router();
 const dataStore = require('../dataStore');
+const orderManager = require('../../services/orderManager');
+const paymentProvider = require('../../services/paymentProvider');
 
 /**
  * POST /api/orders/ready/:orderId
@@ -69,6 +71,58 @@ router.post('/ready/:orderId', async (req, res) => {
             message: 'Failed to mark order as ready',
             error: error.message
         });
+    }
+});
+
+/**
+ * POST /api/orders/create
+ * Create new order from cashier dashboard (POS)
+ * Body: { customerName, userId?, items: [{id,name,price,quantity,notes?}], paymentMethod: 'QRIS'|'CASH' }
+ */
+router.post('/create', async (req, res) => {
+    try {
+        const { customerName, userId, items, paymentMethod } = req.body || {};
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ success: false, message: 'Items required' });
+        }
+        const pm = (paymentMethod || 'QRIS').toUpperCase();
+        if (!['QRIS', 'CASH'].includes(pm)) {
+            return res.status(400).json({ success: false, message: 'paymentMethod must be QRIS or CASH' });
+        }
+        // Resolve userId (walk-in)
+        const uid = (userId && String(userId)) || `cashier-${Date.now()}@dashboard`;
+        // Build session cart
+        items.forEach(it => {
+            if (!it || typeof it.price !== 'number' || !it.id || !it.name) return;
+            const qty = Number(it.quantity || 1);
+            orderManager.addItemToCart(uid, { id: String(it.id), name: String(it.name), price: Number(it.price), size: it.size || 'REG', notes: it.notes || '' }, qty);
+        });
+        // Create order
+        const order = orderManager.createOrder(uid, customerName || 'Customer', pm);
+
+        let payment = null;
+        if (pm === 'QRIS') {
+            // Create dynamic QR
+            const qr = await paymentProvider.createDynamicQR(order);
+            orderManager.setOrderQRIS(order.orderId, qr.qrString);
+            payment = {
+                id: order.orderId,
+                orderId: order.orderId,
+                customerId: uid,
+                amount: order.pricing.total,
+                items: order.items,
+                status: 'pending',
+                qrisCode: qr.qrString,
+                createdAt: new Date(),
+                expiresAt: qr.expiresAt
+            };
+            dataStore.addPendingPayment(payment);
+        }
+
+        res.json({ success: true, order, payment });
+    } catch (error) {
+        console.error('Create order error:', error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 

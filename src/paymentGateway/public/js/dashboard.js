@@ -119,8 +119,6 @@ function updateTabCounters(counts) {
     }
   });
   
-  console.log('[Dashboard] Tab counters updated:', tabCounterState);
-  
   // Update DOM with current state
   Object.keys(tabCounterState).forEach(key => {
     const el = document.getElementById(`count-${key}`);
@@ -153,7 +151,6 @@ async function loadStats() {
     const data = await res.json();
 
     if (data.success) {
-      console.log('[Dashboard] Stats updated:', data.stats);
       document.getElementById('today-orders').textContent = data.stats.todayOrders;
       document.getElementById('today-revenue').textContent = 'Rp ' + formatNumber(data.stats.todayRevenue);
 

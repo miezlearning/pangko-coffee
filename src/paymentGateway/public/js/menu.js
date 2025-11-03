@@ -3,10 +3,7 @@
 let currentCategory = 'all';
 let deleteItemId = null;
 
-// Load menu items on page load
-document.addEventListener('DOMContentLoaded', () => {
-  loadMenuItems();
-});
+// Removed - moved to bottom with image preview listener
 
 // Load menu items from API
 async function loadMenuItems(category = 'all') {
@@ -44,43 +41,108 @@ function displayMenuItems(items) {
   
   emptyState.classList.add('hidden');
   
-  tbody.innerHTML = items.map(item => `
+  tbody.innerHTML = items.map(item => {
+    const finalPrice = item.discount_percent > 0 
+      ? item.price - (item.price * item.discount_percent / 100) 
+      : item.price;
+    
+    return `
     <tr class="hover:bg-matcha/5 transition-all">
-      <td class="px-6 py-4">
-        <span class="font-mono text-sm font-bold text-matcha bg-matcha/10 px-3 py-1 rounded-lg">${item.id}</span>
-      </td>
-      <td class="px-6 py-4">
-        <div>
-          <div class="font-semibold text-charcoal">${item.name}</div>
-          ${item.description ? `<div class="text-sm text-charcoal/60 mt-1">${item.description}</div>` : ''}
+      <td class="px-4 py-4">
+        <div class="w-16 h-16 rounded-xl overflow-hidden bg-charcoal/5 border border-charcoal/10 flex items-center justify-center">
+          ${item.image 
+            ? `<img src="${item.image}" alt="${item.name}" class="w-full h-full object-cover" onerror="this.style.display='none'">` 
+            : '<span class="text-2xl">📦</span>'}
         </div>
       </td>
-      <td class="px-6 py-4">
-        <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold ${getCategoryBadgeClass(item.category)}">
+      <td class="px-4 py-4">
+        <div>
+          <div class="font-semibold text-charcoal">${item.name}</div>
+          ${item.description ? `<div class="text-xs text-charcoal/60 mt-1 line-clamp-1">${item.description}</div>` : ''}
+          ${item.rack_location ? `<div class="text-xs text-blue-600 mt-1">📍 ${item.rack_location}</div>` : ''}
+        </div>
+      </td>
+      <td class="px-4 py-4">
+        <span class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold ${getTypeBadgeClass(item.item_type)}">
+          ${getTypeLabel(item.item_type)}
+        </span>
+      </td>
+      <td class="px-4 py-4">
+        <span class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold ${getCategoryBadgeClass(item.category)}">
           ${getCategoryLabel(item.category)}
         </span>
       </td>
-      <td class="px-6 py-4">
-        <span class="font-semibold text-charcoal">Rp ${formatNumber(item.price)}</span>
+      <td class="px-4 py-4">
+        <div class="font-semibold text-charcoal">
+          ${item.discount_percent > 0 
+            ? `<div class="text-xs text-red-600 line-through">Rp ${formatNumber(item.price)}</div>
+               <div class="text-sm text-matcha">Rp ${formatNumber(finalPrice)}</div>
+               <div class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded inline-block mt-1">-${item.discount_percent}%</div>`
+            : `<span class="text-sm">Rp ${formatNumber(item.price)}</span>`
+          }
+        </div>
       </td>
-      <td class="px-6 py-4">
-        ${item.available 
-          ? '<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold bg-green-100 text-green-700 border border-green-200">✓ Tersedia</span>'
-          : '<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold bg-red-100 text-red-700 border border-red-200">✗ Habis</span>'
+      <td class="px-4 py-4">
+        ${item.use_stock 
+          ? `<div class="text-sm font-semibold ${item.stock_quantity > 0 ? 'text-green-700' : 'text-red-600'}">
+               ${item.stock_quantity} ${item.unit || 'pcs'}
+             </div>`
+          : '<span class="text-xs text-charcoal/40">-</span>'
         }
       </td>
-      <td class="px-6 py-4">
+      <td class="px-4 py-4">
+        <div class="flex flex-col gap-1">
+          ${item.available 
+            ? '<span class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-green-100 text-green-700 border border-green-200">✓ Tersedia</span>'
+            : '<span class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-red-100 text-red-700 border border-red-200">✗ Habis</span>'
+          }
+          ${!item.show_in_transaction 
+            ? '<span class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600">🔒 Hidden</span>'
+            : ''
+          }
+        </div>
+      </td>
+      <td class="px-4 py-4">
         <div class="flex items-center gap-2">
-          <button onclick='editItem(${JSON.stringify(item)})' class="px-4 py-2 text-sm font-semibold text-matcha hover:bg-matcha/10 rounded-lg transition-all border border-matcha/20 hover:border-matcha/40">
+          <button onclick='editItem(${JSON.stringify(item).replace(/'/g, "\\'")})' class="px-3 py-2 text-xs font-semibold text-matcha hover:bg-matcha/10 rounded-lg transition-all border border-matcha/20">
             Edit
           </button>
-          <button onclick="openDeleteModal('${item.id}', '${item.name}')" class="px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-all border border-red-200 hover:border-red-300">
+          <button onclick="openDeleteModal('${item.id}', '${item.name}')" class="px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-all border border-red-200">
             Hapus
           </button>
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
+}
+
+// Get type badge class
+function getTypeBadgeClass(type) {
+  switch (type) {
+    case 'product':
+      return 'bg-purple-100 text-purple-700 border border-purple-200';
+    case 'ingredient':
+      return 'bg-orange-100 text-orange-700 border border-orange-200';
+    case 'packaging':
+      return 'bg-teal-100 text-teal-700 border border-teal-200';
+    default:
+      return 'bg-gray-100 text-gray-700 border border-gray-200';
+  }
+}
+
+// Get type label
+function getTypeLabel(type) {
+  switch (type) {
+    case 'product':
+      return '🍵 Produk';
+    case 'ingredient':
+      return '🧃 Bahan';
+    case 'packaging':
+      return '📦 Kemasan';
+    default:
+      return type || 'product';
+  }
 }
 
 // Get category badge class
@@ -145,14 +207,50 @@ function editItem(item) {
   document.getElementById('item-id').value = item.id;
   document.getElementById('item-name').value = item.name;
   document.getElementById('item-category').value = item.category;
+  document.getElementById('item-type').value = item.item_type || 'product';
   document.getElementById('item-price').value = item.price;
+  document.getElementById('item-discount').value = item.discount_percent || 0;
+  document.getElementById('item-weight').value = item.weight || 0;
+  document.getElementById('item-unit').value = item.unit || 'pcs';
+  document.getElementById('item-stock').value = item.stock_quantity || 0;
+  document.getElementById('item-rack').value = item.rack_location || '';
   document.getElementById('item-description').value = item.description || '';
+  document.getElementById('item-notes').value = item.notes || '';
+  document.getElementById('item-image').value = item.image || '';
   document.getElementById('item-available').checked = item.available;
+  document.getElementById('item-use-stock').checked = item.use_stock;
+  document.getElementById('item-show-transaction').checked = item.show_in_transaction !== false;
   document.getElementById('item-edit-mode').value = 'true';
   document.getElementById('item-original-id').value = item.id;
   document.getElementById('item-id').readOnly = true;
+  
+  // Update image preview
+  updateImagePreview(item.image);
+  
   document.getElementById('item-modal').classList.remove('hidden');
 }
+
+// Update image preview
+function updateImagePreview(imageUrl) {
+  const preview = document.getElementById('image-preview');
+  if (imageUrl) {
+    preview.innerHTML = `<img src="${imageUrl}" alt="Preview" class="w-full h-full object-cover" onerror="this.style.display='none'">`;
+  } else {
+    preview.innerHTML = '<span class="text-charcoal/30 text-xs">No Image</span>';
+  }
+}
+
+// Listen to image input change
+document.addEventListener('DOMContentLoaded', () => {
+  const imageInput = document.getElementById('item-image');
+  if (imageInput) {
+    imageInput.addEventListener('input', (e) => {
+      updateImagePreview(e.target.value);
+    });
+  }
+  
+  loadMenuItems();
+});
 
 // Save item
 async function saveItem(event) {
@@ -162,9 +260,19 @@ async function saveItem(event) {
     id: document.getElementById('item-id').value.trim().toUpperCase(),
     name: document.getElementById('item-name').value.trim(),
     category: document.getElementById('item-category').value,
+    item_type: document.getElementById('item-type').value,
     price: parseInt(document.getElementById('item-price').value),
+    discount_percent: parseFloat(document.getElementById('item-discount').value) || 0,
+    weight: parseFloat(document.getElementById('item-weight').value) || 0,
+    unit: document.getElementById('item-unit').value,
+    stock_quantity: parseInt(document.getElementById('item-stock').value) || 0,
+    rack_location: document.getElementById('item-rack').value.trim() || null,
     description: document.getElementById('item-description').value.trim() || null,
-    available: document.getElementById('item-available').checked
+    notes: document.getElementById('item-notes').value.trim() || null,
+    image: document.getElementById('item-image').value.trim() || null,
+    available: document.getElementById('item-available').checked,
+    use_stock: document.getElementById('item-use-stock').checked,
+    show_in_transaction: document.getElementById('item-show-transaction').checked
   };
   
   try {
