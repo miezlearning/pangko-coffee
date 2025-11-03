@@ -496,11 +496,17 @@ async function loadProcessingOrders() {
               </div>
             </div>
 
-            <!-- Action Button -->
-            <button class="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="markOrderReady('${order.orderId}', '${order.customerName}')">
-              <span>✅</span>
-              <span>Tandai Siap - Atas Nama: ${order.customerName}</span>
-            </button>
+            <!-- Action Buttons -->
+            <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button class="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-peach bg-white px-4 py-3 text-sm font-semibold text-peach transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printReceipt('${order.orderId}')">
+                <span>🖨️</span>
+                <span>Print & Buka Laci</span>
+              </button>
+              <button class="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="markOrderReady('${order.orderId}', '${order.customerName}')">
+                <span>✅</span>
+                <span>Tandai Siap</span>
+              </button>
+            </div>
           </div>
         `;
       }).join('');
@@ -1037,11 +1043,17 @@ async function loadReadyOrders() {
             </div>
           </div>
 
-          <!-- Action Button -->
-          <button class="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-charcoal px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="completeOrder('${order.orderId}', '${order.customerName}')">
-            <span>✔️</span>
-            <span>Tandai Sudah Diambil & Selesai</span>
-          </button>
+          <!-- Action Buttons -->
+          <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+            <button class="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-peach bg-white px-4 py-3 text-sm font-semibold text-peach transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printReceipt('${order.orderId}')">
+              <span>🖨️</span>
+              <span>Print & Buka Laci</span>
+            </button>
+            <button class="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-charcoal px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="completeOrder('${order.orderId}', '${order.customerName}')">
+              <span>✔️</span>
+              <span>Tandai Sudah Diambil</span>
+            </button>
+          </div>
         </div>`;
     }).join('');
   } catch (e) {
@@ -1065,6 +1077,107 @@ async function completeOrder(orderId, customerName) {
       loadStats();
     } else {
       showNotification('❌ Gagal tanda selesai: ' + (data.message || 'Unknown error'));
+    }
+  } catch (e) {
+    showNotification('❌ Error: ' + e.message);
+  }
+}
+
+/**
+ * Print receipt and open cash drawer
+ */
+async function printReceipt(orderId) {
+  const proceed = confirm(`Print struk dan buka laci kasir?\n\nOrder: ${orderId}`);
+  if (!proceed) return;
+  
+  try {
+    showNotification('🖨️ Mencetak struk...', 'info');
+    
+    const res = await fetch(`/api/printer/print-and-open/${orderId}`, {
+      method: 'POST'
+    });
+    
+    const data = await res.json();
+    
+    if (data.success) {
+      showNotification('✅ Struk berhasil dicetak & laci terbuka');
+    } else {
+      showNotification('❌ Gagal: ' + (data.message || 'Unknown error'));
+    }
+  } catch (e) {
+    showNotification('❌ Error: ' + e.message);
+  }
+}
+
+/**
+ * Open cash drawer manually (without printing)
+ */
+async function openDrawer() {
+  try {
+    showNotification('💰 Membuka laci...', 'info');
+    
+    const res = await fetch('/api/printer/open-drawer', {
+      method: 'POST'
+    });
+    
+    const data = await res.json();
+    
+    if (data.success) {
+      showNotification('✅ Laci kasir terbuka');
+    } else {
+      showNotification('❌ Gagal: ' + (data.message || 'Unknown error'));
+    }
+  } catch (e) {
+    showNotification('❌ Error: ' + e.message);
+  }
+}
+
+/**
+ * Test print dari header button
+ */
+async function testPrintReceipt() {
+  const proceed = confirm('🖨️ Test Print Receipt?\n\nAkan mencetak struk test dari printer.');
+  if (!proceed) return;
+  
+  try {
+    showNotification('🖨️ Mengirim test print...', 'info');
+    
+    const res = await fetch('/api/printer/test', {
+      method: 'POST'
+    });
+    
+    const data = await res.json();
+    
+    if (data.success) {
+      showNotification('✅ Test print berhasil! Cek printer Anda.');
+    } else {
+      showNotification('❌ Test print gagal: ' + (data.message || 'Unknown error'));
+    }
+  } catch (e) {
+    showNotification('❌ Error: ' + e.message);
+  }
+}
+
+/**
+ * Test buka laci dari header button
+ */
+async function testOpenDrawer() {
+  const proceed = confirm('💰 Test Buka Laci?\n\nAkan membuka cash drawer untuk testing.');
+  if (!proceed) return;
+  
+  try {
+    showNotification('💰 Membuka laci kasir...', 'info');
+    
+    const res = await fetch('/api/printer/open-drawer', {
+      method: 'POST'
+    });
+    
+    const data = await res.json();
+    
+    if (data.success) {
+      showNotification('✅ Laci kasir berhasil dibuka!');
+    } else {
+      showNotification('❌ Gagal buka laci: ' + (data.message || 'Unknown error'));
     }
   } catch (e) {
     showNotification('❌ Error: ' + e.message);

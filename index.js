@@ -1,5 +1,7 @@
 const WhatsAppBot = require('./src/bot');
 const PaymentGateway = require('./src/paymentGateway');
+const printerService = require('./src/services/printerService');
+const config = require('./src/config/config');
 
 /**
  * Main Entry Point
@@ -11,6 +13,11 @@ async function main() {
     console.log('');
 
     try {
+        // Initialize printer (if enabled in config)
+        if (config.printer?.enabled) {
+            printerService.init(config.printer);
+        }
+
         // Start payment gateway dashboard
         PaymentGateway.startServer();
         

@@ -212,6 +212,7 @@ class OrderManager {
             throw new Error('Order not found');
         }
 
+        const oldStatus = order.status;
         order.status = status;
         order.updatedAt = new Date();
 
@@ -221,6 +222,13 @@ class OrderManager {
         } else if (status === this.STATUS.PROCESSING) {
             // Mark when processing started (used by dashboard duration)
             if (!order.confirmedAt) order.confirmedAt = new Date();
+
+            // 🖨️ Auto-print receipt and open cash drawer when payment confirmed
+            // Trigger when transitioning to PROCESSING from PENDING states
+            if ((oldStatus === this.STATUS.PENDING || oldStatus === this.STATUS.PENDING_CASH) && 
+                status === this.STATUS.PROCESSING) {
+                this._autoPrintReceipt(order);
+            }
         } else if (status === this.STATUS.COMPLETED) {
             order.completedAt = new Date();
         }
@@ -230,6 +238,31 @@ class OrderManager {
         this._persistAll();
         
         return order;
+    }
+
+    /**
+     * Auto-print receipt when payment confirmed (async, non-blocking)
+     */
+    _autoPrintReceipt(order) {
+        try {
+            const config = require('../config/config');
+            if (!config.printer?.enabled || !config.printer?.autoPrint) {
+                return;
+            }
+
+            const printerService = require('./printerService');
+            
+            // Run async without blocking order status update
+            printerService.printAndOpenDrawer(order)
+                .then(() => {
+                    console.log(`[OrderManager] ✅ Auto-printed receipt for ${order.orderId}`);
+                })
+                .catch(err => {
+                    console.error(`[OrderManager] ❌ Auto-print failed for ${order.orderId}:`, err.message);
+                });
+        } catch (error) {
+            console.error('[OrderManager] Error triggering auto-print:', error.message);
+        }
     }
 
     /**

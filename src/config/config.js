@@ -110,6 +110,25 @@ module.exports = {
         }
     },
 
+    // Printer Configuration
+    printer: {
+        enabled: false,              // Set to true to enable printer
+        type: 'EPSON',               // VSC TM-58V uses EPSON ESC/POS protocol
+        interface: 'tcp://192.168.192.168', // VSC TM-58V default IP (change if needed)
+        // VSC TM-58V Connection Options:
+        // - Network: 'tcp://192.168.192.168' (default VSC IP)
+        // - USB: 'usb://0x0fe6:0x811e' (VSC USB vendor:product ID)
+        // - Serial: 'com://COM3' (Windows) or '/dev/ttyUSB0' (Linux)
+        
+        autoPrint: false,            // Auto-print receipt when payment confirmed
+        autoOpenDrawer: false,       // Auto-open cash drawer after print (RJ11 port)
+        
+        // Receipt customization (58mm width)
+        shopName: 'PANGKO COFFEE',
+        shopAddress: 'Jl. Contoh No. 123',
+        shopPhone: '0812-3456-7890'
+    },
+
     // Messages Template
     messages: {
     welcome: `Selamat datang di *{shopName}*! ☕

@@ -32,6 +32,7 @@ const webhookRouter = require('./routes/webhook');
 const exportRouter = require('./routes/export');
 const importRouter = require('./routes/import');
 const menuRouter = require('./routes/menu');
+const printerRouter = require('./routes/printer');
 
 // Mount routes
 app.use('/api/payments', paymentsRouter);
@@ -41,6 +42,7 @@ app.use('/api/webhook', webhookRouter);
 app.use('/api/menu', menuRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/import', importRouter);
+app.use('/api/printer', printerRouter);
 
 // Serve dashboard
 app.get('/', (req, res) => {
