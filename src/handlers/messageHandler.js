@@ -21,7 +21,7 @@ async function messageHandler(sock, msg) {
         const isGroup = from.endsWith('@g.us');
         
         // Ignore group messages (optional)
-        // if (isGroup) return;
+        if (isGroup) return;
 
     // Parse command
         const args = messageText.trim().split(/\s+/);
