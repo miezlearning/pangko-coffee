@@ -14,7 +14,7 @@
 
 ### Step 1: Sambungkan Hardware
 
-#### A. USB Connection (Paling Mudah)
+#### A. USB Connection (Paling Mudah) ⭐
 1. Colok kabel USB dari printer ke komputer
 2. Install driver VSC jika belum (biasanya auto-detect Windows)
 3. Pastikan printer muncul di Device Manager
@@ -27,7 +27,18 @@ Get-PnpDevice -Class Printer | Where-Object {$_.FriendlyName -like "*VSC*"}
 
 Biasanya VSC TM-58V punya USB ID: `0x0fe6:0x811e`
 
-#### B. Network Connection (dengan WiFi/Ethernet Adapter)
+#### B. Bluetooth Connection (Tanpa Kabel) 🔵
+1. Pair VSC via Windows Bluetooth settings
+2. Windows create virtual COM port otomatis
+3. Cek COM port: `Get-WmiObject Win32_SerialPort`
+4. Gunakan COM port di config (contoh: `com://COM6`)
+
+**📘 Lihat panduan lengkap:** `BLUETOOTH_PRINTER_SETUP.md`
+
+**Pros:** Wireless, fleksibel, no cable mess  
+**Cons:** Slower, bisa disconnect, setup lebih ribet
+
+#### C. Network Connection (dengan WiFi/Ethernet Adapter)
 1. Sambungkan VSC ke network adapter
 2. Default IP VSC biasanya: `192.168.192.168`
 3. Print test page untuk konfirmasi IP

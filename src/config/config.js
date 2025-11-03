@@ -116,9 +116,11 @@ module.exports = {
         type: 'EPSON',               // VSC TM-58V uses EPSON ESC/POS protocol
         interface: 'tcp://192.168.192.168', // VSC TM-58V default IP (change if needed)
         // VSC TM-58V Connection Options:
+        // - USB: 'printer:VSC TM-T88' or 'usb://0x0fe6:0x811e' (VSC USB ID)
         // - Network: 'tcp://192.168.192.168' (default VSC IP)
-        // - USB: 'usb://0x0fe6:0x811e' (VSC USB vendor:product ID)
         // - Serial: 'com://COM3' (Windows) or '/dev/ttyUSB0' (Linux)
+        // - Bluetooth: 'com://COM5' (pair via Windows, then use virtual COM port)
+        //   Lihat BLUETOOTH_PRINTER_SETUP.md untuk cara setup Bluetooth
         
         autoPrint: false,            // Auto-print receipt when payment confirmed
         autoOpenDrawer: false,       // Auto-open cash drawer after print (RJ11 port)
