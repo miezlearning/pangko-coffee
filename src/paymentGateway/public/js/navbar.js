@@ -30,7 +30,7 @@ function generateNavbar(activePage = 'dashboard') {
       <div class="mx-auto w-full max-w-[1180px] px-5">
         <div class="flex items-center justify-between rounded-2xl border border-white/40 bg-white/60 px-6 py-3 backdrop-blur transition-all duration-300">
           <div class="flex items-center gap-3">
-            <img src="https://media.discordapp.net/attachments/1403748644657828031/1434222820501487791/567458429_17844516144596099_4231043402342710190_n.jpg?ex=69078b96&is=69063a16&hm=501155baf10b69fcf042da9c625e7259b0cbf9e660fce9f608e542b884a46eb2&=&format=webp&width=805&height=805" alt="Pangko Coffee" class="h-14 w-14 rounded-full object-cover border-2 border-white shadow-sm sm:h-16 sm:w-16 md:h-20 md:w-20" />
+            <img src="https://i.imgur.com/KJIUltC.jpeg" alt="Pangko Coffee" class="h-14 w-14 rounded-full object-cover border-2 border-white shadow-sm sm:h-16 sm:w-16 md:h-20 md:w-20" />
             <div class="flex flex-col">
               <span class="text-sm uppercase tracking-[0.18em] text-matcha">Pangko Coffee</span>
               <strong class="text-base">Simple coffee, gentle taste.</strong>

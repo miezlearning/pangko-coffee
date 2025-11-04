@@ -225,7 +225,7 @@ class OrderManager {
 
             // 🖨️ Auto-print receipt and open cash drawer when payment confirmed
             // Trigger when transitioning to PROCESSING from PENDING states
-            if ((oldStatus === this.STATUS.PENDING || oldStatus === this.STATUS.PENDING_CASH) && 
+            if ((oldStatus === this.STATUS.PENDING_PAYMENT || oldStatus === this.STATUS.PENDING_CASH) && 
                 status === this.STATUS.PROCESSING) {
                 this._autoPrintReceipt(order);
             }
@@ -253,7 +253,11 @@ class OrderManager {
             const printerService = require('./printerService');
             
             // Run async without blocking order status update
-            printerService.printAndOpenDrawer(order)
+            const action = (order.paymentMethod || 'QRIS') === 'CASH'
+                ? () => printerService.printAndOpenDrawer(order)
+                : () => printerService.printReceipt(order);
+
+            action()
                 .then(() => {
                     console.log(`[OrderManager] ✅ Auto-printed receipt for ${order.orderId}`);
                 })
@@ -319,15 +323,15 @@ class OrderManager {
         if (!order) throw new Error('Order not found');
         if (order.paymentMethod !== 'CASH') throw new Error('Not a cash order');
         if (order.status !== this.STATUS.PENDING_CASH) throw new Error(`Order status must be PENDING_CASH, got ${order.status}`);
-        order.cashAcceptedAt = new Date();
-        order.acceptedBy = acceptedBy;
-        order.status = this.STATUS.PROCESSING;
-        // For duration on dashboard
-        order.confirmedAt = order.cashAcceptedAt;
-        order.updatedAt = new Date();
-        this.orders.set(orderId, order);
-        this._persistAll();
-        return order;
+
+        const cashAcceptedAt = new Date();
+        // Use the unified path to trigger auto-print + drawer
+        const updated = this.updateOrderStatus(orderId, this.STATUS.PROCESSING, {
+            cashAcceptedAt,
+            acceptedBy,
+            confirmedAt: cashAcceptedAt
+        });
+        return updated;
     }
 
     /**

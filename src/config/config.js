@@ -111,21 +111,38 @@ module.exports = {
     },
 
     // Printer Configuration
+    // Catatan pemakaian:
+    // - Jika menggunakan Windows Printer (USB001), isi printerName sesuai nama printer di Windows (Get-Printer)
+    //   dan biarkan interface kosong. Service akan otomatis membentuk interface 'printer:<NamaPrinter>'.
+    // - Jika menggunakan COM (serial), isi serialPort (mis. 'COM6') dan biarkan interface kosong → akan jadi 'com://COM6'.
+    // - Jika menggunakan jaringan, isi tcpHost (mis. '192.168.1.50') dan biarkan interface kosong → akan jadi 'tcp://<host>'.
     printer: {
-        enabled: false,              // Set to true to enable printer
-        type: 'EPSON',               // VSC TM-58V uses EPSON ESC/POS protocol
-        interface: 'tcp://192.168.192.168', // VSC TM-58V default IP (change if needed)
-        // VSC TM-58V Connection Options:
-        // - USB: 'printer:VSC TM-T88' or 'usb://0x0fe6:0x811e' (VSC USB ID)
-        // - Network: 'tcp://192.168.192.168' (default VSC IP)
-        // - Serial: 'com://COM3' (Windows) or '/dev/ttyUSB0' (Linux)
-        // - Bluetooth: 'com://COM5' (pair via Windows, then use virtual COM port)
-        //   Lihat BLUETOOTH_PRINTER_SETUP.md untuk cara setup Bluetooth
+        enabled: true,              // Set true untuk aktifkan printer
+        type: 'EPSON',               // Mayoritas thermal ESC/POS gunakan EPSON
+
+        // Opsi input sederhana (pilih salah satu, sisanya kosong):
+        printerName: '',       // Dikosongkan, karena kita pakai serial
+        serialPort: 'COM10',              // Port dari Bluetooth
+        tcpHost: '',                 // Dikosongkan
+
+        // Kalau ingin override manual, bisa isi langsung salah satu:
+        // interface: 'printer:POS-58',
+        interface: '',
+
+        // Baud rate hanya relevan untuk sebagian perangkat serial; tetap disimpan utk referensi
+        baudRate: 9600,
+
+    autoPrint: true,             // Auto-print receipt ketika pembayaran terkonfirmasi
+        autoOpenDrawer: false,       // Auto-open cash drawer (port RJ11)
+        // Pengaturan cash drawer (ESC p m t1 t2)
+        // m: 0(pin2) atau 1(pin5), t1/t2: durasi pulsa (0-255) dalam unit ~2ms (80 ≈ 160ms)
+        drawer: {
+            pin: 0,      // 0 = pin2, 1 = pin5 (coba tukar jika tidak membuka)
+            t1: 80,      // waktu ON
+            t2: 80       // waktu OFF
+        },
         
-        autoPrint: false,            // Auto-print receipt when payment confirmed
-        autoOpenDrawer: false,       // Auto-open cash drawer after print (RJ11 port)
-        
-        // Receipt customization (58mm width)
+        // Kustomisasi struk (58mm)
         shopName: 'PANGKO COFFEE',
         shopAddress: 'Jl. Contoh No. 123',
         shopPhone: '0812-3456-7890'
