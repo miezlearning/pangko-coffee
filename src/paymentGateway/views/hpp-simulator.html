@@ -264,6 +264,17 @@
             </div>
           </div>
           
+          <div class="grid grid-cols-2 gap-4 mt-2">
+            <div>
+              <label class="block text-sm font-bold text-charcoal/80 mb-2">Density (g/ml) <span class="text-xs text-charcoal/50">(opsional, untuk cairan)</span></label>
+              <input id="bahan-density" type="number" min="0" step="0.001" class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-matcha focus:ring-2 focus:ring-matcha/20 outline-none transition-all" placeholder="1.03" />
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-charcoal/80 mb-2">Waste (%) <span class="text-xs text-charcoal/50">(retensi / loss)</span></label>
+              <input id="bahan-waste" type="number" min="0" max="100" step="0.1" class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-matcha focus:ring-2 focus:ring-matcha/20 outline-none transition-all" placeholder="0" />
+            </div>
+          </div>
+          
           <div>
             <label class="block text-sm font-bold text-charcoal/80 mb-2">Harga Beli *</label>
             <div class="relative">

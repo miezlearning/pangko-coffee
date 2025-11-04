@@ -21,17 +21,17 @@ function loadData() {
     } else {
         // Default bahan baku (contoh dari Excel)
         bahanBaku = [
-            { id: Date.now() + 1, nama: 'Biji Kopi', netto: 500, harga: 170000, satuan: 'gram' },
-            { id: Date.now() + 2, nama: 'Susu', netto: 1000, harga: 18900, satuan: 'ml' },
-            { id: Date.now() + 3, nama: 'Cream', netto: 500, harga: 40000, satuan: 'ml' },
-            { id: Date.now() + 4, nama: 'SKM', netto: 480, harga: 15000, satuan: 'ml' },
-            { id: Date.now() + 5, nama: 'Syrup Caramel', netto: 850, harga: 110000, satuan: 'ml' },
-            { id: Date.now() + 6, nama: 'Syrup Butterscotch', netto: 850, harga: 110000, satuan: 'ml' },
-            { id: Date.now() + 7, nama: 'Air', netto: 19000, harga: 12000, satuan: 'ml' },
-            { id: Date.now() + 8, nama: 'Es Batu', netto: 10000, harga: 12000, satuan: 'gram' },
-            { id: Date.now() + 9, nama: 'Gelas', netto: 25, harga: 25000, satuan: 'pcs' },
-            { id: Date.now() + 10, nama: 'Botol', netto: 10, harga: 13000, satuan: 'pcs' },
-            { id: Date.now() + 11, nama: 'Stiker', netto: 22, harga: 22000, satuan: 'pcs' },
+            { id: Date.now() + 1, nama: 'Biji Kopi', netto: 500, harga: 170000, satuan: 'gram', density: null, waste_pct: 3 },
+            { id: Date.now() + 2, nama: 'Susu', netto: 1000, harga: 18900, satuan: 'ml', density: 1.03, waste_pct: 5 },
+            { id: Date.now() + 3, nama: 'Cream', netto: 500, harga: 40000, satuan: 'ml', density: 1.02, waste_pct: 3 },
+            { id: Date.now() + 4, nama: 'SKM', netto: 480, harga: 15000, satuan: 'ml', density: 1.15, waste_pct: 2 },
+            { id: Date.now() + 5, nama: 'Syrup Caramel', netto: 850, harga: 110000, satuan: 'ml', density: 1.25, waste_pct: 2 },
+            { id: Date.now() + 6, nama: 'Syrup Butterscotch', netto: 850, harga: 110000, satuan: 'ml', density: 1.25, waste_pct: 2 },
+            { id: Date.now() + 7, nama: 'Air', netto: 19000, harga: 12000, satuan: 'ml', density: 1.0, waste_pct: 0 },
+            { id: Date.now() + 8, nama: 'Es Batu', netto: 10000, harga: 12000, satuan: 'gram', density: null, waste_pct: 5 },
+            { id: Date.now() + 9, nama: 'Gelas', netto: 25, harga: 25000, satuan: 'pcs', density: null, waste_pct: 0 },
+            { id: Date.now() + 10, nama: 'Botol', netto: 10, harga: 13000, satuan: 'pcs', density: null, waste_pct: 0 },
+            { id: Date.now() + 11, nama: 'Stiker', netto: 22, harga: 22000, satuan: 'pcs', density: null, waste_pct: 0 },
         ];
     }
 }
@@ -47,8 +47,19 @@ function formatRupiah(amount) {
 }
 
 // Hitung harga per unit
-function hitungHargaPerUnit(harga, netto) {
-    return netto > 0 ? harga / netto : 0;
+// Hitung harga per base unit (harga per netto/package_qty)
+function hitungHargaPerUnit(bahan) {
+    const qty = Number(bahan.netto || 0);
+    const harga = Number(bahan.harga || 0);
+    return qty > 0 ? harga / qty : 0;
+}
+
+// Hitung cost untuk jumlah tertentu (memperhitungkan waste_pct)
+function hitungIngredientCost(bahan, jumlah) {
+    const hargaPerUnit = hitungHargaPerUnit(bahan);
+    const waste = Number(bahan.waste_pct || 0) / 100;
+    const cost = hargaPerUnit * jumlah * (1 + waste);
+    return cost;
 }
 
 // ========================================
@@ -80,13 +91,13 @@ function renderBahanBaku() {
     }
 
     tbody.innerHTML = filtered.map(bahan => {
-        const hargaPerUnit = hitungHargaPerUnit(bahan.harga, bahan.netto);
+        const hargaPerUnit = hitungHargaPerUnit(bahan);
         return `
             <tr class="hover:bg-matcha/5 transition-colors duration-150">
                 <td class="px-6 py-4 font-semibold text-charcoal">${bahan.nama}</td>
-                <td class="px-6 py-4 text-right text-charcoal/70">${bahan.netto.toLocaleString('id-ID')} ${bahan.satuan}</td>
-                <td class="px-6 py-4 text-right font-semibold text-charcoal">${formatRupiah(bahan.harga)}</td>
-                <td class="px-6 py-4 text-right font-bold text-matcha">${formatRupiah(hargaPerUnit)}</td>
+                    <td class="px-6 py-4 text-right text-charcoal/70">${bahan.netto.toLocaleString('id-ID')} ${bahan.satuan}</td>
+                    <td class="px-6 py-4 text-right font-semibold text-charcoal">${formatRupiah(bahan.harga)}</td>
+                    <td class="px-6 py-4 text-right font-bold text-matcha">${formatRupiah(hargaPerUnit)}</td>
                 <td class="px-6 py-4 text-center">
                     <div class="flex items-center justify-center gap-2">
                         <button onclick="editBahan(${bahan.id})" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Edit">✏️</button>
@@ -232,8 +243,8 @@ function renderProdukCard(produk) {
                                 const bahan = bahanBaku.find(b => b.id === item.bahanId);
                                 if (!bahan) return '';
                                 
-                                const hargaPerUnit = hitungHargaPerUnit(bahan.harga, bahan.netto);
-                                const hpp = hargaPerUnit * item.jumlah;
+                                const hargaPerUnit = hitungHargaPerUnit(bahan);
+                                const hpp = hitungIngredientCost(bahan, item.jumlah);
                                 
                                 return `
                                     <tr class="hover:bg-blue-50/30 transition-colors">
@@ -269,8 +280,7 @@ function hitungTotalHPP(resep) {
     return resep.reduce((total, item) => {
         const bahan = bahanBaku.find(b => b.id === item.bahanId);
         if (!bahan) return total;
-        const hargaPerUnit = hitungHargaPerUnit(bahan.harga, bahan.netto);
-        return total + (hargaPerUnit * item.jumlah);
+        return total + hitungIngredientCost(bahan, item.jumlah);
     }, 0);
 }
 
@@ -353,10 +363,10 @@ function setupMarginCalculator() {
 function exportToExcel() {
     // Simple CSV export (bisa upgrade pakai ExcelJS jika perlu)
     let csv = 'BAHAN BAKU\n';
-    csv += 'Bahan,Netto,Harga Beli,Harga per Unit\n';
+    csv += 'Bahan,Netto,Satuan,Harga Beli,Harga per Unit,Density (g/ml),Waste (%)\n';
     bahanBaku.forEach(b => {
-        const hargaPerUnit = hitungHargaPerUnit(b.harga, b.netto);
-        csv += `${b.nama},${b.netto} ${b.satuan},${b.harga},${hargaPerUnit}\n`;
+        const hargaPerUnit = hitungHargaPerUnit(b);
+        csv += `${b.nama},${b.netto},${b.satuan},${b.harga},${hargaPerUnit},${b.density != null ? b.density : ''},${b.waste_pct != null ? b.waste_pct : ''}\n`;
     });
 
     csv += '\n\nPRODUK\n';
@@ -371,8 +381,8 @@ function exportToExcel() {
         p.resep.forEach(item => {
             const bahan = bahanBaku.find(b => b.id === item.bahanId);
             if (bahan) {
-                const hargaPerUnit = hitungHargaPerUnit(bahan.harga, bahan.netto);
-                const itemHpp = hargaPerUnit * item.jumlah;
+                const hargaPerUnit = hitungHargaPerUnit(bahan);
+                const itemHpp = hitungIngredientCost(bahan, item.jumlah);
                 csv += `${bahan.nama},${item.jumlah} ${bahan.satuan},${hargaPerUnit},${itemHpp},,,\n`;
             }
         });
@@ -525,6 +535,8 @@ function openBahanModal(id) {
     const netto = document.getElementById('bahan-netto');
     const satuan = document.getElementById('bahan-satuan');
     const harga = document.getElementById('bahan-harga');
+    const density = document.getElementById('bahan-density');
+    const waste = document.getElementById('bahan-waste');
     if (!title || !fid || !nama || !netto || !satuan || !harga) return;
 
     if (id) {
@@ -536,6 +548,8 @@ function openBahanModal(id) {
         netto.value = b.netto;
         satuan.value = b.satuan;
         harga.value = (b.harga || 0).toLocaleString('id-ID');
+        if (density) density.value = b.density != null ? b.density : '';
+        if (waste) waste.value = b.waste_pct != null ? b.waste_pct : '';
     } else {
         title.textContent = 'Tambah Bahan';
         fid.value = '';
@@ -543,6 +557,8 @@ function openBahanModal(id) {
         netto.value = '';
         satuan.value = 'ml';
         harga.value = '';
+        if (density) density.value = '';
+        if (waste) waste.value = '';
     }
     openModal('modal-bahan');
 }
@@ -554,16 +570,20 @@ function submitBahanForm(e) {
     const netto = parseFloat(document.getElementById('bahan-netto').value);
     const satuan = document.getElementById('bahan-satuan').value;
     const harga = parseCurrency(document.getElementById('bahan-harga').value);
+    const densityEl = document.getElementById('bahan-density');
+    const wasteEl = document.getElementById('bahan-waste');
+    const density = densityEl ? (densityEl.value === '' ? null : parseFloat(densityEl.value)) : null;
+    const waste_pct = wasteEl ? (wasteEl.value === '' ? null : parseFloat(wasteEl.value)) : null;
     if (!nama || !satuan || isNaN(netto) || netto <= 0 || isNaN(harga) || harga < 0) {
         showToast('Mohon lengkapi data bahan dengan benar', 'error');
         return;
     }
     if (fid) {
         const idx = bahanBaku.findIndex(b => b.id === Number(fid));
-        if (idx !== -1) bahanBaku[idx] = { ...bahanBaku[idx], nama, netto, satuan, harga };
+        if (idx !== -1) bahanBaku[idx] = { ...bahanBaku[idx], nama, netto, satuan, harga, density, waste_pct };
         showToast('Bahan diperbarui', 'success');
     } else {
-        bahanBaku.push({ id: Date.now(), nama, netto, satuan, harga });
+        bahanBaku.push({ id: Date.now(), nama, netto, satuan, harga, density, waste_pct });
         showToast('Bahan ditambahkan', 'success');
     }
     saveData();
@@ -765,7 +785,16 @@ function handleImportBahanCsv(e) {
                     satuan = 'ml';
                 }
                 if (!nama || isNaN(netto) || netto <= 0 || isNaN(harga)) continue;
-                bahanBaku.push({ id: Date.now() + i, nama, netto, harga, satuan });
+                // try to read optional density and waste columns if present
+                let density = null;
+                let waste_pct = null;
+                if (cols.length >= 6) {
+                    const maybeDensity = parseFloat(cols[4]);
+                    const maybeWaste = parseFloat(cols[5]);
+                    if (!isNaN(maybeDensity)) density = maybeDensity;
+                    if (!isNaN(maybeWaste)) waste_pct = maybeWaste;
+                }
+                bahanBaku.push({ id: Date.now() + i, nama, netto, harga, satuan, density, waste_pct });
                 imported++;
             }
             saveData();

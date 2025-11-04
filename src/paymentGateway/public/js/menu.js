@@ -120,6 +120,10 @@ function displayMenuItems(items) {
 // Get type badge class
 function getTypeBadgeClass(type) {
   switch (type) {
+    case 'gelas':
+      return 'bg-yellow-100 text-yellow-700 border border-yellow-200';
+    case 'cup':
+      return 'bg-indigo-100 text-indigo-700 border border-indigo-200';
     case 'product':
       return 'bg-purple-100 text-purple-700 border border-purple-200';
     case 'ingredient':
@@ -134,6 +138,10 @@ function getTypeBadgeClass(type) {
 // Get type label
 function getTypeLabel(type) {
   switch (type) {
+    case 'gelas':
+      return 'Gelas';
+    case 'cup':
+      return 'Cup';
     case 'product':
       return '🍵 Produk';
     case 'ingredient':
@@ -211,7 +219,6 @@ function editItem(item) {
   document.getElementById('item-price').value = item.price;
   document.getElementById('item-discount').value = item.discount_percent || 0;
   document.getElementById('item-weight').value = item.weight || 0;
-  document.getElementById('item-unit').value = item.unit || 'pcs';
   document.getElementById('item-stock').value = item.stock_quantity || 0;
   document.getElementById('item-rack').value = item.rack_location || '';
   document.getElementById('item-description').value = item.description || '';
@@ -264,7 +271,8 @@ async function saveItem(event) {
     price: parseInt(document.getElementById('item-price').value),
     discount_percent: parseFloat(document.getElementById('item-discount').value) || 0,
     weight: parseFloat(document.getElementById('item-weight').value) || 0,
-    unit: document.getElementById('item-unit').value,
+    // 'unit' field removed from form; keep null to avoid breaking API
+    unit: null,
     stock_quantity: parseInt(document.getElementById('item-stock').value) || 0,
     rack_location: document.getElementById('item-rack').value.trim() || null,
     description: document.getElementById('item-description').value.trim() || null,
