@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pangko Coffee · Kalkulator Modern</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Konfigurasi tailwind custom Anda
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Manrope", "system-ui", "sans-serif"],
+            },
+            colors: {
+              matcha: "#74A662",
+              cream: "#FFFDD0",
+              charcoal: "#333333",
+              peach: "#FFE5B4",
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body
+    class="min-h-screen bg-gradient-to-br from-peach to-cream text-charcoal antialiased"
+    data-page="tools-calculators"
+  >
+    <div id="navbar-container"></div>
+
+    <main class="mx-auto w-full max-w-[520px] px-5 pt-40 pb-16">
+      <header class="mb-6 text-center">
+        <h1 class="text-4xl md:text-5xl font-extrabold text-charcoal/90">
+          Kalkulator
+        </h1>
+        <p class="mt-2 text-lg text-charcoal/70">
+          Kalkulator modern dengan UI yang lebih baik.
+        </p>
+      </header>
+
+      <section
+        class="rounded-2xl border border-white/40 bg-white/30 p-5 shadow-xl backdrop-blur-md"
+      >
+        <input
+          id="display"
+          class="w-full rounded-lg border border-white/30 bg-white/20 px-4 py-6 text-right text-5xl font-bold text-charcoal shadow-inner focus:outline-none"
+          placeholder="0"
+          readonly
+        />
+
+        <div class="mt-5 grid grid-cols-4 gap-3">
+          <button
+            data-action="clear"
+            class="py-4 rounded-lg bg-red-400/80 hover:bg-red-400/100 text-white font-semibold transition-all duration-150 active:scale-95"
+          >
+            C
+          </button>
+          <button
+            data-action="back"
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal transition-all duration-150 active:scale-95"
+          >
+            ←
+          </button>
+          <button
+            data-value="("
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal transition-all duration-150 active:scale-95"
+          >
+            (
+          </button>
+          <button
+            data-value=")"
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal transition-all duration-150 active:scale-95"
+          >
+            )
+          </button>
+
+          <button
+            data-value="7"
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal transition-all duration-150 active:scale-95"
+          >
+            7
+          </button>
+          <button
+            data-value="8"
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal transition-all duration-150 active:scale-95"
+          >
+            8
+          </button>
+          <button
+            data-value="9"
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal transition-all duration-150 active:scale-95"
+          >
+            9
+          </button>
+          <button
+            data-op="/"
+            class="py-4 rounded-lg bg-peach/80 hover:bg-peach text-orange-900 font-semibold transition-all duration-150 active:scale-95"
+          >
+            ÷
+          </button>
+
+          <button
+            data-value="4"
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal transition-all duration-150 active:scale-95"
+          >
+            4
+          </button>
+          <button
+            data-value="5"
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal transition-all duration-150 active:scale-95"
+          >
+            5
+          </button>
+          <button
+            data-value="6"
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal transition-all duration-150 active:scale-95"
+          >
+            6
+          </button>
+          <button
+            data-op="*"
+            class="py-4 rounded-lg bg-peach/80 hover:bg-peach text-orange-900 font-semibold transition-all duration-150 active:scale-95"
+          >
+            ×
+          </button>
+
+          <button
+            data-value="1"
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal transition-all duration-150 active:scale-95"
+          >
+            1
+          </button>
+          <button
+            data-value="2"
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal transition-all duration-150 active:scale-95"
+          >
+            2
+          </button>
+          <button
+            data-value="3"
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal transition-all duration-150 active:scale-95"
+          >
+            3
+          </button>
+          <button
+            data-op="-"
+            class="py-4 rounded-lg bg-peach/80 hover:bg-peach text-orange-900 font-semibold transition-all duration-150 active:scale-95"
+          >
+            −
+          </button>
+
+          <button
+            data-value="0"
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal col-span-2 transition-all duration-150 active:scale-95"
+          >
+            0
+          </button>
+          <button
+            data-value="."
+            class="py-4 rounded-lg bg-gray-50/70 hover:bg-gray-50/100 font-semibold text-charcoal transition-all duration-150 active:scale-95"
+          >
+            .
+          </button>
+          <button
+            data-action="equals"
+            class="py-4 rounded-lg bg-matcha/90 hover:bg-matcha text-white font-semibold transition-all duration-150 active:scale-95"
+          >
+            =
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <script src="/js/navbar.js"></script>
+    <script>
+      const display = document.getElementById("display");
+      // [PERUBAHAN UX] Variabel untuk melacak status perhitungan
+      let justCalculated = false;
+
+      function sanitize(expr) {
+        // Replace pretty operators with JS operators
+        expr = expr.replace(/×/g, "*").replace(/÷/g, "/").replace(/−/g, "-");
+        // Allow only digits, operators, dot, parentheses and spaces
+        return expr.replace(/[^0-9+\-*/(). ]/g, "");
+      }
+
+      function evaluate(expr) {
+        const safe = sanitize(expr);
+        try {
+          // eslint-disable-next-line no-eval
+          const val = eval(safe);
+          if (val === undefined || val === null || Number.isNaN(val)) return "0";
+          return (Math.round(val * 1e12) / 1e12).toString();
+        } catch (e) {
+          return "Error";
+        }
+      }
+
+      function append(val) {
+        if (display.value === "Error") {
+          display.value = "0";
+          justCalculated = false;
+        }
+
+        // [PERUBAHAN UX] Jika baru saja menekan '=', dan user menekan angka,
+        // mulai kalkulasi baru, jangan ditambahkan ke hasil sebelumnya.
+        if (justCalculated && /[0-9.(]/.test(val)) {
+          display.value = val;
+          justCalculated = false;
+          return;
+        }
+        // Jika menekan operator, lanjutkan perhitungan
+        justCalculated = false;
+
+        if (display.value === "0" && val !== ".") {
+          display.value = "";
+        }
+        
+        // [PERUBAHAN UX] Mencegah operator ganda (e.g., 5++ atau 5+-)
+        // Alih-alih mencegah, kita ganti operator terakhir
+        const lastChar = display.value.slice(-1);
+        if (/[+\-*/]/.test(val) && /[+\-*/]/.test(lastChar)) {
+            display.value = display.value.slice(0, -1) + val;
+            return;
+        }
+
+        display.value += val;
+      }
+
+      function back() {
+        display.value = display.value.length ? display.value.slice(0, -1) : "0";
+        if (!display.value) display.value = "0";
+        justCalculated = false; // Reset status
+      }
+
+      function clearAll() {
+        display.value = "0";
+        justCalculated = false; // Reset status
+      }
+
+      function equals() {
+        display.value = evaluate(display.value);
+        justCalculated = true; // Set status bahwa kita baru saja menghitung
+      }
+
+      document.addEventListener("click", (e) => {
+        const btn = e.target.closest("button");
+        if (!btn) return;
+        
+        // [PERUBAHAN] Logika event klik disatukan dengan 'append'
+        if (btn.dataset.value) {
+          append(btn.dataset.value);
+        } else if (btn.dataset.op) {
+          append(btn.dataset.op); // Operator juga menggunakan 'append'
+        } else if (btn.dataset.action === "back") {
+          back();
+        } else if (btn.dataset.action === "clear") {
+          clearAll();
+        } else if (btn.dataset.action === "equals") {
+          equals();
+        }
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (/[0-9()+\-*/.]/.test(e.key)) {
+          append(e.key);
+          e.preventDefault();
+        } else if (e.key === "Enter" || e.key === "=") { // Menambahkan support key '='
+          equals();
+          e.preventDefault();
+        } else if (e.key === "Backspace") {
+          back();
+          e.preventDefault();
+        } else if (e.key === "Escape") {
+          clearAll();
+          e.preventDefault();
+        }
+      });
+
+      // init
+      clearAll();
+    </script>
+  </body>
+</html>

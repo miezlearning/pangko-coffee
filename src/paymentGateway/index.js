@@ -89,6 +89,13 @@ app.get('/tools/hpp-simulator', (req, res) => {
     res.sendFile(path.join(__dirname, 'views/hpp-simulator.html'));
 });
 
+// Serve calculators landing
+app.get('/tools/calculators', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views/tools-calculators.html'));
+});
+
+// (Removed) Specialized calculators routes are intentionally deleted as requested
+
 // Serve cashier page
 app.get('/cashier', (req, res) => {
     res.sendFile(path.join(__dirname, 'views/cashier.html'));

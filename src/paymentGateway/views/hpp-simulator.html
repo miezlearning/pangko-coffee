@@ -35,93 +35,336 @@
       .fade-in { animation: fadeIn 0.3s ease-in-out; }
       @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       .animate-slide-in { animation: slideIn 0.3s ease-out; }
-      @keyframes slideIn { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
+      @keyframes slideIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+      
+      /* Scrollbar Styling */
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb { background: #74A662; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #5d8550; }
+      
+      /* Table Fix */
+      .table-container { overflow-x: auto; overflow-y: auto; max-height: 400px; }
+      .table-container table { border-collapse: separate; border-spacing: 0; }
+      .table-container thead { position: sticky; top: 0; z-index: 10; }
+      
+      /* Modal backdrop blur */
+      .modal-backdrop { backdrop-filter: blur(4px); }
+      
+      /* Input focus style */
+      input:focus, select:focus, textarea:focus { 
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(116,166,98,0.2), 0 0 0 1px rgba(116,166,98,0.6);
+      }
+      
+      /* Badge pill */
+      .badge { 
+        display: inline-flex; 
+        align-items: center; 
+        padding: 0.25rem 0.75rem; 
+        border-radius: 9999px; 
+        font-size: 0.75rem; 
+        font-weight: 600;
+      }
     </style>
   </head>
   <body class="min-h-screen bg-cream text-charcoal antialiased" data-page="hpp-simulator">
     <div id="navbar-container"></div>
-    <main id="main-content" class="relative mx-auto flex w-full max-w-[900px] flex-col gap-12 px-5 pt-40 pb-20">
+    <main id="main-content" class="relative mx-auto flex w-full max-w-[1200px] flex-col gap-8 px-4 md:px-6 pt-32 pb-24">
+      <!-- Hero Header -->
       <section class="relative">
-        <div class="relative overflow-hidden rounded-3xl bg-white/90 px-10 py-12 shadow-glow">
-          <div class="pointer-events-none absolute -left-16 -top-16 h-64 w-64 rounded-full bg-matcha/25 blur-3xl"></div>
-          <div class="pointer-events-none absolute -right-12 bottom-0 h-56 w-56 rounded-full bg-peach/40 blur-3xl"></div>
+        <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white via-white to-matcha/5 px-6 md:px-10 py-10 shadow-xl border border-matcha/10">
+          <div class="pointer-events-none absolute -left-16 -top-16 h-64 w-64 rounded-full bg-matcha/20 blur-3xl"></div>
+          <div class="pointer-events-none absolute -right-12 bottom-0 h-56 w-56 rounded-full bg-peach/30 blur-3xl"></div>
           <div class="relative">
-            <h1 class="text-4xl font-bold text-charcoal mb-3">🧮 Simulasi HPP Menu</h1>
-            <p class="text-charcoal/60 text-lg mb-6">Hitung HPP, margin, dan profit menu secara interaktif</p>
-
-            <!-- Saved Simulations -->
-            <div class="mb-6">
-              <div class="flex items-center justify-between mb-3">
-                <h2 class="text-xl font-bold text-charcoal">Simulasi Tersimpan</h2>
-                <div class="flex gap-3 items-center">
-                  <input id="sim-name" type="text" placeholder="Nama simulasi (contoh: Coffee Cream)" class="px-3 py-2 border rounded w-64" />
-                  <button id="save-sim-btn" class="bg-matcha text-cream px-3 py-2 rounded font-semibold">Simpan</button>
+            <div class="flex items-start justify-between flex-wrap gap-4 mb-6">
+              <div>
+                <h1 class="text-3xl md:text-4xl font-extrabold text-charcoal mb-2 flex items-center gap-3">
+                  <span class="text-4xl md:text-5xl">🧮</span>
+                  Kalkulator HPP
+                </h1>
+                <p class="text-charcoal/70 text-base md:text-lg max-w-2xl">
+                  Kelola bahan baku, hitung HPP produk, dan analisis margin profit dengan mudah
+                </p>
+              </div>
+              <div class="flex gap-3">
+                <button id="export-excel-btn" class="bg-gradient-to-r from-green-600 to-green-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center gap-2">
+                  <span>📊</span>
+                  <span class="hidden sm:inline">Export Excel</span>
+                </button>
+                <button id="reset-all-btn" class="bg-gradient-to-r from-red-600 to-red-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center gap-2">
+                  <span>🔄</span>
+                  <span class="hidden sm:inline">Reset</span>
+                </button>
+              </div>
+            </div>            <!-- SECTION 1: BAHAN BAKU -->
+            <div class="mb-10 rounded-2xl bg-gradient-to-br from-matcha/5 to-matcha/10 p-6 border-2 border-matcha/20">
+              <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+                <h2 class="text-2xl font-bold text-matcha flex items-center gap-2">📦 BAHAN BAKU
+                  <span class="text-xs font-semibold text-charcoal/60 bg-white/60 px-2 py-1 rounded-full" id="bahan-count">0 item</span>
+                </h2>
+                <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                  <div class="relative flex-1 min-w-[220px]">
+                    <input id="search-bahan" type="text" placeholder="Cari bahan (nama/satuan)" class="w-full pl-10 pr-3 py-2 rounded-lg border-2 border-matcha/30 focus:border-matcha/60 outline-none" />
+                    <span class="absolute left-3 top-2.5">🔎</span>
+                  </div>
+                  <input id="import-bahan" type="file" accept=".csv" class="hidden" />
+                  <button id="import-bahan-btn" class="bg-white text-matcha border-2 border-matcha/50 px-4 py-2 rounded-lg font-semibold hover:bg-matcha/10 transition">⬆️ Import CSV</button>
+                  <button id="add-bahan-btn" class="bg-matcha text-white px-4 py-2 rounded-lg font-semibold shadow hover:bg-matcha/90 transition">
+                    ➕ Tambah Bahan
+                  </button>
                 </div>
               </div>
-              <div id="saved-simulations" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-            </div>
-
-            <!-- Tabel Bahan Baku -->
-            <div class="mb-10">
-              <h2 class="text-xl font-bold text-matcha mb-2">Daftar Bahan Baku & Kemasan</h2>
-              <table class="w-full text-sm rounded-xl overflow-hidden border border-charcoal/10 mb-2">
-                <thead class="bg-matcha/10">
-                  <tr>
-                    <th class="p-2">Nama</th>
-                    <th class="p-2">Harga</th>
-                    <th class="p-2">Netto</th>
-                    <th class="p-2">Satuan</th>
-                    <th class="p-2">Harga/Satuan</th>
-                    <th class="p-2">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody id="hpp-bahan-list"></tbody>
-              </table>
-              <button id="add-bahan-btn" class="bg-matcha text-cream px-3 py-1 rounded font-semibold shadow hover:bg-matcha/80">+ Tambah Bahan</button>
-            </div>
-
-            <!-- Tabel Simulasi Resep -->
-            <div class="mb-10">
-              <h2 class="text-xl font-bold text-peach mb-2">Simulasi Resep Menu</h2>
-              <table class="w-full text-sm rounded-xl overflow-hidden border border-charcoal/10 mb-2">
-                <thead class="bg-peach/10">
-                  <tr>
-                    <th class="p-2">Bahan</th>
-                    <th class="p-2">Jumlah</th>
-                    <th class="p-2">Satuan</th>
-                    <th class="p-2">Harga/Satuan</th>
-                    <th class="p-2">Subtotal</th>
-                    <th class="p-2">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody id="hpp-resep-list"></tbody>
-              </table>
-              <button id="add-resep-btn" class="bg-peach text-charcoal px-3 py-1 rounded font-semibold shadow hover:bg-peach/80">+ Tambah Bahan ke Resep</button>
-            </div>
-
-            <!-- Ringkasan Simulasi -->
-            <div class="mb-6">
-              <h2 class="text-lg font-bold text-charcoal mb-2">Ringkasan Simulasi</h2>
-              <div class="grid grid-cols-2 gap-4">
-                <div class="bg-peach/30 rounded-xl p-4">
-                  <div class="text-charcoal/70">Total HPP</div>
-                  <div id="hpp-total" class="text-2xl font-bold text-matcha"></div>
-                </div>
-                <div class="bg-matcha/10 rounded-xl p-4">
-                  <div class="text-charcoal/70">Total Volume</div>
-                  <div id="hpp-volume" class="text-2xl font-bold text-charcoal"></div>
+              <p class="text-sm text-charcoal/60 mb-4">Kelola daftar bahan baku & kemasan. Data ini akan digunakan untuk menghitung HPP produk. Tips: bisa import dari CSV agar lebih cepat.</p>
+              
+              <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+                <div class="table-container">
+                  <table class="w-full text-sm" style="table-layout: fixed;">
+                    <colgroup>
+                      <col style="width: 40%" />
+                      <col style="width: 15%" />
+                      <col style="width: 20%" />
+                      <col style="width: 15%" />
+                      <col style="width: 10%" />
+                    </colgroup>
+                    <thead class="bg-matcha/10">
+                      <tr>
+                        <th class="px-6 py-3 text-left font-bold text-charcoal sticky top-0 bg-white">Bahan</th>
+                        <th class="px-6 py-3 text-right font-bold text-charcoal sticky top-0 bg-white">Netto</th>
+                        <th class="px-6 py-3 text-right font-bold text-charcoal sticky top-0 bg-white">Harga Beli</th>
+                        <th class="px-6 py-3 text-right font-bold text-charcoal sticky top-0 bg-white">Harga/Unit</th>
+                        <th class="px-6 py-3 text-center font-bold text-charcoal sticky top-0 bg-white">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody id="bahan-baku-list" class="divide-y divide-charcoal/5">
+                      <!-- Rows will be inserted here -->
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
 
-            <div class="flex gap-4 mt-6">
-              <button id="hpp-export-btn" class="bg-matcha text-cream px-4 py-2 rounded-lg font-semibold shadow hover:bg-matcha/80">Export Simulasi</button>
-              <button id="hpp-reset-btn" class="bg-charcoal text-cream px-4 py-2 rounded-lg font-semibold shadow hover:bg-charcoal/80">Reset</button>
+            <!-- SECTION 2: PRODUK MENU -->
+            <div class="mb-8">
+              <div class="bg-white rounded-2xl shadow-lg border border-peach/20 overflow-hidden">
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-orange-500 to-peach-600 px-6 py-5">
+                  <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                      <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">☕</div>
+                      <div>
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                          Produk Menu
+                          <span class="badge bg-white/20 text-white" id="produk-count">0 produk</span>
+                        </h2>
+                        <p class="text-white/80 text-sm">Resep & perhitungan HPP produk</p>
+                      </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                      <div class="relative flex-1 min-w-[200px]">
+                        <input id="search-produk" type="text" placeholder="Cari produk..." class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/95 border-2 border-transparent focus:border-white focus:bg-white outline-none text-sm placeholder:text-charcoal/50 shadow-sm" />
+                        <span class="absolute left-3 top-2.5 text-lg">🔎</span>
+                      </div>
+                      <button id="add-produk-btn" class="bg-white text-orange-600 px-5 py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all duration-200 flex items-center gap-2 text-sm">
+                        <span>➕</span>
+                        <span>Tambah Produk</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Products Container -->
+                <div class="p-6">
+                  <div id="produk-list" class="space-y-4">
+                    <!-- Product cards will be inserted here -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION 3: KALKULATOR MARGIN -->
+            <div class="bg-white rounded-2xl shadow-lg border border-purple-200 overflow-hidden">
+              <div class="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-5">
+                <div class="flex items-center gap-3">
+                  <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">🎯</div>
+                  <div>
+                    <h2 class="text-xl font-bold text-white">Kalkulator Margin</h2>
+                    <p class="text-white/80 text-sm">Hitung harga jual dari target margin</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div class="space-y-2">
+                    <label class="block text-sm font-bold text-charcoal/80">HPP (Rp)</label>
+                    <div class="relative">
+                      <span class="absolute left-4 top-3.5 text-charcoal/60 font-semibold">Rp</span>
+                      <input id="margin-hpp" type="text" inputmode="numeric" placeholder="0" class="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none text-lg font-semibold transition-all" />
+                    </div>
+                  </div>
+                  <div class="space-y-2">
+                    <label class="block text-sm font-bold text-charcoal/80">Target Margin (%)</label>
+                    <div class="relative">
+                      <input id="margin-target" type="number" placeholder="50" value="50" min="0" max="100" step="1" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none text-lg font-semibold transition-all" />
+                      <span class="absolute right-4 top-3.5 text-charcoal/60 font-semibold">%</span>
+                    </div>
+                  </div>
+                  <div class="space-y-2">
+                    <label class="block text-sm font-bold text-charcoal/80">Harga Jual</label>
+                    <div id="margin-result" class="w-full px-4 py-3 bg-gradient-to-r from-purple-100 to-blue-100 rounded-xl text-2xl font-extrabold text-purple-800 text-right border-2 border-purple-200 flex items-center justify-end">
+                      Rp 0
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
     </main>
+    <!-- Toast Container -->
+    <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 hidden"></div>
+
+    <!-- Modals -->
+    <!-- Modal: Bahan -->
+    <div id="modal-bahan" class="modal-backdrop fixed inset-0 z-50 hidden items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/50" data-close-modal></div>
+      <div class="relative w-full max-w-[550px] bg-white rounded-2xl shadow-2xl animate-slide-in overflow-hidden">
+        <!-- Modal Header -->
+        <div class="bg-gradient-to-r from-matcha to-matcha/90 px-6 py-4 flex items-center justify-between">
+          <h3 id="modal-bahan-title" class="text-xl font-bold text-white flex items-center gap-2">
+            <span>📦</span>
+            <span>Tambah Bahan</span>
+          </h3>
+          <button type="button" data-close-modal class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+        </div>
+        
+        <!-- Modal Body -->
+        <form id="form-bahan" class="p-6 space-y-5">
+          <input type="hidden" id="bahan-id" />
+          
+          <div>
+            <label class="block text-sm font-bold text-charcoal/80 mb-2">Nama Bahan *</label>
+            <input id="bahan-nama" type="text" required class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-matcha focus:ring-2 focus:ring-matcha/20 outline-none transition-all" placeholder="Contoh: Susu UHT Full Cream" />
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-bold text-charcoal/80 mb-2">Netto *</label>
+              <input id="bahan-netto" type="number" min="0" step="0.01" required class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-matcha focus:ring-2 focus:ring-matcha/20 outline-none transition-all" placeholder="1000" />
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-charcoal/80 mb-2">Satuan *</label>
+              <select id="bahan-satuan" class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-matcha focus:ring-2 focus:ring-matcha/20 outline-none transition-all bg-white">
+                <option value="ml">ml (mililiter)</option>
+                <option value="gram">gram</option>
+                <option value="pcs">pcs (pieces)</option>
+              </select>
+            </div>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-bold text-charcoal/80 mb-2">Harga Beli *</label>
+            <div class="relative">
+              <span class="absolute left-4 top-3.5 text-charcoal/60 font-semibold">Rp</span>
+              <input id="bahan-harga" type="text" inputmode="numeric" required class="w-full pl-11 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-matcha focus:ring-2 focus:ring-matcha/20 outline-none transition-all" placeholder="18.900" />
+            </div>
+          </div>
+          
+          <div class="flex items-center justify-end gap-3 pt-2 border-t">
+            <button type="button" class="px-6 py-2.5 rounded-xl border-2 border-gray-300 hover:bg-gray-50 font-semibold transition-all" data-close-modal>Batal</button>
+            <button type="submit" class="px-6 py-2.5 rounded-xl bg-matcha text-white font-bold shadow-lg hover:shadow-xl hover:bg-matcha/90 transition-all">Simpan Bahan</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Produk -->
+    <div id="modal-produk" class="modal-backdrop fixed inset-0 z-50 hidden items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/50" data-close-modal></div>
+      <div class="relative w-full max-w-[550px] bg-white rounded-2xl shadow-2xl animate-slide-in overflow-hidden">
+        <!-- Modal Header -->
+        <div class="bg-gradient-to-r from-orange-500 to-peach-600 px-6 py-4 flex items-center justify-between">
+          <h3 id="modal-produk-title" class="text-xl font-bold text-white flex items-center gap-2">
+            <span>☕</span>
+            <span>Tambah Produk</span>
+          </h3>
+          <button type="button" data-close-modal class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+        </div>
+        
+        <!-- Modal Body -->
+        <form id="form-produk" class="p-6 space-y-5">
+          <input type="hidden" id="produk-id" />
+          
+          <div>
+            <label class="block text-sm font-bold text-charcoal/80 mb-2">Nama Produk *</label>
+            <input id="produk-nama" type="text" required class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-all" placeholder="Contoh: Caramel Latte" />
+          </div>
+          
+          <div>
+            <label class="block text-sm font-bold text-charcoal/80 mb-2">Harga Jual (Opsional)</label>
+            <div class="relative">
+              <span class="absolute left-4 top-3.5 text-charcoal/60 font-semibold">Rp</span>
+              <input id="produk-harga" type="text" inputmode="numeric" class="w-full pl-11 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-all" placeholder="25.000" />
+            </div>
+            <p class="text-xs text-charcoal/60 mt-1.5">Bisa diisi nanti setelah menghitung HPP</p>
+          </div>
+          
+          <div class="flex items-center justify-end gap-3 pt-2 border-t">
+            <button type="button" class="px-6 py-2.5 rounded-xl border-2 border-gray-300 hover:bg-gray-50 font-semibold transition-all" data-close-modal>Batal</button>
+            <button type="submit" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-peach-600 text-white font-bold shadow-lg hover:shadow-xl transition-all">Simpan Produk</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Resep Item -->
+    <div id="modal-resep" class="modal-backdrop fixed inset-0 z-50 hidden items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/50" data-close-modal></div>
+      <div class="relative w-full max-w-[600px] bg-white rounded-2xl shadow-2xl animate-slide-in overflow-hidden">
+        <!-- Modal Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 flex items-center justify-between">
+          <h3 id="modal-resep-title" class="text-xl font-bold text-white flex items-center gap-2">
+            <span>🧾</span>
+            <span>Tambah Bahan ke Resep</span>
+          </h3>
+          <button type="button" data-close-modal class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+        </div>
+        
+        <!-- Modal Body -->
+        <form id="form-resep" class="p-6 space-y-5">
+          <input type="hidden" id="resep-produk-id" />
+          <input type="hidden" id="resep-idx" />
+          
+          <div>
+            <label class="block text-sm font-bold text-charcoal/80 mb-2">Pilih Bahan *</label>
+            <div class="relative">
+              <input id="resep-bahan-search" type="text" placeholder="🔍 Ketik untuk mencari bahan..." class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" />
+              <div id="resep-bahan-list" class="absolute z-20 mt-2 w-full bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-64 overflow-auto hidden">
+                <!-- Dynamic list here -->
+              </div>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-bold text-charcoal/80 mb-2">Jumlah *</label>
+              <input id="resep-jumlah" type="number" min="0" step="0.01" required class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" placeholder="0" />
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-charcoal/80 mb-2">Satuan</label>
+              <input id="resep-satuan" disabled class="w-full px-4 py-3 rounded-xl border-2 bg-gray-100 border-gray-200 text-charcoal/70 cursor-not-allowed" placeholder="Auto" />
+            </div>
+          </div>
+          
+          <div class="flex items-center justify-end gap-3 pt-2 border-t">
+            <button type="button" class="px-6 py-2.5 rounded-xl border-2 border-gray-300 hover:bg-gray-50 font-semibold transition-all" data-close-modal>Batal</button>
+            <button type="submit" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold shadow-lg hover:shadow-xl transition-all">Simpan ke Resep</button>
+          </div>
+        </form>
+      </div>
+    </div>
     <script src="/js/navbar.js"></script>
     <script src="/js/hpp-simulator.js"></script>
   </body>

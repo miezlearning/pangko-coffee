@@ -5,6 +5,7 @@ let MENU_ITEMS = [];
 let CART = [];
 let DISCOUNT_RP = 0;
 let DISCOUNT_PCT = 0;
+let currentEditingItemId = null; // To track which item's note is being edited
 
 const DRAFT_KEY = 'pos_draft_v1';
 
@@ -307,14 +308,52 @@ function renderCart(){
   saveDraft();
 }
 
-function editNote(id){
-  const idx = CART.findIndex(i=>i.id===id);
-  if(idx===-1) return;
-  const current = CART[idx].notes || '';
-  const note = prompt('Catatan untuk item ini?', current || '');
-  if(note===null) return; // cancelled
-  CART[idx].notes = note.trim();
+function showNoteModal(itemId) {
+  currentEditingItemId = itemId;
+  const modal = el('note-modal');
+  const textarea = el('note-input');
+  const item = CART.find(i => i.id === itemId);
+  
+  if (!modal || !textarea || !item) return;
+  
+  textarea.value = item.notes || '';
+  
+  modal.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    modal.querySelector('.transform').classList.remove('opacity-0', 'scale-95');
+    modal.querySelector('.transform').classList.add('opacity-100', 'scale-100');
+    textarea.focus();
+    textarea.select();
+  });
+}
+
+function hideNoteModal() {
+  const modal = el('note-modal');
+  if (!modal) return;
+  
+  modal.querySelector('.transform').classList.remove('opacity-100', 'scale-100');
+  modal.querySelector('.transform').classList.add('opacity-0', 'scale-95');
+  setTimeout(() => {
+    modal.classList.add('hidden');
+    currentEditingItemId = null; // Clear the ID after closing
+  }, 200);
+}
+
+function saveNote() {
+  if (!currentEditingItemId) return;
+  
+  const idx = CART.findIndex(i => i.id === currentEditingItemId);
+  if (idx === -1) return;
+  
+  const textarea = el('note-input');
+  CART[idx].notes = textarea.value.trim();
+  
   renderCart();
+  hideNoteModal();
+}
+
+function editNote(id){
+  showNoteModal(id);
 }
 
 async function createOrder(){
@@ -361,7 +400,7 @@ function showPaymentPanel(order, payment){
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   
   if(order.paymentMethod==='QRIS'){
-    const q = encodeURIComponent(payment.qrisCode);
+    showQRISModal(order, payment); // Show modal instead of small panel
     const expiresAt = new Date(payment.expiresAt).toLocaleTimeString('id-ID');
     panel.innerHTML = `
       <div class="space-y-3">
@@ -369,14 +408,14 @@ function showPaymentPanel(order, payment){
           <div class="text-xs text-charcoal/60">Order <span class="font-mono font-bold">#${order.orderId}</span></div>
           <span id="status-badge-${order.orderId}" class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">⏳ PENDING</span>
         </div>
-        <div class="text-2xl font-extrabold text-matcha">Rp ${fmt(order.pricing.total)}</div>
-        <div class="bg-gradient-to-br from-matcha/5 to-peach/5 rounded-xl p-4 flex flex-col items-center border border-matcha/10">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${q}" alt="QRIS" class="rounded-lg border-2 border-white shadow-lg" />
-          <div class="text-xs text-charcoal/60 mt-3 flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <span>Kadaluarsa: ${expiresAt}</span>
-          </div>
+        <div class="text-lg font-extrabold text-matcha">Rp ${fmt(order.pricing.total)}</div>
+        <div class="text-xs text-charcoal/60 flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>Kadaluarsa: ${expiresAt}</span>
         </div>
+        <button class="w-full bg-blue-500 text-white rounded-lg py-2.5 font-bold hover:bg-blue-600 transition active:scale-95" onclick='showQRISModal(${JSON.stringify(order)}, ${JSON.stringify(payment)})'>
+          🔍 Tampilkan QR Lagi
+        </button>
         <div class="flex gap-2">
           <button class="flex-1 bg-matcha text-white rounded-lg py-2.5 font-bold hover:bg-matcha/90 transition active:scale-95" onclick="confirmPayment('${order.orderId}')">✓ Sudah Bayar</button>
           <button class="flex-1 bg-red-500 text-white rounded-lg py-2.5 font-bold hover:bg-red-600 transition active:scale-95" onclick="rejectPayment('${order.orderId}')">✕ Batal</button>
@@ -405,6 +444,41 @@ function showPaymentPanel(order, payment){
         </div>
       </div>`;
   }
+}
+
+function showQRISModal(order, payment) {
+  const modal = el('qris-modal');
+  const modalContent = el('qris-modal-content');
+  if (!modal || !modalContent) return;
+
+  const q = encodeURIComponent(payment.qrisCode);
+  const expiresAt = new Date(payment.expiresAt).toLocaleTimeString('id-ID');
+
+  modalContent.innerHTML = `
+    <div class="bg-gradient-to-br from-matcha/5 to-peach/5 rounded-2xl p-6 flex flex-col items-center border-2 border-matcha/20 shadow-inner">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${q}&qzone=1" alt="QRIS" class="rounded-xl border-4 border-white shadow-lg" />
+      <div class="text-3xl font-extrabold text-matcha mt-4">Rp ${fmt(order.pricing.total)}</div>
+      <div class="text-sm text-charcoal/60 mt-1">Order <span class="font-mono font-bold">#${order.orderId}</span></div>
+    </div>
+    <div class="text-xs text-charcoal/60 mt-3 flex items-center justify-center gap-1.5">
+      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span>Berlaku hingga: <strong>${expiresAt}</strong></span>
+    </div>
+  `;
+
+  modal.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    modal.querySelector('.transform').classList.remove('opacity-0', 'scale-95');
+    modal.querySelector('.transform').classList.add('opacity-100', 'scale-100');
+  });
+}
+
+function hideQRISModal() {
+  const modal = el('qris-modal');
+  if (!modal) return;
+  modal.querySelector('.transform').classList.remove('opacity-100', 'scale-100');
+  modal.querySelector('.transform').classList.add('opacity-0', 'scale-95');
+  setTimeout(() => modal.classList.add('hidden'), 200);
 }
 
 async function confirmPayment(orderId){
@@ -568,6 +642,29 @@ function bindEvents(){
   if(savedSound) el('notif-sound-select').value = savedSound;
   updateSoundToggleUI();
   
+  // QRIS Modal listeners
+  el('close-qris-modal')?.addEventListener('click', hideQRISModal);
+  el('qris-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'qris-modal') {
+      hideQRISModal();
+    }
+  });
+
+  // Note Modal listeners
+  el('save-note-btn')?.addEventListener('click', saveNote);
+  el('cancel-note-btn')?.addEventListener('click', hideNoteModal);
+  el('note-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'note-modal') {
+      hideNoteModal();
+    }
+  });
+  // Also allow saving with Ctrl+Enter in textarea
+  el('note-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      saveNote();
+    }
+  });
+
   // Unlock audio on any user interaction
   document.body.addEventListener('click', unlockAudio, {once: true});
 }
