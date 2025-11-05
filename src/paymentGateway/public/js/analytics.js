@@ -1,6 +1,38 @@
 // Analytics page logic
 
 let ordersChart, revenueChart;
+let leaderboardTimer;
+let currentLeaderboardMethod = 'all';
+let currentLeaderboardScope = 'month';
+
+const leaderboardData = new Map();
+
+const leaderboardScopes = [
+  {
+    scope: 'today',
+    label: 'Hari Ini',
+    detailTitle: 'Top 5 Menu Hari Ini',
+    description: 'Gunakan rekomendasi ini untuk upsell cepat selama shift berjalan.'
+  },
+  {
+    scope: 'week',
+    label: 'Minggu Ini',
+    detailTitle: 'Top 5 Menu Mingguan',
+    description: 'Pantau pola favorit pelanggan dalam 7 hari terakhir dan sesuaikan stoknya.'
+  },
+  {
+    scope: 'month',
+    label: 'Bulan Ini',
+    detailTitle: 'Top 5 Menu Bulan Ini',
+    description: 'Evaluasi performa menu untuk laporan manajemen dan promo akhir bulan.'
+  },
+  {
+    scope: 'year',
+    label: 'Tahun Ini',
+    detailTitle: 'Top 5 Menu Tahunan',
+    description: 'Identifikasi juara sepanjang tahun untuk campaign signature menu.'
+  }
+];
 
 function parseDateInput(id){
   const el = document.getElementById(id);
@@ -62,6 +94,161 @@ async function loadSeries(range, method, from, to){
 
 function formatNumber(num){ return (num||0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 
+function getScopeMeta(scope){
+  return leaderboardScopes.find(meta => meta.scope === scope) || leaderboardScopes[0];
+}
+
+function setActiveLeaderboardCard(scope, active){
+  const card = document.querySelector(`[data-leaderboard-card][data-scope="${scope}"]`);
+  if (!card) return;
+  card.classList.toggle('ring-2', active);
+  card.classList.toggle('ring-matcha/70', active);
+  card.classList.toggle('ring-offset-2', active);
+}
+
+function renderLeaderboardHighlights(){
+  leaderboardScopes.forEach(meta => {
+    const items = leaderboardData.get(meta.scope) || [];
+    const top = items[0];
+    const totalQty = items.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+    const totalRevenue = items.reduce((sum, item) => sum + Number(item.revenue || 0), 0);
+    const share = top && totalQty > 0 ? Math.round((Number(top.qty || 0) / totalQty) * 100) : 0;
+
+    const nameEl = document.getElementById(`leaderboard-card-${meta.scope}-name`);
+    const qtyEl = document.getElementById(`leaderboard-card-${meta.scope}-qty`);
+    const revenueEl = document.getElementById(`leaderboard-card-${meta.scope}-revenue`);
+    const shareEl = document.getElementById(`leaderboard-card-${meta.scope}-share`);
+    const progressEl = document.getElementById(`leaderboard-card-${meta.scope}-progress`);
+
+    if (!nameEl || !qtyEl || !revenueEl || !shareEl || !progressEl) return;
+
+    if (!top){
+      nameEl.textContent = '-';
+      qtyEl.textContent = '0';
+      revenueEl.textContent = '0';
+      shareEl.textContent = '0% kontribusi';
+      progressEl.style.width = '0%';
+    } else {
+      nameEl.textContent = top.name || 'Item Tanpa Nama';
+      qtyEl.textContent = formatNumber(Number(top.qty || 0));
+      revenueEl.textContent = formatNumber(Math.round(Number(top.revenue || 0)));
+      shareEl.textContent = `${share}% kontribusi`; 
+      const width = share > 0 ? `${Math.min(100, Math.max(10, share))}%` : '0%';
+      progressEl.style.width = width;
+      progressEl.style.backgroundColor = meta.scope === 'week' ? '#FFE5B4' : meta.scope === 'month' ? '#333333' : meta.scope === 'year' ? '#555555' : '#74A662';
+    }
+
+    const card = document.querySelector(`[data-leaderboard-card][data-scope="${meta.scope}"]`);
+    if (card){
+      card.setAttribute('aria-label', top ? `Top ${meta.label}: ${top.name} terjual ${formatNumber(Number(top.qty||0))}` : `Top ${meta.label}: belum ada data`);
+    }
+
+    setActiveLeaderboardCard(meta.scope, meta.scope === currentLeaderboardScope);
+  });
+}
+
+function updateLeaderboardInsights(items, meta){
+  const insightEl = document.getElementById('leaderboard-insights');
+  if (!insightEl) return;
+  if (!items.length){
+    insightEl.innerHTML = '<li>Menunggu data untuk menghitung rekomendasi.</li>';
+    return;
+  }
+
+  const totalQty = items.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+  const totalRevenue = items.reduce((sum, item) => sum + Number(item.revenue || 0), 0);
+  const top = items[0];
+  const runner = items[1];
+
+  const insights = [];
+  const shareQty = totalQty ? Math.round((Number(top.qty || 0) / totalQty) * 100) : 0;
+  const shareRevenue = totalRevenue ? Math.round((Number(top.revenue || 0) / totalRevenue) * 100) : shareQty;
+
+  insights.push(`Fokus bahan & stok <strong>${top.name}</strong>, kontribusi ${shareQty}% volume ${meta.label.toLowerCase()} (${shareRevenue}% revenue).`);
+
+  if (runner){
+    insights.push(`Coba bundling <strong>${top.name}</strong> + <strong>${runner.name}</strong> untuk upsell kasir saat pelanggan ragu memilih.`);
+  }
+
+  if (items.length >= 3){
+    const third = items[2];
+    const topThreeQty = Number(top.qty || 0) + Number(runner?.qty || 0) + Number(third?.qty || 0);
+    const topThreeShare = totalQty ? Math.round((topThreeQty / totalQty) * 100) : 0;
+    insights.push(`Tiga besar menyumbang ${topThreeShare}% penjualan. Evaluasi menu di luar tiga besar untuk kampanye cross-sell.`);
+  } else {
+    insights.push('Tambahkan promo baru untuk memperluas variasi menu favorit pelanggan.');
+  }
+
+  insightEl.innerHTML = insights.map(text => `<li>${text}</li>`).join('');
+}
+
+function renderLeaderboardDetail(){
+  const meta = getScopeMeta(currentLeaderboardScope);
+  const items = leaderboardData.get(currentLeaderboardScope) || [];
+  const labelEl = document.getElementById('leaderboard-detail-label');
+  const titleEl = document.getElementById('leaderboard-detail-title');
+  const descEl = document.getElementById('leaderboard-detail-description');
+  const listEl = document.getElementById('leaderboard-detail-list');
+
+  if (labelEl) labelEl.textContent = `Fokus: ${meta.label}`;
+  if (titleEl) titleEl.textContent = meta.detailTitle;
+  if (descEl) descEl.textContent = meta.description;
+
+  if (!listEl) return;
+
+  if (!items.length){
+    listEl.innerHTML = '<li class="rounded-2xl border border-charcoal/8 bg-white px-4 py-4 text-sm text-charcoal/60">Data leaderboard akan tampil otomatis.</li>';
+    updateLeaderboardInsights([], meta);
+    return;
+  }
+
+  const maxQty = Math.max(...items.map(item => Number(item.qty || 0)), 0) || 1;
+
+  listEl.innerHTML = items.map((item, index) => {
+    const rank = index + 1;
+    const qty = Number(item.qty || 0);
+    const qtyPercent = Math.round((qty / maxQty) * 100);
+    const revenue = Number(item.revenue || 0);
+    const badge = rank === 1 ? 'bg-matcha text-white' : rank === 2 ? 'bg-peach text-charcoal' : 'bg-charcoal/10 text-charcoal';
+    return `
+      <li class="rounded-2xl border border-charcoal/8 bg-white px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-lg">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex items-center gap-3">
+            <span class="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ${badge}">${rank}</span>
+            <div>
+              <p class="text-base font-semibold text-charcoal">${item.name || 'Item Tanpa Nama'}</p>
+              <p class="text-xs font-medium text-charcoal/55">Terjual ${formatNumber(qty)} · Rp ${formatNumber(Math.round(revenue))}</p>
+            </div>
+          </div>
+          <span class="rounded-full bg-matcha/10 px-3 py-1 text-xs font-semibold text-matcha/90">${qtyPercent}% dari top performer</span>
+        </div>
+        <div class="mt-3 h-2 w-full overflow-hidden rounded-full bg-charcoal/10">
+          <div class="h-full rounded-full bg-matcha transition-[width] duration-300" style="width:${qtyPercent}%"></div>
+        </div>
+      </li>`;
+  }).join('');
+
+  updateLeaderboardInsights(items, meta);
+}
+
+async function loadLeaderboards(method = 'all'){
+  await Promise.all(leaderboardScopes.map(async (meta) => {
+    try {
+      const res = await fetch(`/api/stats/top-items?scope=${meta.scope}&limit=5&method=${encodeURIComponent(method)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const items = data.success ? (data.items || []) : [];
+      leaderboardData.set(meta.scope, items);
+    } catch (err) {
+      console.error('Failed to load leaderboard', meta.scope, err);
+      leaderboardData.set(meta.scope, []);
+    }
+  }));
+
+  renderLeaderboardHighlights();
+  renderLeaderboardDetail();
+}
+
 async function loadOverview(){
   try {
     const res = await fetch('/api/stats/overview');
@@ -76,25 +263,6 @@ async function loadOverview(){
   } catch (_) {}
 }
 
-async function loadTopItems(scope, method){
-  const params = new URLSearchParams({ scope, method, limit: '9' });
-  const res = await fetch(`/api/stats/top-items?${params.toString()}`);
-  const data = await res.json();
-  const wrap = document.getElementById('top-items');
-  if (!wrap) return;
-  if (!data.success){ wrap.innerHTML = '<p class="text-sm text-rose-700">Gagal memuat top produk</p>'; return; }
-  const items = (data.items||[]).map(it=>{
-    return `<div class="rounded-xl border border-charcoal/10 bg-white p-4">
-      <div class="text-sm font-semibold">${it.name}</div>
-      <div class="mt-1 text-xs text-charcoal/60">Terjual</div>
-      <div class="text-2xl font-bold">${formatNumber(it.qty)}</div>
-      <div class="mt-1 text-xs text-charcoal/60">Revenue</div>
-      <div class="text-xl font-bold">Rp ${formatNumber(it.revenue||0)}</div>
-    </div>`;
-  }).join('');
-  wrap.innerHTML = items || '<p class="text-sm text-charcoal/60">Tidak ada data</p>';
-}
-
 async function applyFilters(){
   const range = document.getElementById('range').value;
   const method = document.getElementById('method').value;
@@ -104,9 +272,8 @@ async function applyFilters(){
   const scopeSel = document.getElementById('methodScope');
   const scope = scopeSel ? scopeSel.value : 'month';
   await loadSummary(scope, method);
-  const topScopeSel = document.getElementById('topScope');
-  const topScope = topScopeSel ? topScopeSel.value : 'month';
-  await loadTopItems(topScope, method);
+  currentLeaderboardMethod = method;
+  await loadLeaderboards(method);
 }
 
 async function exportDailyReport(){
@@ -214,7 +381,16 @@ window.addEventListener('DOMContentLoaded', ()=>{
   ['from','to'].forEach(id => document.getElementById(id).disabled = true);
   // Change of scopes for method and top-items
   const ms = document.getElementById('methodScope'); if (ms) ms.addEventListener('change', applyFilters);
-  const ts = document.getElementById('topScope'); if (ts) ts.addEventListener('change', applyFilters);
+
+  document.querySelectorAll('[data-leaderboard-card]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const scope = btn.getAttribute('data-scope');
+      if (!scope || scope === currentLeaderboardScope) return;
+      currentLeaderboardScope = scope;
+      renderLeaderboardHighlights();
+      renderLeaderboardDetail();
+    });
+  });
   
   // Export buttons
   document.getElementById('export-daily').addEventListener('click', exportDailyReport);
@@ -222,4 +398,5 @@ window.addEventListener('DOMContentLoaded', ()=>{
   
   loadOverview();
   applyFilters();
+  leaderboardTimer = setInterval(() => loadLeaderboards(currentLeaderboardMethod), 15000);
 });

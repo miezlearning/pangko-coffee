@@ -772,7 +772,6 @@ window.addEventListener('DOMContentLoaded', () => {
   const submitBtn = document.getElementById('reject-submit');
   if (cancelBtn) cancelBtn.addEventListener('click', closeRejectModal);
   if (submitBtn) submitBtn.addEventListener('click', submitReject);
-
 });
 
 // Auto-refresh every 3 seconds
