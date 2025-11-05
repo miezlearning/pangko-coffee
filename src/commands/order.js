@@ -1,128 +1,167 @@
 const config = require('../config/config');
 const orderManager = require('../services/orderManager');
 const menuStore = require('../services/menuStore');
+const {
+    formatNumber,
+    computeMenuUnitPrice,
+    normalizeAddons,
+    buildCartItem,
+    describeAddonOption,
+    formatAddonLines,
+    parseAddonSelectionInput
+} = require('../utils/addonHelpers');
 
-function formatNumber(num) {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
+const DEFAULT_ADDON_TIMEOUT_MS = 5 * 60 * 1000;
+const pendingAddonSessions = new Map();
 
-function computeMenuUnitPrice(item) {
-    const discountPercent = Number(item.discount_percent || 0);
-    if (!discountPercent) return Number(item.price || 0);
-    const discounted = Number(item.price || 0) - Number(item.price || 0) * (discountPercent / 100);
-    return Math.max(0, Math.round(discounted));
-}
-
-function normalizeAddons(addons = []) {
-    return addons
-        .filter(addon => addon && (addon.isActive !== false))
-        .map(addon => ({
-            id: addon.id,
-            name: addon.name,
-            unitPrice: Number(addon.price || 0),
-            minQuantity: Number.isFinite(Number(addon.minQuantity)) ? Number(addon.minQuantity) : 0,
-            maxQuantity: Number.isFinite(Number(addon.maxQuantity)) ? Number(addon.maxQuantity) : null,
-            defaultQuantity: Number.isFinite(Number(addon.defaultQuantity)) ? Number(addon.defaultQuantity) : null,
-            isRequired: !!addon.isRequired
-        }));
-}
-
-function parseAddonArguments(rawTokens, availableAddons) {
-    if (!rawTokens.length || !availableAddons.length) {
-        return { selections: [], invalid: [] };
+function cleanupExpiredAddonSessions() {
+    const now = Date.now();
+    for (const [userId, session] of pendingAddonSessions.entries()) {
+        if (now - session.startedAt > DEFAULT_ADDON_TIMEOUT_MS) {
+            pendingAddonSessions.delete(userId);
+        }
     }
-
-    const addonMap = new Map();
-    availableAddons.forEach(addon => addonMap.set(addon.id.toLowerCase(), addon));
-
-    const quantities = new Map();
-    const invalid = [];
-
-    rawTokens.forEach(token => {
-        if (!token) return;
-        const cleaned = token.trim();
-        if (!cleaned) return;
-        const parts = cleaned.split(/[:=]/);
-        const idPart = parts[0].toLowerCase();
-        const addon = addonMap.get(idPart);
-        if (!addon) {
-            invalid.push(`Add-on '${cleaned}' tidak dikenali`);
-            return;
-        }
-        let qty = null;
-        if (parts.length > 1 && parts[1] !== '') {
-            qty = Number(parts[1]);
-        }
-        if (qty === null || Number.isNaN(qty)) {
-            qty = addon.minQuantity > 0 ? addon.minQuantity : 1;
-        }
-        if (qty < 0) {
-            invalid.push(`Jumlah untuk ${addon.name} tidak boleh negatif`);
-            return;
-        }
-        quantities.set(addon.id, qty);
-    });
-
-    const selections = [];
-    availableAddons.forEach(addon => {
-        let qty;
-        if (quantities.has(addon.id)) {
-            qty = quantities.get(addon.id);
-        } else if (addon.defaultQuantity !== null && addon.defaultQuantity !== undefined) {
-            qty = addon.defaultQuantity;
-        } else {
-            qty = addon.minQuantity;
-        }
-
-        if (addon.isRequired && qty < addon.minQuantity) {
-            invalid.push(`Add-on ${addon.name} minimal ${addon.minQuantity}`);
-            return;
-        }
-        if (addon.maxQuantity !== null && addon.maxQuantity !== undefined && qty > addon.maxQuantity) {
-            invalid.push(`Add-on ${addon.name} maksimal ${addon.maxQuantity}`);
-            return;
-        }
-
-        if (qty > 0) {
-            selections.push({
-                id: addon.id,
-                name: addon.name,
-                quantity: qty,
-                unitPrice: addon.unitPrice
-            });
-        }
-    });
-
-    return { selections, invalid };
 }
 
-function buildCartItem(item, baseUnitPrice, addonSelections) {
-    const addonsTotal = addonSelections.reduce((sum, addon) => sum + addon.unitPrice * addon.quantity, 0);
-    const unitPrice = baseUnitPrice + addonsTotal;
-    const keyPart = addonSelections
-        .map(addon => `${addon.id}:${addon.quantity}`)
-        .sort()
-        .join('|');
-    const cartKey = keyPart ? `${item.id}::${keyPart}` : item.id;
+setInterval(cleanupExpiredAddonSessions, 60 * 1000);
 
-    return {
-        id: item.id,
-        name: item.name,
-        price: unitPrice,
-        basePrice: baseUnitPrice,
-        addons: addonSelections,
-        cartKey
-    };
+function formatAddonPrompt(item, availableAddons) {
+    let text = `➕ *Add-on tersedia untuk ${item.name}*\n\n`;
+    availableAddons.forEach(addon => {
+        text += `• ${describeAddonOption(addon)}\n`;
+    });
+    text += `\nBalas dengan format: \`1x2,2\` (index add-on lalu jumlah).\n`;
+    text += `Gunakan ID add-on jika Anda sudah hafal, contoh: \`shot=2,cara=1\`.\n`;
+    text += `Ketik *skip* jika tidak ingin add-on.\n`;
+    text += `Ketik *batal* untuk membatalkan penambahan item ini.`;
+    return text;
+}
+
+function sendCartSummaryMessage({ sock, to, orderSession, pricing, highlightItemName, highlightQuantity, highlightAddons }) {
+    const lineItemHeader = highlightItemName ? `${highlightItemName} x${highlightQuantity}` : null;
+    let text = `✅ *Item ditambahkan ke keranjang!*\n\n`;
+    if (lineItemHeader) {
+        text += `${lineItemHeader}\n`;
+        if (highlightAddons?.length) {
+            text += `${formatAddonLines(highlightAddons)}\n`;
+        }
+        text += `\n`;
+    }
+    text += `🛒 *Keranjang Saat Ini:*\n`;
+
+    orderSession.items.forEach((cartItem, index) => {
+        text += `${index + 1}. ${cartItem.name} x${cartItem.quantity}\n`;
+        text += `   Rp ${formatNumber(cartItem.price * cartItem.quantity)}\n`;
+        if (Array.isArray(cartItem.addons) && cartItem.addons.length > 0) {
+            text += `${formatAddonLines(cartItem.addons)}\n`;
+        }
+        if (cartItem.notes) {
+            text += `   📝 ${cartItem.notes}\n`;
+        }
+    });
+
+    text += `\nSubtotal: Rp ${formatNumber(pricing.subtotal)}\n`;
+    if (pricing.fee > 0) {
+        text += `Biaya Layanan: Rp ${formatNumber(pricing.fee)}\n`;
+    }
+    text += `*Total: Rp ${formatNumber(pricing.total)}*\n\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    text += `💡 *Lanjut?*\n`;
+    text += `• Tambah item: *!order [ID] [JUMLAH]*\n`;
+    text += `• Lihat keranjang: *!cart*\n`;
+    text += `• Checkout: *!checkout*\n`;
+    text += `• Batal pesanan: *!cancel*\n`;
+
+    return sock.sendMessage(to, { text });
+}
+
+function completeAddonSelection({ sock, to, userId, item, quantity, addonSelections }) {
+    const baseUnitPrice = computeMenuUnitPrice(item);
+    const cartItem = buildCartItem(item, addonSelections, { baseUnitPrice });
+    const session = orderManager.addItemToCart(userId, cartItem, quantity);
+    const pricing = orderManager.calculateTotal(session.items, true);
+
+    return sendCartSummaryMessage({
+        sock,
+        to,
+        orderSession: session,
+        pricing,
+        highlightItemName: item.name,
+        highlightQuantity: quantity,
+        highlightAddons: addonSelections
+    });
+}
+
+async function promptAddons(sock, to, userId, item, quantity, availableAddons) {
+    pendingAddonSessions.set(userId, {
+        userId,
+        item,
+        quantity,
+        availableAddons,
+        startedAt: Date.now()
+    });
+
+    await sock.sendMessage(to, { text: formatAddonPrompt(item, availableAddons) });
 }
 
 module.exports = {
     name: 'order',
     description: 'Mulai proses pemesanan',
     aliases: ['pesan', 'beli'],
-    
+
+    hasActiveSession(userId) {
+        return pendingAddonSessions.has(userId);
+    },
+
+    async handleResponse(sock, msg) {
+        const from = msg.key.remoteJid;
+        const userId = from;
+        const pending = pendingAddonSessions.get(userId);
+        if (!pending) return;
+
+        const messageText = (
+            msg.message?.conversation ||
+            msg.message?.extendedTextMessage?.text ||
+            ''
+        ).trim();
+
+        if (/^(batal|cancel)$/i.test(messageText)) {
+            pendingAddonSessions.delete(userId);
+            await sock.sendMessage(from, { text: '❌ Penambahan item dibatalkan. Ketik *!order* lagi jika ingin memesan.' });
+            return;
+        }
+
+        if (!messageText) {
+            await sock.sendMessage(from, { text: '⚠️ Mohon kirim format add-on dengan benar, contoh: `1x2,2`. Ketik *skip* jika tidak ingin add-on.' });
+            await sock.sendMessage(from, { text: formatAddonPrompt(pending.item, pending.availableAddons) });
+            return;
+        }
+
+        const { selections, errors } = parseAddonSelectionInput(messageText, pending.availableAddons);
+
+        if (errors.length > 0) {
+            await sock.sendMessage(from, { text: `❌ ${errors.join('\n')}` });
+            await sock.sendMessage(from, { text: formatAddonPrompt(pending.item, pending.availableAddons) });
+            return;
+        }
+
+        pendingAddonSessions.delete(userId);
+        await completeAddonSelection({
+            sock,
+            to: from,
+            userId,
+            item: pending.item,
+            quantity: pending.quantity,
+            addonSelections: selections
+        });
+    },
+
     async execute(sock, msg, args) {
         const from = msg.key.remoteJid;
         const userId = msg.key.remoteJid;
+
+        // Cancel any pending add-on prompts when issuing a new command
+        pendingAddonSessions.delete(userId);
 
         // Jika ada argument, langsung tambah item
         if (args.length > 0) {
@@ -155,7 +194,9 @@ module.exports = {
     async addItemToOrder(sock, msg, args) {
         const from = msg.key.remoteJid;
         const userId = msg.key.remoteJid;
-        
+
+        pendingAddonSessions.delete(userId);
+
         const itemId = args[0].toUpperCase();
         let qtyArgIndex = 1;
         let quantity = 1;
@@ -189,64 +230,28 @@ module.exports = {
             return;
         }
 
-        const availableAddons = normalizeAddons(item.addons || []);
+        const availableAddons = normalizeAddons(item.addons || [], { includeIndex: true });
         const addonTokens = args.slice(qtyArgIndex);
-        const { selections: addonSelections, invalid } = parseAddonArguments(addonTokens, availableAddons);
-
-        if (invalid.length > 0) {
-            await sock.sendMessage(from, {
-                text: `❌ Gagal memproses add-on:\n- ${invalid.join('\n- ')}`
-            });
+        if (availableAddons.length > 0 && addonTokens.length === 0) {
+            await promptAddons(sock, from, userId, item, quantity, availableAddons);
             return;
         }
 
-        // Ensure required add-ons are fulfilled
-        const missingRequired = availableAddons.filter(addon => addon.isRequired)
-            .filter(addon => !addonSelections.some(sel => sel.id === addon.id && sel.quantity >= addon.minQuantity))
-            .map(addon => `• ${addon.name} minimal ${addon.minQuantity}`);
+        const selectionInput = addonTokens.join(',');
+        const { selections, errors } = parseAddonSelectionInput(selectionInput, availableAddons);
 
-        if (missingRequired.length > 0) {
-            await sock.sendMessage(from, {
-                text: `❌ Add-on wajib belum lengkap:\n${missingRequired.join('\n')}`
-            });
+        if (errors.length > 0) {
+            await sock.sendMessage(from, { text: `❌ ${errors.join('\n')}` });
             return;
         }
 
-        const baseUnitPrice = computeMenuUnitPrice(item);
-        const cartItem = buildCartItem(item, baseUnitPrice, addonSelections);
-
-        // Add to cart
-        const session = orderManager.addItemToCart(userId, cartItem, quantity);
-        const pricing = orderManager.calculateTotal(session.items, true);
-
-        let text = `✅ *${item.name}* x${quantity} ditambahkan!\n\n`;
-        text += `🛒 *Keranjang Saat Ini:*\n`;
-        
-        session.items.forEach((cartItem, index) => {
-            text += `${index + 1}. ${cartItem.name} x${cartItem.quantity}\n`;
-            text += `   Rp ${formatNumber(cartItem.price * cartItem.quantity)}\n`;
-            if (Array.isArray(cartItem.addons) && cartItem.addons.length > 0) {
-                cartItem.addons.forEach(addon => {
-                    text += `   ➕ ${addon.name} x${addon.quantity} (Rp ${formatNumber(addon.unitPrice * addon.quantity)})\n`;
-                });
-            }
+        await completeAddonSelection({
+            sock,
+            to: from,
+            userId,
+            item,
+            quantity,
+            addonSelections: selections
         });
-        
-        text += `\n`;
-        text += `Subtotal: Rp ${formatNumber(pricing.subtotal)}\n`;
-        
-        if (pricing.fee > 0) {
-            text += `Biaya Layanan: Rp ${formatNumber(pricing.fee)}\n`;
-        }
-        
-        text += `*Total: Rp ${formatNumber(pricing.total)}*\n\n`;
-        text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-        text += `💡 *Lanjut?*\n`;
-        text += `• Tambah item: *!order [ID] [JUMLAH]*\n`;
-        text += `• Lihat keranjang: *!cart*\n`;
-        text += `• Checkout: *!checkout*\n`;
-        text += `• Batal: *!cancel*\n`;
-
-        await sock.sendMessage(from, { text });
     }
 };

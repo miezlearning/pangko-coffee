@@ -2,6 +2,32 @@ const orderManager = require('../services/orderManager');
 const QRISGenerator = require('../utils/qris');
 const config = require('../config/config');
 const moment = require('moment-timezone');
+const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+
+const FOLLOW_UP_TIMEOUT_MS = 15 * 60 * 1000;
+const pendingFollowUps = new Map();
+
+function cleanupFollowUps() {
+    const now = Date.now();
+    for (const [userId, data] of pendingFollowUps.entries()) {
+        if (now - data.startedAt > FOLLOW_UP_TIMEOUT_MS) {
+            pendingFollowUps.delete(userId);
+        }
+    }
+}
+
+setInterval(cleanupFollowUps, 60 * 1000);
+
+async function downloadImageBuffer(msg) {
+    const image = msg.message?.imageMessage;
+    if (!image) return null;
+    const stream = await downloadContentFromMessage(image, 'image');
+    const chunks = [];
+    for await (const chunk of stream) {
+        chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+}
 
 // Simple in-memory state is stored inside orderManager session under `checkoutWizard`
 
@@ -13,57 +39,165 @@ module.exports = {
     // Interactive session helpers
     async hasActiveSession(userId) {
         const session = orderManager.getSession(userId);
-        return !!(session && session.checkoutWizard && session.checkoutWizard.active);
+        const wizardActive = !!(session && session.checkoutWizard && session.checkoutWizard.active);
+        return wizardActive || pendingFollowUps.has(userId);
     },
 
     async handleResponse(sock, msg) {
         const from = msg.key.remoteJid;
         const userId = from;
         const session = orderManager.getSession(userId);
-        if (!session || !session.checkoutWizard || !session.checkoutWizard.active) return;
+        const wizard = session?.checkoutWizard;
 
-        const text = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').trim();
-        if (!text) return;
+        if (wizard && wizard.active) {
+            const text = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').trim();
+            if (!text) return;
 
-        // Allow cancel
-        if (/^(batal|cancel)$/i.test(text)) {
-            session.checkoutWizard = null;
-            orderManager.sessions.set(userId, session);
-            await sock.sendMessage(from, { text: '✅ Checkout dibatalkan. Ketik *!checkout* lagi jika ingin melanjutkan.' });
+            // Allow cancel
+            if (/^(batal|cancel)$/i.test(text)) {
+                session.checkoutWizard = null;
+                orderManager.sessions.set(userId, session);
+                await sock.sendMessage(from, { text: '✅ Checkout dibatalkan. Ketik *!checkout* lagi jika ingin melanjutkan.' });
+                return;
+            }
+
+            if (wizard.step === 'ask_name') {
+                const name = text.replace(/\s+/g, ' ').trim();
+                if (!name || name.length < 2) {
+                    await sock.sendMessage(from, { text: '⚠️ Nama terlalu pendek. Mohon ketik nama yang benar.' });
+                    return;
+                }
+                wizard.customerName = name;
+                wizard.step = 'ask_method';
+                orderManager.sessions.set(userId, session);
+                await sock.sendMessage(from, { text: '🔰 Pilih metode pembayaran: *qris* atau *tunai* (ketik salah satu).' });
+                return;
+            }
+
+            if (wizard.step === 'ask_method') {
+                const lc = text.toLowerCase();
+                let method = null;
+                if (lc.includes('qris')) method = 'QRIS';
+                if (/(tunai|cash)/.test(lc)) method = 'CASH';
+                if (!method) {
+                    await sock.sendMessage(from, { text: '⚠️ Metode tidak dikenali. Ketik *qris* atau *tunai*.' });
+                    return;
+                }
+                wizard.paymentMethod = method;
+                // Proceed to create order with captured data
+                session.checkoutWizard = null;
+                orderManager.sessions.set(userId, session);
+
+                // Delegate to same execution path with parsed args
+                await this.execute(sock, msg, [wizard.customerName, method.toLowerCase()]);
+                return;
+            }
             return;
         }
 
-        const wiz = session.checkoutWizard;
-        if (wiz.step === 'ask_name') {
-            const name = text.replace(/\s+/g, ' ').trim();
-            if (!name || name.length < 2) {
-                await sock.sendMessage(from, { text: '⚠️ Nama terlalu pendek. Mohon ketik nama yang benar.' });
+        const followUp = pendingFollowUps.get(userId);
+        if (!followUp) return;
+
+        if (followUp.type === 'qris_proof') {
+            const image = msg.message?.imageMessage;
+            if (!image) {
+                await sock.sendMessage(from, { text: '📸 Mohon kirim foto/screenshot bukti transfer QRIS sebagai balasan pesan ini.' });
                 return;
             }
-            wiz.customerName = name;
-            wiz.step = 'ask_method';
-            orderManager.sessions.set(userId, session);
-            await sock.sendMessage(from, { text: '🔰 Pilih metode pembayaran: *qris* atau *tunai* (ketik salah satu).' });
+
+            const proofBuffer = await downloadImageBuffer(msg);
+            if (!proofBuffer) {
+                await sock.sendMessage(from, { text: '❌ Gagal membaca gambar. Mohon kirim ulang bukti pembayaran.' });
+                return;
+            }
+
+            const order = orderManager.getOrder(followUp.orderId);
+            if (!order) {
+                pendingFollowUps.delete(userId);
+                await sock.sendMessage(from, { text: '❌ Order tidak ditemukan. Silakan hubungi kasir.' });
+                return;
+            }
+
+            try {
+                orderManager.setPaymentProof(order.orderId, {
+                    type: 'image',
+                    mimeType: image.mimetype,
+                    fileLength: image.fileLength,
+                    sender: userId
+                });
+            } catch (error) {
+                console.error('Failed to attach payment proof:', error.message);
+            }
+
+            const caption = `📸 *Bukti Pembayaran QRIS*
+Order: ${order.orderId}
+Nama: ${order.customerName}
+Total: Rp ${this.formatNumber(order.pricing.total)}
+Dari: ${userId.split('@')[0]}`;
+
+            const targets = new Set([...(config.shop.baristaNumbers || []), ...(config.shop.adminNumbers || [])]);
+            for (const target of targets) {
+                if (!target) continue;
+                try {
+                    await sock.sendMessage(target, {
+                        image: proofBuffer,
+                        caption
+                    });
+                } catch (err) {
+                    console.error(`Failed to forward proof to ${target}:`, err.message);
+                }
+            }
+
+            pendingFollowUps.delete(userId);
+
+            await sock.sendMessage(from, {
+                text: '🙏 Terima kasih! Bukti pembayaran sudah diterima. Kasir akan memeriksa dan mengkonfirmasi dalam 1-2 menit.'
+            });
+            await sock.sendMessage(from, {
+                text: `ℹ️ Anda bisa cek status pembayaran dengan mengetik *!status ${order.orderId}*.`
+            });
             return;
         }
 
-        if (wiz.step === 'ask_method') {
-            const lc = text.toLowerCase();
-            let method = null;
-            if (lc.includes('qris')) method = 'QRIS';
-            if (/(tunai|cash)/.test(lc)) method = 'CASH';
-            if (!method) {
-                await sock.sendMessage(from, { text: '⚠️ Metode tidak dikenali. Ketik *qris* atau *tunai*.' });
+        if (followUp.type === 'cash_arrival') {
+            const text = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').trim();
+            if (!text) {
+                await sock.sendMessage(from, { text: '✋ Mohon balas dengan "sudah" ketika Anda sudah berada di kasir.' });
                 return;
             }
-            wiz.paymentMethod = method;
-            // Proceed to create order with captured data
-            session.checkoutWizard = null;
-            orderManager.sessions.set(userId, session);
 
-            // Delegate to same execution path with parsed args
-            await this.execute(sock, msg, [wiz.customerName, method.toLowerCase()]);
-            return;
+            if (/^(sudah|sampai|di kasir|hadir|saya sudah|sampun)$/i.test(text.toLowerCase())) {
+                const order = orderManager.getOrder(followUp.orderId);
+                pendingFollowUps.delete(userId);
+
+                if (order) {
+                    const notifyText = `👥 *Customer Tunai Hadir*
+Order: ${order.orderId}
+Nama: ${order.customerName}
+Total: Rp ${this.formatNumber(order.pricing.total)}
+Status: menunggu kasir menerima pembayaran tunai.`;
+                    for (const target of config.shop.baristaNumbers || []) {
+                        try {
+                            await sock.sendMessage(target, { text: notifyText });
+                        } catch (err) {
+                            console.error(`Failed to notify barista ${target}:`, err.message);
+                        }
+                    }
+                }
+
+                await sock.sendMessage(from, {
+                    text: '👍 Noted! Kasir sudah diberi tahu. Silakan tunjukkan Order ID Anda kepada kasir.'
+                });
+                return;
+            }
+
+            if (/^(batal|cancel)$/i.test(text.toLowerCase())) {
+                pendingFollowUps.delete(userId);
+                await sock.sendMessage(from, { text: 'ℹ️ Jika ingin membatalkan pesanan, silakan informasikan langsung ke kasir atau tunggu pesanan hangus otomatis.' });
+                return;
+            }
+
+            await sock.sendMessage(from, { text: '⚠️ Ketik *sudah* ketika Anda telah berada di kasir, atau *batal* bila tidak jadi datang.' });
         }
     },
 
@@ -152,6 +286,16 @@ module.exports = {
                 text += `Jika lewat waktu, pesanan otomatis dibatalkan. Anda bisa buka kembali dalam 60 menit dengan perintah: *!lanjut ${order.orderId}*.`;
 
                 await sock.sendMessage(from, { text });
+
+                pendingFollowUps.set(userId, {
+                    type: 'cash_arrival',
+                    orderId: order.orderId,
+                    startedAt: Date.now()
+                });
+
+                await sock.sendMessage(from, {
+                    text: '📣 Balas chat ini dengan *sudah* ketika Anda sudah tiba di kasir supaya kasir langsung memproses pembayaran tunai Anda.'
+                });
                 return;
             }
 
@@ -220,7 +364,7 @@ module.exports = {
             text += `⚠️ *PENTING:*\n`;
             text += `• Nominal sudah disesuaikan: Rp ${this.formatNumber(order.pricing.total)}\n`;
             text += `• Jangan ubah nominal saat bayar!\n`;
-            text += `• Setelah bayar, ketik: \`!confirm ${order.orderId}\``;
+            text += `• Setelah bayar, kirim foto bukti transfer di chat ini.`;
 
             await sock.sendMessage(from, { text });
 
@@ -242,18 +386,23 @@ module.exports = {
                             `1. Buka e-wallet (Gopay/OVO/Dana/dll)\n` +
                             `2. Scan QR code di atas\n` +
                             `3. Nominal sudah otomatis terisi\n` +
-                            `4. Konfirmasi pembayaran\n` +
-                            `5. Setelah berhasil, ketik:\n` +
-                            `   \`!confirm ${order.orderId}\`\n\n` +
+                            `4. Selesaikan pembayaran\n` +
+                            `5. Screenshot bukti pembayaran & kirim balasan foto ke chat ini\n\n` +
                             `⏰ Batas waktu: ${expiryTime} ${tzLabel}`
+                });
+
+                pendingFollowUps.set(userId, {
+                    type: 'qris_proof',
+                    orderId: order.orderId,
+                    startedAt: Date.now()
                 });
 
                 // Send reminder message
                 await sock.sendMessage(from, {
-                    text: `🔔 *JANGAN LUPA!*\n\n` +
-                          `Setelah bayar, ketik:\n` +
-                          `\`!confirm ${order.orderId}\`\n\n` +
-                          `Agar pesanan langsung diproses barista! ⚡`
+                    text: `🔔 *Setelah bayar:*\n` +
+                          `• Kirim foto bukti transfer di chat ini\n` +
+                          `• Tunggu kasir mengkonfirmasi (±1-2 menit)\n` +
+                          `• Cek status kapan saja: *!status ${order.orderId}*`
                 });
                 
                 // Register to payment gateway dashboard
@@ -268,7 +417,13 @@ module.exports = {
                     text: `📱 *QRIS Code:*\n\n` +
                           `\`\`\`${dynamicQRIS}\`\`\`\n\n` +
                           `Copy code di atas dan paste ke aplikasi e-wallet Anda.\n\n` +
-                          `Setelah bayar, ketik: \`!confirm ${order.orderId}\``
+                          `Setelah bayar, kirim foto bukti transfer di chat ini. Ketik *!status ${order.orderId}* untuk cek proses.`
+                });
+
+                pendingFollowUps.set(userId, {
+                    type: 'qris_proof',
+                    orderId: order.orderId,
+                    startedAt: Date.now()
                 });
             }
 

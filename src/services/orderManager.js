@@ -171,6 +171,8 @@ class OrderManager {
             completedAt: null
         };
 
+        order.paymentProof = null;
+
         // Cash-specific timers/metadata
         if (paymentMethod === 'CASH') {
             const cashTimeout = (config.order && (config.order.cashTimeout ?? config.order.paymentTimeout)) || 10;
@@ -283,6 +285,20 @@ class OrderManager {
         order.qrisGenerated = true;
         order.qrisGeneratedAt = new Date();
         
+        this.orders.set(orderId, order);
+        this._persistAll();
+        return order;
+    }
+
+    setPaymentProof(orderId, proof) {
+        const order = this.getOrder(orderId);
+        if (!order) throw new Error('Order not found');
+
+        order.paymentProof = {
+            ...proof,
+            receivedAt: new Date()
+        };
+        order.updatedAt = new Date();
         this.orders.set(orderId, order);
         this._persistAll();
         return order;
