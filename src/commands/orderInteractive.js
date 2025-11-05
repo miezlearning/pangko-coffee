@@ -54,6 +54,29 @@ async function promptNotes(sock, to, session) {
 // State management untuk interactive session
 const interactiveSessions = new Map();
 
+function getCategoryAvailability() {
+    return {
+        coffee: menuStore.getMenuItems({ category: 'coffee', available: true }).length > 0,
+        nonCoffee: menuStore.getMenuItems({ category: 'nonCoffee', available: true }).length > 0,
+        food: menuStore.getMenuItems({ category: 'food', available: true }).length > 0
+    };
+}
+
+async function sendCategoryPrompt(sock, to) {
+    const availability = getCategoryAvailability();
+    let text = `🛒 *Pesan Sekarang*\n\n`;
+    text += `Pilih kategori yang Anda inginkan:\n\n`;
+    text += `1️⃣ ☕ Kopi${availability.coffee ? '' : ' *(kosong)*'}\n`;
+    text += `2️⃣ 🥤 Non-Kopi${availability.nonCoffee ? '' : ' *(kosong)*'}\n`;
+    text += `3️⃣ 🍰 Makanan${availability.food ? '' : ' *(kosong)*'}\n\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    text += `💡 Ketik angka (1, 2, atau 3) untuk memilih\n`;
+    text += `💡 Ketik *batal* untuk membatalkan\n`;
+    text += `💡 Atau gunakan command lain (!menu, !cart, dll)`;
+
+    await sock.sendMessage(to, { text });
+}
+
 module.exports = {
     name: 'pesan',
     description: 'Pesan dengan cara interaktif (tanya jawab)',
@@ -73,23 +96,33 @@ module.exports = {
             return this.handleResponse(sock, msg);
         }
 
+        const availableMenuItems = menuStore.getMenuItems({ available: true });
+        if (availableMenuItems.length === 0) {
+            await sock.sendMessage(from, {
+                text: `😕 *Menu belum tersedia*.
+
+Silakan hubungi admin untuk menambahkan menu terlebih dahulu sebelum menggunakan fitur ini.`
+            });
+            return;
+        }
+
+        const availability = getCategoryAvailability();
+        if (!availability.coffee && !availability.nonCoffee && !availability.food) {
+            await sock.sendMessage(from, {
+                text: `😕 Semua kategori menu sedang kosong.
+
+Silakan hubungi admin untuk menambahkan menu sebelum memesan.`
+            });
+            return;
+        }
+
         // Start new interactive session
         interactiveSessions.set(userId, {
             step: 'select_category',
             startTime: Date.now()
         });
 
-        let text = `🛒 *Pesan Sekarang*\n\n`;
-        text += `Pilih kategori yang Anda inginkan:\n\n`;
-        text += `1️⃣ ☕ Kopi\n`;
-        text += `2️⃣ 🥤 Non-Kopi\n`;
-        text += `3️⃣ 🍰 Makanan\n\n`;
-        text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-        text += `💡 Ketik angka (1, 2, atau 3) untuk memilih\n`;
-        text += `💡 Ketik *batal* untuk membatalkan\n`;
-        text += `💡 Atau gunakan command lain (!menu, !cart, dll)`;
-
-        await sock.sendMessage(from, { text });
+        await sendCategoryPrompt(sock, from);
     },
 
     async handleResponse(sock, msg) {
@@ -216,6 +249,20 @@ module.exports = {
             available: true 
         });
 
+        if (items.length === 0) {
+            const category = menuStore.getCategoryById(session.category);
+            const categoryName = category ? category.name : 'kategori ini';
+            await sock.sendMessage(from, {
+                text: `⚠️ Menu untuk *${categoryName}* sedang kosong.
+
+Silakan pilih kategori lain atau hubungi admin untuk menambah menu.`
+            });
+            session.step = 'select_category';
+            delete session.category;
+            await sendCategoryPrompt(sock, from);
+            return;
+        }
+
         let selectedItem;
 
         // Check if input is number (index)
@@ -229,7 +276,7 @@ module.exports = {
 
         if (!selectedItem) {
             await sock.sendMessage(from, {
-                text: `❌ Item tidak ditemukan!\n\nSilakan pilih angka 1-${items.length} atau ID menu.`
+                text: `❌ Item tidak ditemukan!\n\nSilakan pilih angka 1-${items.length} atau masukkan ID menu yang valid.`
             });
             return;
         }
@@ -363,17 +410,33 @@ module.exports = {
         const userId = msg.key.remoteJid;
 
         if (text === '1' || text.toLowerCase().includes('ya')) {
+            const availableMenuItems = menuStore.getMenuItems({ available: true });
+            if (availableMenuItems.length === 0) {
+                interactiveSessions.delete(userId);
+                await sock.sendMessage(from, {
+                    text: `� *Menu belum tersedia*.
+
+Silakan hubungi admin untuk menambahkan menu terlebih dahulu sebelum melanjutkan.`
+                });
+                return;
+            }
+
+            const availability = getCategoryAvailability();
+            if (!availability.coffee && !availability.nonCoffee && !availability.food) {
+                interactiveSessions.delete(userId);
+                await sock.sendMessage(from, {
+                    text: `� Semua kategori menu sedang kosong.
+
+Silakan hubungi admin untuk menambahkan menu sebelum melanjutkan.`
+                });
+                return;
+            }
+
             // Reset to category selection
             session.step = 'select_category';
+            delete session.category;
             interactiveSessions.set(userId, session);
-
-            let responseText = `🛒 *Pilih Kategori Lagi*\n\n`;
-            responseText += `1️⃣ ☕ Kopi\n`;
-            responseText += `2️⃣ 🥤 Non-Kopi\n`;
-            responseText += `3️⃣ 🍰 Makanan\n\n`;
-            responseText += `💡 Ketik angka untuk memilih`;
-
-            await sock.sendMessage(from, { text: responseText });
+            await sendCategoryPrompt(sock, from);
         } else if (text === '2' || text.toLowerCase().includes('tidak') || text.toLowerCase().includes('checkout')) {
             // Clear interactive session
             interactiveSessions.delete(userId);
