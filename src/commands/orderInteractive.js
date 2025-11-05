@@ -1,157 +1,15 @@
 const config = require('../config/config');
 const orderManager = require('../services/orderManager');
 const menuStore = require('../services/menuStore');
-
-function formatNumber(num) {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
-
-function computeMenuUnitPrice(item) {
-    const discountPercent = Number(item.discount_percent || 0);
-    if (!discountPercent) return Number(item.price || 0);
-    const discounted = Number(item.price || 0) - Number(item.price || 0) * (discountPercent / 100);
-    return Math.max(0, Math.round(discounted));
-}
-
-function normalizeAddons(addons = []) {
-    return addons
-        .filter(addon => addon && (addon.isActive !== false))
-        .map((addon, idx) => ({
-            id: addon.id,
-            name: addon.name,
-            unitPrice: Number(addon.price || 0),
-            minQuantity: Number.isFinite(Number(addon.minQuantity)) ? Number(addon.minQuantity) : 0,
-            maxQuantity: Number.isFinite(Number(addon.maxQuantity)) ? Number(addon.maxQuantity) : null,
-            defaultQuantity: Number.isFinite(Number(addon.defaultQuantity)) ? Number(addon.defaultQuantity) : null,
-            isRequired: !!addon.isRequired,
-            index: idx + 1
-        }));
-}
-
-function buildCartItem(item, baseUnitPrice, addonSelections) {
-    const addonsTotal = addonSelections.reduce((sum, addon) => sum + addon.unitPrice * addon.quantity, 0);
-    const unitPrice = baseUnitPrice + addonsTotal;
-    const keyPart = addonSelections
-        .map(addon => `${addon.id}:${addon.quantity}`)
-        .sort()
-        .join('|');
-    const cartKey = keyPart ? `${item.id}::${keyPart}` : item.id;
-
-    return {
-        id: item.id,
-        name: item.name,
-        price: unitPrice,
-        basePrice: baseUnitPrice,
-        addons: addonSelections,
-        cartKey
-    };
-}
-
-function formatAddonLines(addons) {
-    if (!Array.isArray(addons) || addons.length === 0) return '';
-    return addons
-        .map(addon => `   ➕ ${addon.name} x${addon.quantity} (Rp ${formatNumber((addon.unitPrice || addon.price || 0) * addon.quantity)})`)
-        .join('\n');
-}
-
-function describeAddonOption(addon) {
-    const pricePart = `Rp ${formatNumber(addon.unitPrice)}`;
-    const min = addon.minQuantity || 0;
-    const max = addon.maxQuantity;
-    const requirements = [];
-    if (addon.isRequired && min > 0) requirements.push(`min ${min}`);
-    else if (min > 0) requirements.push(`min ${min}`);
-    if (max !== null && max !== undefined) requirements.push(`maks ${max}`);
-    const reqText = requirements.length ? ` (${requirements.join(', ')})` : '';
-    return `${addon.index}. ${addon.name} – ${pricePart}${reqText}`;
-}
-
-function parseAddonSelectionInput(text, availableAddons) {
-    if (!availableAddons.length) {
-        return { selections: [], errors: [] };
-    }
-
-    const lowerText = text.trim().toLowerCase();
-    const skipKeywords = ['skip', 'tidak', 'ga', 'nggak', 'gak', 'no', '-'];
-    const isSkip = skipKeywords.includes(lowerText);
-
-    const tokens = isSkip ? [] : text.split(/[\,\n]/).map(t => t.trim()).filter(Boolean);
-    const addonById = new Map();
-    const addonByIndex = new Map();
-    availableAddons.forEach(addon => {
-        addonById.set(addon.id.toLowerCase(), addon);
-        addonByIndex.set(addon.index, addon);
-    });
-
-    const quantities = new Map();
-    const errors = [];
-
-    tokens.forEach(token => {
-        if (!token) return;
-        let keyPart = token;
-        let qtyPart = null;
-        const operatorMatch = token.match(/[:=x]/i);
-        if (operatorMatch) {
-            const [k, q] = token.split(operatorMatch[0]);
-            keyPart = k.trim();
-            qtyPart = q.trim();
-        }
-
-        let addon = null;
-        if (/^\d+$/.test(keyPart)) {
-            addon = addonByIndex.get(Number(keyPart));
-        } else {
-            addon = addonById.get(keyPart.toLowerCase());
-        }
-
-        if (!addon) {
-            errors.push(`Add-on '${token}' tidak dikenali`);
-            return;
-        }
-
-        let qty = qtyPart !== null && qtyPart !== undefined && qtyPart !== '' ? Number(qtyPart) : null;
-        if (qty === null || Number.isNaN(qty)) {
-            qty = addon.minQuantity > 0 ? addon.minQuantity : 1;
-        }
-        if (qty < 0) {
-            errors.push(`Jumlah untuk ${addon.name} tidak boleh negatif`);
-            return;
-        }
-        quantities.set(addon.id, qty);
-    });
-
-    const selections = [];
-    availableAddons.forEach(addon => {
-        let qty;
-        if (quantities.has(addon.id)) {
-            qty = quantities.get(addon.id);
-        } else if (addon.defaultQuantity !== null && addon.defaultQuantity !== undefined) {
-            qty = addon.defaultQuantity;
-        } else {
-            qty = addon.minQuantity;
-        }
-
-        if (addon.isRequired && qty < addon.minQuantity) {
-            errors.push(`${addon.name} minimal ${addon.minQuantity}`);
-            return;
-        }
-        if (addon.maxQuantity !== null && addon.maxQuantity !== undefined && qty > addon.maxQuantity) {
-            errors.push(`${addon.name} maksimal ${addon.maxQuantity}`);
-            return;
-        }
-
-        if (qty > 0) {
-            selections.push({
-                id: addon.id,
-                name: addon.name,
-                quantity: qty,
-                unitPrice: addon.unitPrice
-            });
-        }
-    });
-
-    return { selections, errors };
-}
+const {
+    formatNumber,
+    computeMenuUnitPrice,
+    normalizeAddons,
+    buildCartItem,
+    describeAddonOption,
+    formatAddonLines,
+    parseAddonSelectionInput
+} = require('../utils/addonHelpers');
 
 async function promptAddons(sock, to, session) {
     let addonText = `🍧 *Add-on untuk ${session.selectedItem.name}*\n\n`;
@@ -333,7 +191,7 @@ module.exports = {
         
         items.forEach((item, index) => {
             responseText += `${index + 1}. *${item.name}*\n`;
-            responseText += `   Rp ${this.formatNumber(item.price)}\n`;
+            responseText += `   Rp ${formatNumber(item.price)}\n`;
             if (item.description) {
                 responseText += `   ${item.description}\n`;
             }
@@ -381,8 +239,8 @@ module.exports = {
         interactiveSessions.set(userId, session);
 
         await sock.sendMessage(from, {
-            text: `✅ *${selectedItem.name}*\n` +
-                  `Harga: Rp ${this.formatNumber(selectedItem.price)}\n\n` +
+        text: `✅ *${selectedItem.name}*\n` +
+            `Harga: Rp ${formatNumber(selectedItem.price)}\n\n` +
                   `━━━━━━━━━━━━━━━━━━━━\n\n` +
                   `Berapa jumlahnya? (1-${config.order.maxItemsPerOrder})\n\n` +
                   `💡 Ketik angka (contoh: 2)\n` +
@@ -457,15 +315,20 @@ module.exports = {
         const cartSession = orderManager.getSession(userId);
         const pricing = orderManager.calculateTotal(cartSession.items, true);
 
+        const selectedItemName = session.selectedItem?.name;
+        const selectedQuantity = session.quantity;
+
         session.step = 'ask_more';
-    session.selectedItem = null;
-    session.availableAddons = [];
-    session.selectedAddons = [];
-    session.quantity = null;
+        session.selectedItem = null;
+        session.availableAddons = [];
+        session.selectedAddons = [];
+        session.quantity = null;
         interactiveSessions.set(userId, session);
 
         let responseText = `✅ *Berhasil ditambahkan!*\n\n`;
-        responseText += `${session.selectedItem.name} x${session.quantity}\n`;
+        if (selectedItemName && selectedQuantity) {
+            responseText += `${selectedItemName} x${selectedQuantity}\n`;
+        }
         if (addonSelections.length > 0) {
             responseText += `${formatAddonLines(addonSelections)}\n`;
         }
@@ -485,7 +348,7 @@ module.exports = {
             }
         });
         
-        responseText += `\n*Total: Rp ${this.formatNumber(pricing.total)}*\n\n`;
+        responseText += `\n*Total: Rp ${formatNumber(pricing.total)}*\n\n`;
         responseText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
         responseText += `Mau pesan lagi?\n\n`;
         responseText += `1️⃣ Ya, pesan lagi\n`;
@@ -525,7 +388,7 @@ module.exports = {
             
             cartSession.items.forEach((item, index) => {
                 responseText += `${index + 1}. ${item.name} x${item.quantity}\n`;
-                responseText += `   Rp ${this.formatNumber(item.price * item.quantity)}\n`;
+                responseText += `   Rp ${formatNumber(item.price * item.quantity)}\n`;
                 if (Array.isArray(item.addons) && item.addons.length > 0) {
                     responseText += `${formatAddonLines(item.addons)}\n`;
                 }
@@ -536,11 +399,11 @@ module.exports = {
             });
             
             responseText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-            responseText += `Subtotal: Rp ${this.formatNumber(pricing.subtotal)}\n`;
+            responseText += `Subtotal: Rp ${formatNumber(pricing.subtotal)}\n`;
             if (pricing.fee > 0) {
-                responseText += `Biaya Layanan: Rp ${this.formatNumber(pricing.fee)}\n`;
+                responseText += `Biaya Layanan: Rp ${formatNumber(pricing.fee)}\n`;
             }
-            responseText += `*TOTAL: Rp ${this.formatNumber(pricing.total)}*\n\n`;
+            responseText += `*TOTAL: Rp ${formatNumber(pricing.total)}*\n\n`;
             responseText += `━━━━━━━━━━━━━━━━━━━━\n\n`;
             responseText += `💡 Ketik *!co atau !checkout* untuk lanjut pembayaran\n`;
             responseText += `💡 Ketik *!cart* untuk edit keranjang`;
@@ -551,10 +414,6 @@ module.exports = {
                 text: `❌ Pilihan tidak valid!\n\nKetik 1 (pesan lagi) atau 2 (checkout)`
             });
         }
-    },
-
-    formatNumber(num) {
-        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     }
 };
 
