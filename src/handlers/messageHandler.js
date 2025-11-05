@@ -15,7 +15,15 @@ async function messageHandler(sock, msg) {
             msg.message?.imageMessage?.caption ||
             '';
 
-        if (!messageText) return;
+        const hasMedia = !!(
+            msg.message?.imageMessage ||
+            msg.message?.documentMessage ||
+            msg.message?.videoMessage ||
+            msg.message?.audioMessage ||
+            msg.message?.stickerMessage
+        );
+
+        if (!messageText && !hasMedia) return;
 
         const from = msg.key.remoteJid;
         const isGroup = from.endsWith('@g.us');
