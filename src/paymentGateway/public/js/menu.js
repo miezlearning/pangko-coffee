@@ -2,6 +2,8 @@
 
 let currentCategory = 'all';
 let deleteItemId = null;
+let ADDONS = [];
+let editingAddonId = null;
 
 // Removed - moved to bottom with image preview listener
 
@@ -59,6 +61,11 @@ function displayMenuItems(items) {
         <div>
           <div class="font-semibold text-charcoal">${item.name}</div>
           ${item.description ? `<div class="text-xs text-charcoal/60 mt-1 line-clamp-1">${item.description}</div>` : ''}
+          ${item.addons && item.addons.length
+            ? `<div class="text-[11px] mt-2 inline-flex items-center gap-1 rounded-full bg-matcha/10 text-matcha px-2 py-0.5 font-semibold">
+                 🍧 ${item.addons.length} add-on
+               </div>`
+            : ''}
           ${item.rack_location ? `<div class="text-xs text-blue-600 mt-1">📍 ${item.rack_location}</div>` : ''}
         </div>
       </td>
@@ -115,6 +122,305 @@ function displayMenuItems(items) {
     </tr>
   `;
   }).join('');
+}
+
+async function loadAddons() {
+  try {
+    const response = await fetch('/api/menu/addons');
+    const data = await response.json();
+    if (data.success) {
+      ADDONS = (data.addons || []).map(addon => ({
+        ...addon,
+        price: Number(addon.price || 0),
+        isActive: addon.isActive !== undefined ? addon.isActive : addon.is_active === 1
+      }));
+      renderAddonManagerList();
+      renderItemAddonOptions(collectSelectedAddons());
+    } else {
+      showError(data.error || 'Gagal memuat add-on');
+    }
+  } catch (error) {
+    console.error('Failed to load add-ons:', error);
+    showError('Gagal memuat add-on');
+  }
+}
+
+function renderAddonManagerList() {
+  const listEl = document.getElementById('addon-list');
+  const emptyEl = document.getElementById('addon-empty');
+  const countEl = document.getElementById('addon-count');
+
+  if (!listEl) return;
+
+  if (!ADDONS.length) {
+    listEl.innerHTML = '';
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    if (countEl) countEl.textContent = '0 add-on';
+    return;
+  }
+
+  if (emptyEl) emptyEl.classList.add('hidden');
+  if (countEl) countEl.textContent = `${ADDONS.length} add-on`;
+
+  listEl.innerHTML = ADDONS.map(addon => {
+    const statusBadge = addon.isActive
+      ? '<span class="text-[11px] font-semibold text-matcha bg-matcha/10 px-2 py-0.5 rounded-full">Aktif</span>'
+      : '<span class="text-[11px] font-semibold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">Nonaktif</span>';
+
+    return `
+      <div class="px-4 py-3 hover:bg-matcha/5 flex items-start justify-between gap-4" data-addon-id="${addon.id}">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <div class="text-sm font-semibold text-charcoal">${addon.name}</div>
+            ${statusBadge}
+          </div>
+          <div class="text-xs text-charcoal/50 mt-1">ID: ${addon.id}</div>
+          <div class="text-xs text-charcoal/70 mt-1">Harga: Rp ${formatNumber(addon.price)}</div>
+          ${addon.description ? `<div class="text-xs text-charcoal/60 mt-1">${addon.description}</div>` : ''}
+        </div>
+        <div class="flex flex-col gap-2 text-xs font-semibold">
+          <button class="px-3 py-1 rounded-lg border border-matcha/30 text-matcha hover:bg-matcha/10 transition" onclick="editAddon('${addon.id}')">Edit</button>
+          <button class="px-3 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition" onclick="confirmDeleteAddon('${addon.id}')">Hapus</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openAddonManagerModal() {
+  const modal = document.getElementById('addon-modal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+}
+
+function closeAddonManagerModal() {
+  const modal = document.getElementById('addon-modal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  resetAddonForm();
+}
+
+function resetAddonForm() {
+  const form = document.getElementById('addon-form');
+  if (!form) return;
+  form.reset();
+  editingAddonId = null;
+  const title = document.getElementById('addon-form-title');
+  if (title) title.textContent = 'Tambah Add-on';
+  const idField = document.getElementById('addon-id');
+  if (idField) idField.readOnly = false;
+  const editFlag = document.getElementById('addon-edit-mode');
+  if (editFlag) editFlag.value = 'false';
+  const activeField = document.getElementById('addon-active');
+  if (activeField) activeField.checked = true;
+}
+
+async function saveAddon(event) {
+  event.preventDefault();
+  const id = document.getElementById('addon-id').value.trim().toUpperCase();
+  const name = document.getElementById('addon-name').value.trim();
+  const price = Number(document.getElementById('addon-price').value);
+  const description = document.getElementById('addon-description').value.trim();
+  const isActive = document.getElementById('addon-active').checked;
+
+  if (!id || !name || Number.isNaN(price) || price < 0) {
+    showError('ID, nama, dan harga add-on wajib diisi');
+    return;
+  }
+
+  try {
+    const currentSelections = collectSelectedAddons();
+    const response = await fetch('/api/menu/addons', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        name,
+        price: Math.round(price),
+        description: description || null,
+        is_active: isActive
+      })
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      await loadAddons();
+      renderItemAddonOptions(currentSelections);
+      resetAddonForm();
+      showSuccess(data.message || 'Add-on disimpan');
+    } else {
+      showError(data.error || 'Gagal menyimpan add-on');
+    }
+  } catch (error) {
+    console.error('Failed to save addon:', error);
+    showError('Gagal menyimpan add-on');
+  }
+}
+
+function editAddon(addonId) {
+  const addon = ADDONS.find(a => a.id === addonId);
+  if (!addon) return;
+  editingAddonId = addon.id;
+  const title = document.getElementById('addon-form-title');
+  if (title) title.textContent = 'Edit Add-on';
+
+  document.getElementById('addon-id').value = addon.id;
+  document.getElementById('addon-id').readOnly = true;
+  document.getElementById('addon-name').value = addon.name;
+  document.getElementById('addon-price').value = addon.price || 0;
+  document.getElementById('addon-description').value = addon.description || '';
+  document.getElementById('addon-active').checked = addon.isActive !== false;
+  document.getElementById('addon-edit-mode').value = 'true';
+}
+
+async function confirmDeleteAddon(addonId) {
+  const addon = ADDONS.find(a => a.id === addonId);
+  if (!addon) return;
+  const confirmed = confirm(`Hapus add-on ${addon.name}?`);
+  if (!confirmed) return;
+
+  try {
+    const currentSelections = collectSelectedAddons();
+    const response = await fetch(`/api/menu/addons/${addonId}`, { method: 'DELETE' });
+    const data = await response.json();
+    if (data.success) {
+      await loadAddons();
+      renderItemAddonOptions(currentSelections.filter(addon => addon.id !== addonId));
+      showSuccess(data.message || 'Add-on dihapus');
+    } else {
+      showError(data.error || 'Gagal menghapus add-on');
+    }
+  } catch (error) {
+    console.error('Failed to delete addon:', error);
+    showError('Gagal menghapus add-on');
+  }
+}
+
+function renderItemAddonOptions(selected = []) {
+  const container = document.getElementById('item-addon-options');
+  const emptyState = document.getElementById('item-addon-empty');
+  const warning = document.getElementById('addon-warning');
+  if (!container) return;
+
+  const selectedMap = Array.isArray(selected)
+    ? selected.reduce((map, addon) => {
+        if (addon && addon.id) map[addon.id] = addon;
+        return map;
+      }, {})
+    : {};
+
+  if (!ADDONS.length) {
+    container.innerHTML = '';
+    if (emptyState) emptyState.classList.remove('hidden');
+    if (warning) warning.classList.add('hidden');
+    return;
+  }
+
+  if (emptyState) emptyState.classList.add('hidden');
+
+  container.innerHTML = ADDONS.map((addon, index) => {
+    const selectedAddon = selectedMap[addon.id];
+    const enabled = !!selectedAddon;
+    const minQuantity = selectedAddon ? selectedAddon.minQuantity ?? 0 : 0;
+    const maxQuantity = selectedAddon ? selectedAddon.maxQuantity ?? 1 : 1;
+    const defaultQuantity = selectedAddon ? selectedAddon.defaultQuantity ?? 0 : 0;
+    const priceOverride = selectedAddon && selectedAddon.priceOverride !== undefined && selectedAddon.priceOverride !== null
+      ? selectedAddon.priceOverride
+      : '';
+    const isRequired = selectedAddon ? !!selectedAddon.isRequired : false;
+    const sortOrder = selectedAddon ? selectedAddon.sortOrder ?? index : index;
+
+    return `
+      <div class="border border-charcoal/10 rounded-xl p-4 bg-white/90 hover:border-matcha/40 transition" data-addon-card data-addon-id="${addon.id}" data-sort-order="${sortOrder}">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <label class="inline-flex items-center gap-2 text-sm font-semibold text-charcoal">
+              <input type="checkbox" class="addon-enable h-4 w-4 text-matcha rounded" ${enabled ? 'checked' : ''}>
+              <span>${addon.name}</span>
+            </label>
+            <div class="text-xs text-charcoal/50 mt-1">ID: ${addon.id}</div>
+          </div>
+          <div class="text-xs font-semibold text-matcha">Rp ${formatNumber(addon.price || 0)}</div>
+        </div>
+        ${addon.description ? `<div class="text-xs text-charcoal/60 mt-2">${addon.description}</div>` : ''}
+        <div class="grid grid-cols-3 gap-3 mt-3">
+          <div>
+            <label class="block text-[10px] font-semibold text-charcoal mb-1">Minimal</label>
+            <input type="number" class="addon-min w-full rounded-lg border border-charcoal/15 px-2 py-1 text-xs" min="0" value="${minQuantity}">
+          </div>
+          <div>
+            <label class="block text-[10px] font-semibold text-charcoal mb-1">Maksimal</label>
+            <input type="number" class="addon-max w-full rounded-lg border border-charcoal/15 px-2 py-1 text-xs" min="0" value="${maxQuantity}">
+          </div>
+          <div>
+            <label class="block text-[10px] font-semibold text-charcoal mb-1">Default</label>
+            <input type="number" class="addon-default w-full rounded-lg border border-charcoal/15 px-2 py-1 text-xs" min="0" value="${defaultQuantity}">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mt-3">
+          <div>
+            <label class="block text-[10px] font-semibold text-charcoal mb-1">Harga Override</label>
+            <input type="number" class="addon-price-override w-full rounded-lg border border-charcoal/15 px-2 py-1 text-xs" min="0" placeholder="Ikuti default" value="${priceOverride === '' ? '' : priceOverride}">
+          </div>
+          <label class="flex items-center gap-2 text-xs font-semibold text-charcoal mt-5">
+            <input type="checkbox" class="addon-required h-4 w-4 text-matcha rounded" ${isRequired ? 'checked' : ''}>
+            Wajib dipilih
+          </label>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('[data-addon-card]').forEach(card => {
+    const checkbox = card.querySelector('.addon-enable');
+    const inputs = card.querySelectorAll('input[type="number"], .addon-required');
+    const toggleState = (enabled) => {
+      inputs.forEach(input => {
+        if (!input.classList.contains('addon-required')) {
+          input.disabled = !enabled;
+          input.classList.toggle('opacity-40', !enabled);
+        } else {
+          input.disabled = !enabled;
+        }
+      });
+      card.classList.toggle('opacity-60', !enabled);
+    };
+
+    toggleState(checkbox.checked);
+    checkbox.addEventListener('change', (e) => {
+      toggleState(e.target.checked);
+    });
+  });
+}
+
+function collectSelectedAddons() {
+  const container = document.getElementById('item-addon-options');
+  if (!container) return [];
+  const cards = container.querySelectorAll('[data-addon-card]');
+  const selected = [];
+  cards.forEach((card, index) => {
+    const addonId = card.getAttribute('data-addon-id');
+    const enabled = card.querySelector('.addon-enable').checked;
+    if (!enabled) return;
+    const minQuantity = Number(card.querySelector('.addon-min').value) || 0;
+    const maxQuantity = Number(card.querySelector('.addon-max').value) || 0;
+    const defaultQuantity = Number(card.querySelector('.addon-default').value) || 0;
+    const isRequired = card.querySelector('.addon-required').checked;
+    const priceOverrideInput = card.querySelector('.addon-price-override').value;
+    const priceOverride = priceOverrideInput === '' ? null : Number(priceOverrideInput);
+    const sortOrder = Number(card.getAttribute('data-sort-order')) || index;
+
+    selected.push({
+      id: addonId,
+      minQuantity,
+      maxQuantity,
+      defaultQuantity,
+      isRequired: isRequired || minQuantity > 0,
+      priceOverride: priceOverride !== null && !Number.isNaN(priceOverride) ? priceOverride : null,
+      sortOrder
+    });
+  });
+  return selected;
 }
 
 // Get type badge class
@@ -201,6 +507,9 @@ function openAddItemModal() {
   document.getElementById('item-form').reset();
   document.getElementById('item-edit-mode').value = 'false';
   document.getElementById('item-id').readOnly = false;
+  renderItemAddonOptions([]);
+  const warning = document.getElementById('addon-warning');
+  if (warning) warning.classList.add('hidden');
   document.getElementById('item-modal').classList.remove('hidden');
 }
 
@@ -233,6 +542,9 @@ function editItem(item) {
   
   // Update image preview
   updateImagePreview(item.image);
+  renderItemAddonOptions(item.addons || []);
+  const warning = document.getElementById('addon-warning');
+  if (warning) warning.classList.add('hidden');
   
   document.getElementById('item-modal').classList.remove('hidden');
 }
@@ -257,11 +569,33 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   loadMenuItems();
+  loadAddons();
+  renderItemAddonOptions();
 });
 
 // Save item
 async function saveItem(event) {
   event.preventDefault();
+  const warning = document.getElementById('addon-warning');
+  if (warning) warning.classList.add('hidden');
+
+  const selectedAddons = collectSelectedAddons();
+  const invalidAddon = selectedAddons.find(addon => {
+    if (addon.maxQuantity !== null && addon.maxQuantity !== undefined && addon.maxQuantity < addon.minQuantity) {
+      return true;
+    }
+    if (addon.defaultQuantity < addon.minQuantity) return true;
+    if (addon.maxQuantity > 0 && addon.defaultQuantity > addon.maxQuantity) return true;
+    return false;
+  });
+
+  if (invalidAddon) {
+    if (warning) {
+      warning.textContent = `Konfigurasi add-on tidak valid. Pastikan default berada di antara minimal dan maksimal serta maksimal ≥ minimal.`;
+      warning.classList.remove('hidden');
+    }
+    return;
+  }
   
   const itemData = {
     id: document.getElementById('item-id').value.trim().toUpperCase(),
@@ -280,7 +614,8 @@ async function saveItem(event) {
     image: document.getElementById('item-image').value.trim() || null,
     available: document.getElementById('item-available').checked,
     use_stock: document.getElementById('item-use-stock').checked,
-    show_in_transaction: document.getElementById('item-show-transaction').checked
+    show_in_transaction: document.getElementById('item-show-transaction').checked,
+    addons: selectedAddons
   };
   
   try {

@@ -1,5 +1,9 @@
 const orderManager = require('../services/orderManager');
 
+function formatNumber(num) {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
 module.exports = {
     name: 'cart',
     description: 'Lihat keranjang belanja',
@@ -24,23 +28,33 @@ module.exports = {
         
         session.items.forEach((item, index) => {
             text += `${index + 1}. *${item.name}*\n`;
-            text += `   ${item.quantity} x Rp ${this.formatNumber(item.price)}\n`;
-            text += `   Subtotal: Rp ${this.formatNumber(item.price * item.quantity)}\n`;
-            text += `   ID: \`${item.id}\`\n\n`;
+            text += `   ${item.quantity} x Rp ${formatNumber(item.price)}\n`;
+            text += `   Subtotal: Rp ${formatNumber(item.price * item.quantity)}\n`;
+            text += `   ID: \`${item.id}\`\n`;
+            if (Array.isArray(item.addons) && item.addons.length > 0) {
+                item.addons.forEach(addon => {
+                    if (!addon || !addon.quantity) return;
+                    text += `   ➕ ${addon.name} x${addon.quantity} (Rp ${formatNumber((addon.unitPrice || addon.price || 0) * addon.quantity)})\n`;
+                });
+            }
+            if (item.notes) {
+                text += `   📝 ${item.notes}\n`;
+            }
+            text += `\n`;
         });
 
         text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-        text += `Subtotal: Rp ${this.formatNumber(pricing.subtotal)}\n`;
+        text += `Subtotal: Rp ${formatNumber(pricing.subtotal)}\n`;
         
         if (pricing.fee > 0) {
             const feeType = require('../config/config').order.serviceFee.type;
             const feeLabel = feeType === 'percent' ? 
                 `Biaya Layanan (${require('../config/config').order.serviceFee.amount}%)` :
                 'Biaya Layanan';
-            text += `${feeLabel}: Rp ${this.formatNumber(pricing.fee)}\n`;
+            text += `${feeLabel}: Rp ${formatNumber(pricing.fee)}\n`;
         }
         
-        text += `*TOTAL: Rp ${this.formatNumber(pricing.total)}*\n\n`;
+        text += `*TOTAL: Rp ${formatNumber(pricing.total)}*\n\n`;
         text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
         text += `💡 *Pilihan:*\n`;
         text += `• Tambah item: \`!order [ID] [JUMLAH]\`\n`;
@@ -53,9 +67,5 @@ module.exports = {
         text += `• \`!checkout\` - Lanjut pembayaran`;
 
         await sock.sendMessage(from, { text });
-    },
-
-    formatNumber(num) {
-        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     }
 };

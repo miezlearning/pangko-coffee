@@ -234,6 +234,28 @@
       </div>
     </div>
 
+    <!-- Add-on Selection Modal -->
+    <div id="addon-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+      <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-2xl w-full relative transform transition-all opacity-0 scale-95">
+        <button id="close-addon-modal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition">
+          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <div class="space-y-6">
+          <div>
+            <h2 id="addon-modal-title" class="text-2xl font-bold">Pilih Add-on</h2>
+            <p id="addon-modal-subtitle" class="text-charcoal/70 mt-1">Tambahkan variasi atau topping untuk pesanan.</p>
+          </div>
+          <div id="addon-modal-error" class="hidden rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600"></div>
+          <div id="addon-modal-list" class="max-h-72 overflow-auto pr-2 space-y-3"></div>
+          <div id="addon-modal-summary" class="rounded-2xl border border-matcha/20 bg-matcha/5 px-4 py-3 text-sm font-semibold text-matcha"></div>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <button id="addon-skip-btn" class="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-charcoal/80 transition hover:bg-gray-50">Tanpa Add-on</button>
+            <button id="addon-confirm-btn" class="rounded-xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:bg-matcha/90">Tambah ke Keranjang</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- QRIS Modal -->
     <div id="qris-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden">
       <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center relative transform transition-all opacity-0 scale-95">

@@ -85,12 +85,13 @@ class OrderManager {
      */
     addItemToCart(userId, item, quantity = 1) {
         const session = this.getSession(userId) || this.createSession(userId);
+        const identityKey = item && item.cartKey ? item.cartKey : item.id;
         // Check if item already in cart
-        const existingIndex = session.items.findIndex(i => i.id === item.id);
+        const existingIndex = session.items.findIndex(i => (i.cartKey || i.id) === identityKey);
         if (existingIndex > -1) {
             session.items[existingIndex].quantity += quantity;
         } else {
-            session.items.push({ ...item, quantity });
+            session.items.push({ ...item, quantity, cartKey: identityKey });
         }
         this.sessions.set(userId, session);
         return session;
@@ -433,6 +434,17 @@ class OrderManager {
         order.items.forEach((item, index) => {
             text += `${index + 1}. ${item.name} x${item.quantity}\n`;
             text += `   Rp ${this.formatNumber(item.price * item.quantity)}\n`;
+            if (Array.isArray(item.addons) && item.addons.length > 0) {
+                item.addons.forEach(addon => {
+                    if (!addon || !addon.quantity) return;
+                    const unit = addon.unitPrice !== undefined ? addon.unitPrice : addon.price || 0;
+                    const addonTotal = unit * addon.quantity;
+                    text += `   ➕ ${addon.name} x${addon.quantity} (Rp ${this.formatNumber(addonTotal)})\n`;
+                });
+            }
+            if (item.notes) {
+                text += `   Catatan: ${item.notes}\n`;
+            }
         });
         
         text += `\n`;

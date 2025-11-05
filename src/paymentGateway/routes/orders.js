@@ -7,6 +7,116 @@ const router = express.Router();
 const dataStore = require('../dataStore');
 const orderManager = require('../../services/orderManager');
 const paymentProvider = require('../../services/paymentProvider');
+const menuStore = require('../../services/menuStore');
+
+function describeItemWithAddons(item, idx) {
+    let lines = [`${idx + 1}. ${item.name} x${item.quantity}`];
+    if (Array.isArray(item.addons) && item.addons.length > 0) {
+        item.addons.forEach(addon => {
+            if (!addon || !addon.quantity) return;
+            const unit = addon.unitPrice !== undefined ? addon.unitPrice : addon.price || 0;
+            const addonTotal = unit * addon.quantity;
+            lines.push(`   ➕ ${addon.name} x${addon.quantity} (Rp ${addonTotal.toLocaleString('id-ID')})`);
+        });
+    }
+    if (item.notes) {
+        lines.push(`   📝 ${item.notes}`);
+    }
+    return lines.join('\n');
+}
+
+function formatItemsForMessage(items = []) {
+    return items.map((item, idx) => describeItemWithAddons(item, idx)).join('\n');
+}
+
+function computeMenuUnitPrice(menuItem) {
+    const base = Number(menuItem?.price || 0);
+    const discountPercent = Number(menuItem?.discount_percent || 0);
+    if (!discountPercent) return base;
+    const discounted = base - base * (discountPercent / 100);
+    return Math.max(0, Math.round(discounted));
+}
+
+function normalizeMenuAddons(addons = []) {
+    return addons
+        .filter(addon => addon && addon.isActive !== false)
+        .map(addon => ({
+            id: String(addon.id),
+            name: addon.name,
+            unitPrice: Number(addon.price || addon.priceOverride || addon.basePrice || 0),
+            minQuantity: Number.isFinite(Number(addon.minQuantity)) ? Number(addon.minQuantity) : 0,
+            maxQuantity: Number.isFinite(Number(addon.maxQuantity)) ? Number(addon.maxQuantity) : null,
+            defaultQuantity: Number.isFinite(Number(addon.defaultQuantity)) ? Number(addon.defaultQuantity) : null,
+            isRequired: !!addon.isRequired
+        }));
+}
+
+function resolveAddonSelections(requestedAddons = [], availableAddons = []) {
+    const availableMap = new Map(availableAddons.map(addon => [addon.id.toLowerCase(), addon]));
+    const requestedQuantities = new Map();
+    const errors = [];
+
+    requestedAddons.forEach(req => {
+        if (!req || !req.id) return;
+        const key = String(req.id).toLowerCase();
+        const addon = availableMap.get(key);
+        if (!addon) {
+            errors.push(`Add-on ${req.id} tidak tersedia untuk menu ini`);
+            return;
+        }
+        const qty = Math.max(0, Number(req.quantity ?? req.qty ?? 0));
+        requestedQuantities.set(addon.id, qty);
+    });
+
+    const selections = [];
+    availableAddons.forEach(addon => {
+        let qty;
+        if (requestedQuantities.has(addon.id)) {
+            qty = requestedQuantities.get(addon.id);
+        } else if (addon.defaultQuantity !== null && addon.defaultQuantity !== undefined) {
+            qty = addon.defaultQuantity;
+        } else {
+            qty = addon.minQuantity;
+        }
+
+        qty = Number.isFinite(Number(qty)) ? Number(qty) : 0;
+
+        if (addon.isRequired && qty < addon.minQuantity) {
+            errors.push(`${addon.name} minimal ${addon.minQuantity}`);
+        }
+        if (addon.maxQuantity !== null && addon.maxQuantity !== undefined && qty > addon.maxQuantity) {
+            errors.push(`${addon.name} maksimal ${addon.maxQuantity}`);
+        }
+        if (qty > 0) {
+            selections.push({
+                id: addon.id,
+                name: addon.name,
+                quantity: qty,
+                unitPrice: addon.unitPrice
+            });
+        }
+    });
+
+    return { selections, errors };
+}
+
+function buildCartItemWithAddons(menuItem, addonSelections) {
+    const basePrice = computeMenuUnitPrice(menuItem);
+    const addonsTotal = addonSelections.reduce((sum, addon) => sum + addon.unitPrice * addon.quantity, 0);
+    const keyPart = addonSelections
+        .filter(addon => addon.quantity > 0)
+        .map(addon => `${addon.id}:${addon.quantity}`)
+        .sort()
+        .join('|');
+    return {
+        id: String(menuItem.id),
+        name: menuItem.name,
+        price: basePrice + addonsTotal,
+        basePrice,
+        addons: addonSelections.map(addon => ({ ...addon })),
+        cartKey: keyPart ? `${menuItem.id}::${keyPart}` : String(menuItem.id)
+    };
+}
 
 /**
  * POST /api/orders/ready/:orderId
@@ -91,12 +201,83 @@ router.post('/create', async (req, res) => {
         }
         // Resolve userId (walk-in)
         const uid = (userId && String(userId)) || `cashier-${Date.now()}@dashboard`;
-        // Build session cart
-        items.forEach(it => {
-            if (!it || typeof it.price !== 'number' || !it.id || !it.name) return;
-            const qty = Number(it.quantity || 1);
-            orderManager.addItemToCart(uid, { id: String(it.id), name: String(it.name), price: Number(it.price), size: it.size || 'REG', notes: it.notes || '' }, qty);
+
+        const cartEntries = [];
+        const validationErrors = [];
+
+        (items || []).forEach((it, idx) => {
+            if (!it || !it.id) {
+                validationErrors.push(`Item ke-${idx + 1} tidak valid`);
+                return;
+            }
+
+            const itemId = String(it.id);
+
+            if (itemId.toUpperCase() === 'DISCOUNT') {
+                const discountPrice = Number(it.price || 0);
+                if (!Number.isFinite(discountPrice)) {
+                    validationErrors.push('Diskon tidak valid');
+                    return;
+                }
+                const quantity = Math.max(1, Number(it.quantity || 1));
+                cartEntries.push({
+                    cartItem: {
+                        id: 'DISCOUNT',
+                        name: it.name || 'Diskon',
+                        price: discountPrice,
+                        basePrice: discountPrice,
+                        addons: [],
+                        cartKey: 'DISCOUNT',
+                        notes: ''
+                    },
+                    quantity
+                });
+                return;
+            }
+
+            const menuItem = menuStore.getMenuItemById(itemId);
+            if (!menuItem) {
+                validationErrors.push(`Menu ${itemId} tidak ditemukan`);
+                return;
+            }
+            if (menuItem.available === false) {
+                validationErrors.push(`${menuItem.name} sedang tidak tersedia`);
+                return;
+            }
+
+            const availableAddons = normalizeMenuAddons(menuItem.addons || []);
+            const requestedAddons = Array.isArray(it.addons) ? it.addons : [];
+            const { selections, errors } = resolveAddonSelections(requestedAddons, availableAddons);
+            if (errors.length) {
+                errors.forEach(err => validationErrors.push(`${menuItem.name}: ${err}`));
+                return;
+            }
+
+            const cartItem = buildCartItemWithAddons(menuItem, selections);
+            cartItem.size = it.size || 'REG';
+            if (it.notes) {
+                cartItem.notes = String(it.notes).trim();
+            }
+            const quantity = Math.max(1, Number(it.quantity || 1));
+            cartEntries.push({ cartItem, quantity });
         });
+
+        if (validationErrors.length) {
+            return res.status(400).json({
+                success: false,
+                message: 'Gagal memproses pesanan',
+                errors: validationErrors
+            });
+        }
+
+        if (cartEntries.length === 0) {
+            return res.status(400).json({ success: false, message: 'Items required' });
+        }
+
+        cartEntries.forEach(({ cartItem, quantity }) => {
+            orderManager.addItemToCart(uid, cartItem, quantity);
+        });
+
         // Create order
         const order = orderManager.createOrder(uid, customerName || 'Customer', pm);
 
@@ -233,7 +414,7 @@ router.post('/cash/accept/:orderId', async (req, res) => {
                 `👤 Atas Nama: *${order.customerName}*\n` +
                 `💰 Total: *Rp ${order.pricing.total.toLocaleString('id-ID')}*\n\n` +
                 `━━━━━━━━━━━━━━━━━━━━\n` +
-                `*PESANAN:*\n${order.items.map((item, idx) => `${idx + 1}. ${item.name} x${item.quantity}${item.notes ? `\n   📝 ${item.notes}` : ''}`).join('\n')}\n` +
+                `*PESANAN:*\n${formatItemsForMessage(order.items)}\n` +
                 `━━━━━━━━━━━━━━━━━━━━\n\n` +
                 `Silakan proses pesanan ini! 👨‍🍳`;
             for (const baristaNumber of config.shop.baristaNumbers || config.baristaNumbers || []) {
@@ -478,13 +659,16 @@ router.delete('/:orderId', async (req, res) => {
  */
 router.post('/complete/:orderId', async (req, res) => {
     const { orderId } = req.params;
-    const { completedBy } = req.body;
+    const { completedBy } = req.body || {};
     const orderManager = require('../../services/orderManager');
+    const dataStore = require('../dataStore');
+
     const order = orderManager.getOrder(orderId);
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
     if (order.status !== orderManager.STATUS.READY) {
         return res.status(400).json({ success: false, message: `Order status is ${order.status}, must be READY to complete` });
     }
+
     try {
         const updated = orderManager.updateOrderStatus(orderId, orderManager.STATUS.COMPLETED, { completedBy: completedBy || 'kasir' });
         // Optional: notify customer

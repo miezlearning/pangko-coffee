@@ -5,7 +5,8 @@ let MENU_ITEMS = [];
 let CART = [];
 let DISCOUNT_RP = 0;
 let DISCOUNT_PCT = 0;
-let currentEditingItemId = null; // To track which item's note is being edited
+let currentEditingCartKey = null; // Track which cart line's note is being edited
+let addonModalState = null; // State for add-on modal interactions
 
 const DRAFT_KEY = 'pos_draft_v1';
 
@@ -20,6 +21,90 @@ let lastOrderStatus = null;
 function fmt(n){ return (n||0).toLocaleString('id-ID'); }
 function el(id){ return document.getElementById(id); }
 function getPM(){ const r=[...document.querySelectorAll('input[name="pm"]')].find(x=>x.checked); return r? r.value: 'QRIS'; }
+
+function computeMenuUnitPrice(item){
+  const base = Number(item?.price || 0);
+  const discountPercent = Number(item?.discount_percent || 0);
+  if (!discountPercent) return base;
+  const discounted = base - base * (discountPercent / 100);
+  return Math.max(0, Math.round(discounted));
+}
+
+function normalizeAddons(addons = []){
+  return addons
+    .filter(addon => addon && addon.isActive !== false)
+    .map(addon => ({
+      id: String(addon.id),
+      name: addon.name,
+      unitPrice: Number(addon.price || 0),
+      minQuantity: Number.isFinite(Number(addon.minQuantity)) ? Number(addon.minQuantity) : 0,
+      maxQuantity: Number.isFinite(Number(addon.maxQuantity)) ? Number(addon.maxQuantity) : null,
+      defaultQuantity: Number.isFinite(Number(addon.defaultQuantity)) ? Number(addon.defaultQuantity) : null,
+      isRequired: !!addon.isRequired
+    }));
+}
+
+function buildCartItem(menuItem, addonSelections){
+  const basePrice = computeMenuUnitPrice(menuItem);
+  const addonsTotal = addonSelections.reduce((sum, addon) => sum + addon.unitPrice * addon.quantity, 0);
+  const unitPrice = basePrice + addonsTotal;
+  const keyPart = addonSelections
+    .filter(addon => addon.quantity > 0)
+    .map(addon => `${addon.id}:${addon.quantity}`)
+    .sort()
+    .join('|');
+  const cartKey = keyPart ? `${menuItem.id}::${keyPart}` : String(menuItem.id);
+
+  return {
+    id: String(menuItem.id),
+    cartKey,
+    name: menuItem.name,
+    basePrice,
+    price: unitPrice,
+    addons: addonSelections,
+    notes: ''
+  };
+}
+
+function formatAddonLines(addons){
+  if (!Array.isArray(addons) || addons.length === 0) return '';
+  return addons.map(addon => {
+    const total = (addon.unitPrice || addon.price || 0) * addon.quantity;
+    return `<div class="text-xs text-charcoal/60 flex items-center gap-1 mt-1">
+      <span class="text-matcha">➕</span>
+      <span class="flex-1">${addon.name}</span>
+      <span class="font-semibold text-charcoal/70">x${addon.quantity} · Rp ${fmt(total)}</span>
+    </div>`;
+  }).join('');
+}
+
+function normalizeCartItem(raw){
+  if(!raw) return null;
+  const addons = Array.isArray(raw.addons) ? raw.addons.map(addon => ({
+    id: String(addon.id),
+    name: addon.name,
+    quantity: Math.max(0, Number(addon.quantity || 0)),
+    unitPrice: Number(addon.unitPrice || addon.price || 0)
+  })).filter(addon => addon.id) : [];
+  const addonsTotal = addons.reduce((sum, addon) => sum + addon.unitPrice * addon.quantity, 0);
+  const basePriceCandidate = Number(raw.basePrice);
+  const basePrice = Number.isFinite(basePriceCandidate) ? Math.max(0, basePriceCandidate) : Math.max(0, Number(raw.price || 0) - addonsTotal);
+  const priceCandidate = Number(raw.price);
+  const price = Number.isFinite(priceCandidate) ? priceCandidate : basePrice + addonsTotal;
+  const keyPart = addons.filter(addon => addon.quantity > 0).map(addon => `${addon.id}:${addon.quantity}`).sort().join('|');
+  const cartKey = raw.cartKey || (keyPart ? `${raw.id}::${keyPart}` : String(raw.id));
+
+  return {
+    id: String(raw.id),
+    name: raw.name,
+    cartKey,
+    basePrice,
+    price,
+    addons,
+    notes: raw.notes || '',
+    quantity: Math.max(1, Number(raw.quantity || 1))
+  };
+}
 
 // Sound & notification functions (similar to dashboard)
 function unlockAudio() {
@@ -233,7 +318,7 @@ function renderMenu(){
                 </div>`
               : `<div class="text-lg font-extrabold text-matcha mb-2">Rp ${price}</div>`
             }
-            <button class="w-full bg-matcha text-white rounded-lg py-2.5 text-sm font-bold hover:bg-matcha/90 active:scale-95 transition-all shadow-md hover:shadow-lg" onclick='addToCart(${JSON.stringify({id:it.id,name:it.name,price:finalPrice,originalPrice:it.price,discount:it.discount_percent||0}).replace(/"/g,"&quot;")})'>
+            <button class="w-full bg-matcha text-white rounded-lg py-2.5 text-sm font-bold hover:bg-matcha/90 active:scale-95 transition-all shadow-md hover:shadow-lg add-to-cart-btn" data-item-id="${it.id}">
               <span class="inline-flex items-center gap-1">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                 Tambah ke Keranjang
@@ -244,25 +329,270 @@ function renderMenu(){
       </div>
     </div>`;
   }).join('');
+
+  grid.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+    btn.addEventListener('click', () => handleAddToCart(btn.dataset.itemId));
+  });
 }
 
-function addToCart(item){
-  const idx = CART.findIndex(i=>i.id===item.id);
-  if(idx>-1){ CART[idx].quantity += 1; }
-  else { CART.push({...item, quantity:1}); }
+function handleAddToCart(itemId){
+  const item = MENU_ITEMS.find(it => String(it.id) === String(itemId));
+  if(!item) return;
+
+  const availableAddons = normalizeAddons(item.addons || []);
+  if(availableAddons.length === 0){
+    const cartItem = buildCartItem(item, []);
+    addCartEntry(cartItem, 1);
+    return;
+  }
+
+  openAddonModal(item, availableAddons);
+}
+
+function addCartEntry(cartItem, quantity){
+  const idx = CART.findIndex(i => i.cartKey === cartItem.cartKey);
+  if(idx > -1){
+    CART[idx].quantity += quantity;
+  } else {
+    const normalized = normalizeCartItem({...cartItem, quantity});
+    if(normalized) CART.push(normalized);
+  }
   renderCart();
 }
-function changeQty(id, delta){
-  const idx = CART.findIndex(i=>i.id===id);
+
+function openAddonModal(item, addons){
+  addonModalState = {
+    item,
+    addons,
+    quantities: addons.map(addon => {
+      if (addon.defaultQuantity !== null && addon.defaultQuantity !== undefined) return addon.defaultQuantity;
+      if (addon.minQuantity) return addon.minQuantity;
+      return 0;
+    })
+  };
+
+  const titleEl = el('addon-modal-title');
+  const subtitleEl = el('addon-modal-subtitle');
+  if(titleEl) titleEl.textContent = `Add-on untuk ${item.name}`;
+  if(subtitleEl) subtitleEl.textContent = 'Atur jumlah add-on sebelum menambah ke keranjang.';
+  renderAddonModal();
+
+  const modal = el('addon-modal');
+  if(modal){
+    modal.classList.remove('hidden');
+    requestAnimationFrame(() => {
+      const container = modal.querySelector('.transform');
+      if(container){
+        container.classList.remove('opacity-0','scale-95');
+        container.classList.add('opacity-100','scale-100');
+      }
+    });
+  }
+  updateAddonSkipButton();
+}
+
+function renderAddonModal(){
+  const listEl = el('addon-modal-list');
+  const summaryEl = el('addon-modal-summary');
+  if(!addonModalState || !listEl) return;
+
+  const { addons, quantities, item } = addonModalState;
+  if(addons.length === 0){
+    listEl.innerHTML = '<div class="rounded-xl border border-charcoal/10 bg-gray-50 px-4 py-6 text-center text-sm text-charcoal/60">Tidak ada add-on untuk item ini.</div>';
+    if(summaryEl) summaryEl.textContent = '';
+    return;
+  }
+
+  listEl.innerHTML = addons.map((addon, index) => {
+    const qty = Number(quantities[index] ?? 0);
+    const subtotal = qty * Number(addon.unitPrice || 0);
+    const requirements = [];
+    if(addon.isRequired && (addon.minQuantity || 0) > 0){
+      requirements.push(`wajib min ${addon.minQuantity}`);
+    } else if((addon.minQuantity || 0) > 0){
+      requirements.push(`min ${addon.minQuantity}`);
+    }
+    if(addon.maxQuantity !== null && addon.maxQuantity !== undefined){
+      requirements.push(`maks ${addon.maxQuantity}`);
+    }
+
+    return `<div class="rounded-2xl border border-charcoal/10 bg-white px-4 py-3">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-sm text-charcoal">${addon.name}</div>
+          <div class="text-xs text-charcoal/60 mt-0.5">Rp ${fmt(addon.unitPrice)}${requirements.length ? ` • ${requirements.join(', ')}` : ''}</div>
+        </div>
+        <div class="flex items-center gap-2 bg-gray-50 rounded-full px-2 py-1">
+          <button class="w-8 h-8 rounded-full bg-white border border-charcoal/10 text-lg leading-none" data-addon-action="dec" data-index="${index}">−</button>
+          <div id="addon-qty-${index}" class="w-8 text-center font-bold text-sm">${qty}</div>
+          <button class="w-8 h-8 rounded-full bg-matcha text-white border border-matcha/10 text-lg leading-none" data-addon-action="inc" data-index="${index}">+</button>
+        </div>
+      </div>
+      <div class="mt-2 text-xs text-charcoal/50" id="addon-subtotal-${index}">Subtotal: Rp ${fmt(subtotal)}</div>
+    </div>`;
+  }).join('');
+
+  if(summaryEl){
+    const basePrice = computeMenuUnitPrice(item);
+    const addonsTotal = addons.reduce((sum, addon, index) => sum + (addon.unitPrice || 0) * (Number(quantities[index] || 0)), 0);
+    summaryEl.textContent = `Harga per item: Rp ${fmt(basePrice + addonsTotal)} (base Rp ${fmt(basePrice)} + add-on Rp ${fmt(addonsTotal)})`;
+  }
+
+  renderAddonSummary();
+}
+
+function updateAddonSkipButton(){
+  const btn = el('addon-skip-btn');
+  if(!btn) return;
+  if(!addonModalState){
+    btn.disabled = true;
+    btn.classList.add('opacity-50','cursor-not-allowed');
+    return;
+  }
+  const canSkip = addonModalState.addons.every(addon => !addon.isRequired && (addon.minQuantity || 0) === 0);
+  btn.disabled = !canSkip;
+  btn.classList.toggle('opacity-50', !canSkip);
+  btn.classList.toggle('cursor-not-allowed', !canSkip);
+  btn.textContent = canSkip ? 'Tanpa Add-on' : 'Add-on wajib dipilih';
+}
+
+function setAddonError(message){
+  const errorEl = el('addon-modal-error');
+  if(!errorEl) return;
+  if(message){
+    errorEl.textContent = message;
+    errorEl.classList.remove('hidden');
+  } else {
+    errorEl.textContent = '';
+    errorEl.classList.add('hidden');
+  }
+}
+
+function adjustAddonQuantity(index, delta){
+  if(!addonModalState) return;
+  const addon = addonModalState.addons[index];
+  if(!addon) return;
+
+  const min = addon.minQuantity || 0;
+  const max = addon.maxQuantity === null || addon.maxQuantity === undefined ? Infinity : addon.maxQuantity;
+  const current = Number(addonModalState.quantities[index] ?? (addon.defaultQuantity ?? min) ?? 0);
+  let next = current + delta;
+  if(delta < 0){
+    next = Math.max(min, next);
+  }
+  if(delta > 0){
+    next = Math.min(max, next);
+  }
+  next = Math.max(min, Math.min(max, next));
+  addonModalState.quantities[index] = next;
+  updateAddonRow(index);
+  setAddonError('');
+  renderAddonSummary();
+}
+
+function updateAddonRow(index){
+  if(!addonModalState) return;
+  const qtyEl = el(`addon-qty-${index}`);
+  const subtotalEl = el(`addon-subtotal-${index}`);
+  const addon = addonModalState.addons[index];
+  const qty = Number(addonModalState.quantities[index] || 0);
+  if(qtyEl) qtyEl.textContent = qty;
+  if(subtotalEl) subtotalEl.textContent = `Subtotal: Rp ${fmt(qty * (addon.unitPrice || 0))}`;
+}
+
+function renderAddonSummary(){
+  if(!addonModalState) return;
+  const summaryEl = el('addon-modal-summary');
+  if(!summaryEl) return;
+  const basePrice = computeMenuUnitPrice(addonModalState.item);
+  const addonsTotal = addonModalState.addons.reduce((sum, addon, index) => sum + (addon.unitPrice || 0) * (Number(addonModalState.quantities[index] || 0)), 0);
+  summaryEl.textContent = `Harga per item: Rp ${fmt(basePrice + addonsTotal)} (base Rp ${fmt(basePrice)} + add-on Rp ${fmt(addonsTotal)})`;
+}
+
+function handleAddonListClick(e){
+  const button = e.target.closest('[data-addon-action]');
+  if(!button) return;
+  const index = Number(button.dataset.index);
+  if(Number.isNaN(index)) return;
+  const action = button.dataset.addonAction || button.getAttribute('data-addon-action');
+  if(action === 'inc') adjustAddonQuantity(index, 1);
+  if(action === 'dec') adjustAddonQuantity(index, -1);
+}
+
+function confirmAddonSelection(){
+  if(!addonModalState) return;
+  const { addons, quantities, item } = addonModalState;
+  const selections = [];
+  const errors = [];
+
+  addons.forEach((addon, index) => {
+    const qty = Number(quantities[index] || 0);
+    if(addon.isRequired && qty < (addon.minQuantity || 0)){
+      errors.push(`${addon.name} minimal ${addon.minQuantity}`);
+    }
+    if(addon.maxQuantity !== null && addon.maxQuantity !== undefined && qty > addon.maxQuantity){
+      errors.push(`${addon.name} maksimal ${addon.maxQuantity}`);
+    }
+    if(qty > 0){
+      selections.push({
+        id: addon.id,
+        name: addon.name,
+        quantity: qty,
+        unitPrice: addon.unitPrice
+      });
+    }
+  });
+
+  if(errors.length){
+    setAddonError(errors.join('\n'));
+    return;
+  }
+
+  setAddonError('');
+  const cartItem = buildCartItem(item, selections);
+  addCartEntry(cartItem, 1);
+  closeAddonModal();
+}
+
+function skipAddonSelection(){
+  if(!addonModalState) return;
+  const canSkip = addonModalState.addons.every(addon => !addon.isRequired && (addon.minQuantity || 0) === 0);
+  if(!canSkip){
+    setAddonError('Add-on wajib minimal harus dipenuhi.');
+    return;
+  }
+  addonModalState.quantities = addonModalState.addons.map(() => 0);
+  confirmAddonSelection();
+}
+
+function closeAddonModal(){
+  const modal = el('addon-modal');
+  if(modal){
+    const container = modal.querySelector('.transform');
+    if(container){
+      container.classList.remove('opacity-100','scale-100');
+      container.classList.add('opacity-0','scale-95');
+    }
+    setTimeout(() => {
+      modal.classList.add('hidden');
+      setAddonError('');
+      addonModalState = null;
+    }, 200);
+  } else {
+    addonModalState = null;
+  }
+}
+function changeQty(cartKey, delta){
+  const idx = CART.findIndex(i=>i.cartKey===cartKey);
   if(idx===-1) return;
   CART[idx].quantity = Math.max(0,(CART[idx].quantity||0)+delta);
   if(CART[idx].quantity===0) CART.splice(idx,1);
   renderCart();
 }
-function removeItem(id){ CART = CART.filter(i=>i.id!==id); renderCart(); }
+function removeItem(cartKey){ CART = CART.filter(i=>i.cartKey!==cartKey); renderCart(); }
 
 function calcTotals(){
-  const subtotal = CART.reduce((s,i)=>s+i.price*i.quantity,0);
+  const subtotal = CART.reduce((sum,item)=> sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
   // Fee will be calculated server-side too; show approx  per config? We'll keep 0 here.
   const fee = 0;
   // Discounts
@@ -283,18 +613,20 @@ function renderCart(){
       `<div class="flex items-start gap-3 p-2.5 rounded-lg bg-cream/50 border border-charcoal/5 hover:bg-cream/80 transition">
         <div class="flex-1 min-w-0">
           <div class="font-semibold text-sm truncate">${i.name}</div>
-          <div class="text-xs text-charcoal/60 mt-0.5">Rp ${fmt(i.price)} × ${i.quantity} = <span class="font-semibold text-matcha">Rp ${fmt(i.price * i.quantity)}</span></div>
+          <div class="text-xs text-charcoal/60 mt-0.5">Harga satuan: Rp ${fmt(i.price)}</div>
+          <div class="text-xs text-charcoal/60">Subtotal: Rp ${fmt(i.price * i.quantity)}</div>
+          ${formatAddonLines(i.addons || [])}
           ${i.notes ? `<div class="text-xs text-charcoal/70 mt-1.5 bg-white/80 px-2 py-1 rounded border border-charcoal/10">📝 ${i.notes.replace(/</g,'&lt;')}</div>` : ''}
         </div>
         <div class="flex flex-col gap-1">
           <div class="flex items-center gap-1 bg-white rounded-lg border border-charcoal/10">
-            <button class="px-2 py-1 hover:bg-charcoal/5 rounded-l-lg transition" onclick="changeQty('${i.id}',-1)">−</button>
+            <button class="px-2 py-1 hover:bg-charcoal/5 rounded-l-lg transition" onclick="changeQty('${i.cartKey}',-1)">−</button>
             <div class="w-8 text-center font-bold text-sm">${i.quantity}</div>
-            <button class="px-2 py-1 hover:bg-charcoal/5 rounded-r-lg transition" onclick="changeQty('${i.id}',1)">+</button>
+            <button class="px-2 py-1 hover:bg-charcoal/5 rounded-r-lg transition" onclick="changeQty('${i.cartKey}',1)">+</button>
           </div>
           <div class="flex gap-1">
-            <button class="px-2 py-1 text-xs hover:bg-white rounded border border-charcoal/10 transition" title="Catatan" onclick="editNote('${i.id}')">📝</button>
-            <button class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded border border-red-200 transition" title="Hapus" onclick="removeItem('${i.id}')">🗑</button>
+            <button class="px-2 py-1 text-xs hover:bg-white rounded border border-charcoal/10 transition" title="Catatan" onclick="editNote('${i.cartKey}')">📝</button>
+            <button class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded border border-red-200 transition" title="Hapus" onclick="removeItem('${i.cartKey}')">🗑</button>
           </div>
         </div>
       </div>`
@@ -308,11 +640,11 @@ function renderCart(){
   saveDraft();
 }
 
-function showNoteModal(itemId) {
-  currentEditingItemId = itemId;
+function showNoteModal(cartKey) {
+  currentEditingCartKey = cartKey;
   const modal = el('note-modal');
   const textarea = el('note-input');
-  const item = CART.find(i => i.id === itemId);
+  const item = CART.find(i => i.cartKey === cartKey);
   
   if (!modal || !textarea || !item) return;
   
@@ -335,14 +667,14 @@ function hideNoteModal() {
   modal.querySelector('.transform').classList.add('opacity-0', 'scale-95');
   setTimeout(() => {
     modal.classList.add('hidden');
-    currentEditingItemId = null; // Clear the ID after closing
+    currentEditingCartKey = null; // Clear the key after closing
   }, 200);
 }
 
 function saveNote() {
-  if (!currentEditingItemId) return;
+  if (!currentEditingCartKey) return;
   
-  const idx = CART.findIndex(i => i.id === currentEditingItemId);
+  const idx = CART.findIndex(i => i.cartKey === currentEditingCartKey);
   if (idx === -1) return;
   
   const textarea = el('note-input');
@@ -352,14 +684,27 @@ function saveNote() {
   hideNoteModal();
 }
 
-function editNote(id){
-  showNoteModal(id);
+function editNote(cartKey){
+  showNoteModal(cartKey);
 }
 
 async function createOrder(){
   if(CART.length===0) return alert('Keranjang kosong');
   const t = calcTotals();
-  const items = CART.map(i=>({ id:i.id, name:i.name, price:i.price, quantity:i.quantity, notes: i.notes||undefined }));
+  const items = CART.map(i=>({
+    id: i.id,
+    name: i.name,
+    price: Number(i.price),
+    basePrice: Number(i.basePrice || i.price),
+    quantity: i.quantity,
+    notes: i.notes || undefined,
+    addons: Array.isArray(i.addons) ? i.addons.map(addon => ({
+      id: addon.id,
+      name: addon.name,
+      quantity: addon.quantity,
+      unitPrice: addon.unitPrice
+    })) : []
+  }));
   if(t.discount>0){
     items.push({ id:'DISCOUNT', name:'Diskon', price: -t.discount, quantity:1 });
   }
@@ -665,6 +1010,17 @@ function bindEvents(){
     }
   });
 
+  // Add-on modal listeners
+  el('addon-modal-list')?.addEventListener('click', handleAddonListClick);
+  el('addon-confirm-btn')?.addEventListener('click', (e) => { e.preventDefault(); confirmAddonSelection(); });
+  el('addon-skip-btn')?.addEventListener('click', (e) => { e.preventDefault(); skipAddonSelection(); });
+  el('close-addon-modal')?.addEventListener('click', closeAddonModal);
+  el('addon-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'addon-modal') {
+      closeAddonModal();
+    }
+  });
+
   // Unlock audio on any user interaction
   document.body.addEventListener('click', unlockAudio, {once: true});
 }
@@ -691,7 +1047,7 @@ function loadDraft(){
     const raw = localStorage.getItem(DRAFT_KEY);
     if(!raw) return;
     const data = JSON.parse(raw);
-    CART = Array.isArray(data.cart)? data.cart : [];
+  CART = Array.isArray(data.cart)? data.cart.map(normalizeCartItem).filter(Boolean) : [];
     DISCOUNT_RP = Number(data.discountRp||0);
     DISCOUNT_PCT = Number(data.discountPct||0);
     el('customer-name').value = data.customerName||'';
