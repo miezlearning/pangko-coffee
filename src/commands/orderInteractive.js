@@ -262,7 +262,7 @@ module.exports = {
         }
 
         session.quantity = quantity;
-        session.availableAddons = normalizeAddons(session.selectedItem.addons || []);
+        session.availableAddons = normalizeAddons(session.selectedItem.addons || [], { includeIndex: true });
         session.selectedAddons = [];
 
         if (session.availableAddons.length > 0) {
@@ -302,9 +302,9 @@ module.exports = {
             notes = text;
         }
 
-        const baseUnitPrice = computeMenuUnitPrice(session.selectedItem);
-        const addonSelections = Array.isArray(session.selectedAddons) ? session.selectedAddons.map(addon => ({ ...addon })) : [];
-        const cartItem = buildCartItem(session.selectedItem, baseUnitPrice, addonSelections);
+    const baseUnitPrice = computeMenuUnitPrice(session.selectedItem);
+    const addonSelections = Array.isArray(session.selectedAddons) ? session.selectedAddons.map(addon => ({ ...addon })) : [];
+    const cartItem = buildCartItem(session.selectedItem, addonSelections, { baseUnitPrice });
         if (notes) {
             cartItem.notes = notes;
         }

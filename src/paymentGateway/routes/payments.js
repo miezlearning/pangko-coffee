@@ -5,6 +5,20 @@
 const express = require('express');
 const router = express.Router();
 const dataStore = require('../dataStore');
+const { formatAddonLines } = require('../../utils/addonHelpers');
+
+function describeOrderItem(item, idx) {
+    const sizePart = item && item.size ? ` (${item.size})` : '';
+    const quantity = Number(item && item.quantity ? item.quantity : 0);
+    const lines = [`${idx + 1}. ${(item && item.name) || 'Item'}${sizePart} x${quantity}`];
+    if (Array.isArray(item?.addons) && item.addons.length > 0) {
+        lines.push(formatAddonLines(item.addons));
+    }
+    if (item?.notes) {
+        lines.push(`   📝 ${item.notes}`);
+    }
+    return lines.join('\n');
+}
 
 /**
  * Trigger bot confirmation
@@ -38,15 +52,15 @@ async function triggerBotConfirmation(payment) {
     await botInstance.sock.sendMessage(order.userId, { text: customerText });
     
     // Notify baristas
+    const items = Array.isArray(order.items) ? order.items : [];
+
     const baristaText = `🔔 *Pesanan Baru Masuk!*\n\n` +
         `📋 Order ID: *${payment.orderId}*\n` +
         `👤 Atas Nama: *${order.customerName || 'Customer'}*\n` +
         `👨‍💼 Customer: ${order.userId.split('@')[0]}\n` +
         `💰 Total: *Rp ${payment.amount.toLocaleString('id-ID')}*\n\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
-        `*PESANAN:*\n${order.items.map((item, idx) => 
-            `${idx + 1}. ${item.name} (${item.size}) x${item.quantity}${item.notes ? `\n   📝 ${item.notes}` : ''}`
-        ).join('\n')}\n` +
+        `*PESANAN:*\n${items.map((item, idx) => describeOrderItem(item, idx)).join('\n')}\n` +
         `━━━━━━━━━━━━━━━━━━━━\n\n` +
         `Silakan proses pesanan ini! 👨‍🍳`;
     

@@ -271,6 +271,23 @@
                                     🔄 Refresh
                                 </button>
                             </div>
+                            <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div class="relative w-full md:max-w-sm">
+                                    <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-charcoal/40">🔍</span>
+                                    <input id="search-qris" type="text" oninput="handleSearch('qris', this.value)" placeholder="Cari order, nama customer, atau nomor WhatsApp" class="w-full rounded-2xl border border-charcoal/10 bg-white/90 py-3 pl-10 pr-4 text-sm outline-none ring-matcha/20 focus:border-matcha/40 focus:ring-2" />
+                                </div>
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                                    <label for="sort-qris" class="text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">Urutkan</label>
+                                    <select id="sort-qris" onchange="handleSort('qris', this.value)" class="w-full rounded-2xl border border-charcoal/10 bg-white px-4 py-3 text-sm font-semibold text-charcoal/80 outline-none ring-matcha/20 focus:border-matcha/40 focus:ring-2 sm:w-auto">
+                                        <option value="newest" selected>Terbaru</option>
+                                        <option value="oldest">Terlama</option>
+                                        <option value="amount_desc">Nominal terbesar</option>
+                                        <option value="amount_asc">Nominal terkecil</option>
+                                        <option value="name_az">Nama A → Z</option>
+                                        <option value="name_za">Nama Z → A</option>
+                                    </select>
+                                </div>
+                            </div>
                             <div id="payments-list" class="space-y-4"></div>
                         </div>
 
@@ -287,6 +304,23 @@
                                 <button onclick="loadPendingCash()" class="inline-flex items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-500/90 shadow-md">
                                     🔄 Refresh
                                 </button>
+                            </div>
+                            <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div class="relative w-full md:max-w-sm">
+                                    <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-charcoal/40">🔍</span>
+                                    <input id="search-cash" type="text" oninput="handleSearch('cash', this.value)" placeholder="Cari order, nama customer, atau nomor WhatsApp" class="w-full rounded-2xl border border-charcoal/10 bg-white/90 py-3 pl-10 pr-4 text-sm outline-none ring-orange-400/20 focus:border-orange-400/40 focus:ring-2" />
+                                </div>
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                                    <label for="sort-cash" class="text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">Urutkan</label>
+                                    <select id="sort-cash" onchange="handleSort('cash', this.value)" class="w-full rounded-2xl border border-charcoal/10 bg-white px-4 py-3 text-sm font-semibold text-charcoal/80 outline-none ring-orange-400/20 focus:border-orange-400/40 focus:ring-2 sm:w-auto">
+                                        <option value="newest" selected>Terbaru</option>
+                                        <option value="oldest">Terlama</option>
+                                        <option value="amount_desc">Nominal terbesar</option>
+                                        <option value="amount_asc">Nominal terkecil</option>
+                                        <option value="name_az">Nama A → Z</option>
+                                        <option value="name_za">Nama Z → A</option>
+                                    </select>
+                                </div>
                             </div>
                             <div id="pending-cash-list" class="space-y-4"></div>
                         </div>
@@ -305,6 +339,23 @@
                                     🔄 Refresh
                                 </button>
                             </div>
+                            <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div class="relative w-full md:max-w-sm">
+                                    <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-charcoal/40">🔍</span>
+                                    <input id="search-processing" type="text" oninput="handleSearch('processing', this.value)" placeholder="Cari order, nama customer, atau nomor WhatsApp" class="w-full rounded-2xl border border-charcoal/10 bg-white/90 py-3 pl-10 pr-4 text-sm outline-none ring-blue-500/20 focus:border-blue-500/40 focus:ring-2" />
+                                </div>
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                                    <label for="sort-processing" class="text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">Urutkan</label>
+                                    <select id="sort-processing" onchange="handleSort('processing', this.value)" class="w-full rounded-2xl border border-charcoal/10 bg-white px-4 py-3 text-sm font-semibold text-charcoal/80 outline-none ring-blue-500/20 focus:border-blue-500/40 focus:ring-2 sm:w-auto">
+                                        <option value="newest" selected>Terbaru</option>
+                                        <option value="oldest">Terlama</option>
+                                        <option value="amount_desc">Nominal terbesar</option>
+                                        <option value="amount_asc">Nominal terkecil</option>
+                                        <option value="name_az">Nama A → Z</option>
+                                        <option value="name_za">Nama Z → A</option>
+                                    </select>
+                                </div>
+                            </div>
                             <div id="processing-list" class="space-y-4"></div>
                         </div>
 
@@ -322,6 +373,23 @@
                                     🔄 Refresh
                                 </button>
                             </div>
+                            <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div class="relative w-full md:max-w-sm">
+                                    <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-charcoal/40">🔍</span>
+                                    <input id="search-ready" type="text" oninput="handleSearch('ready', this.value)" placeholder="Cari order, nama customer, atau nomor WhatsApp" class="w-full rounded-2xl border border-charcoal/10 bg-white/90 py-3 pl-10 pr-4 text-sm outline-none ring-green-500/20 focus:border-green-500/40 focus:ring-2" />
+                                </div>
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                                    <label for="sort-ready" class="text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">Urutkan</label>
+                                    <select id="sort-ready" onchange="handleSort('ready', this.value)" class="w-full rounded-2xl border border-charcoal/10 bg-white px-4 py-3 text-sm font-semibold text-charcoal/80 outline-none ring-green-500/20 focus:border-green-500/40 focus:ring-2 sm:w-auto">
+                                        <option value="newest" selected>Terbaru</option>
+                                        <option value="oldest">Terlama</option>
+                                        <option value="amount_desc">Nominal terbesar</option>
+                                        <option value="amount_asc">Nominal terkecil</option>
+                                        <option value="name_az">Nama A → Z</option>
+                                        <option value="name_za">Nama Z → A</option>
+                                    </select>
+                                </div>
+                            </div>
                             <div id="ready-list" class="space-y-4"></div>
                         </div>
 
@@ -338,6 +406,23 @@
                                 <button onclick="loadCancelledCash()" class="inline-flex items-center gap-2 rounded-full border border-gray-500/30 bg-gray-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-500/90 shadow-md">
                                     🔄 Refresh
                                 </button>
+                            </div>
+                            <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div class="relative w-full md:max-w-sm">
+                                    <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-charcoal/40">🔍</span>
+                                    <input id="search-cancelled" type="text" oninput="handleSearch('cancelled', this.value)" placeholder="Cari order, nama customer, atau nomor WhatsApp" class="w-full rounded-2xl border border-charcoal/10 bg-white/90 py-3 pl-10 pr-4 text-sm outline-none ring-gray-500/20 focus:border-gray-500/40 focus:ring-2" />
+                                </div>
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                                    <label for="sort-cancelled" class="text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">Urutkan</label>
+                                    <select id="sort-cancelled" onchange="handleSort('cancelled', this.value)" class="w-full rounded-2xl border border-charcoal/10 bg-white px-4 py-3 text-sm font-semibold text-charcoal/80 outline-none ring-gray-500/20 focus:border-gray-500/40 focus:ring-2 sm:w-auto">
+                                        <option value="newest" selected>Terbaru</option>
+                                        <option value="oldest">Terlama</option>
+                                        <option value="amount_desc">Nominal terbesar</option>
+                                        <option value="amount_asc">Nominal terkecil</option>
+                                        <option value="name_az">Nama A → Z</option>
+                                        <option value="name_za">Nama Z → A</option>
+                                    </select>
+                                </div>
                             </div>
                             <div id="cancelled-cash-list" class="space-y-4"></div>
                         </div>
