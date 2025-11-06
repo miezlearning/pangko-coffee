@@ -23,11 +23,8 @@ function el(id){ return document.getElementById(id); }
 function getPM(){ const r=[...document.querySelectorAll('input[name="pm"]')].find(x=>x.checked); return r? r.value: 'QRIS'; }
 
 function computeMenuUnitPrice(item){
-  const base = Number(item?.price || 0);
-  const discountPercent = Number(item?.discount_percent || 0);
-  if (!discountPercent) return base;
-  const discounted = base - base * (discountPercent / 100);
-  return Math.max(0, Math.round(discounted));
+  // No discount system - just return the base price
+  return Number(item?.price || 0);
 }
 
 function normalizeAddons(addons = []){
@@ -262,9 +259,9 @@ function renderMenu(){
   
   grid.innerHTML = items.map(it=>{
     const price = fmt(it.price);
-    const finalPrice = it.discount_percent > 0 
-      ? it.price - (it.price * it.discount_percent / 100) 
-      : it.price;
+    // Show original/base price when provided and higher than selling price
+    const basePriceNum = (it.basePrice !== undefined && it.basePrice !== null) ? Number(it.basePrice) : null;
+    const showOriginal = basePriceNum !== null && basePriceNum > Number(it.price || 0);
     
     // Get category info
     const catObj = CATEGORIES.find(c=>c.id===it.category);
@@ -288,15 +285,9 @@ function renderMenu(){
         ${it.image 
           ? `<div class="relative w-full h-32 rounded-t-xl overflow-hidden bg-gradient-to-br from-cream to-peach/20">
               <img src="${it.image}" alt="${it.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full text-5xl\\'>${emoji}</div>'">
-              ${it.discount_percent > 0 
-                ? `<div class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-lg">-${it.discount_percent}%</div>`
-                : ''}
             </div>`
           : `<div class="relative w-full h-32 rounded-t-xl bg-gradient-to-br from-cream to-peach/20 flex items-center justify-center border-b border-charcoal/5">
               <div class="text-5xl group-hover:scale-110 transition-transform">${emoji}</div>
-              ${it.discount_percent > 0 
-                ? `<div class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-lg">-${it.discount_percent}%</div>`
-                : ''}
             </div>`
         }
         <div class="flex flex-col flex-1 p-3">
@@ -311,11 +302,11 @@ function renderMenu(){
             : ''
           }
           <div class="mt-auto">
-            ${it.discount_percent > 0
+            ${showOriginal
               ? `<div class="flex items-baseline gap-2 mb-2">
-                  <span class="text-xs text-red-500 line-through">Rp ${price}</span>
-                  <span class="text-lg font-extrabold text-matcha">Rp ${fmt(finalPrice)}</span>
-                </div>`
+                   <span class="text-xs text-red-500 line-through">Rp ${fmt(basePriceNum)}</span>
+                   <span class="text-lg font-extrabold text-matcha">Rp ${price}</span>
+                 </div>`
               : `<div class="text-lg font-extrabold text-matcha mb-2">Rp ${price}</div>`
             }
             <button class="w-full bg-matcha text-white rounded-lg py-2.5 text-sm font-bold hover:bg-matcha/90 active:scale-95 transition-all shadow-md hover:shadow-lg add-to-cart-btn" data-item-id="${it.id}">

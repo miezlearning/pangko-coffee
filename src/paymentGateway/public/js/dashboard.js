@@ -3,6 +3,9 @@
 let autoRefresh;
 let previousPaymentCount = 0;
 let soundEnabled = true;
+let selectedSound = localStorage.getItem('dashboardNotifSound')
+  || localStorage.getItem('notifSound')
+  || '/sounds/sound1.mp3';
 let knownPaymentIds = new Set();
 let knownProcessingIds = new Set();
 let knownPendingCashIds = new Set();
@@ -29,135 +32,16 @@ const dashboardFilters = {
   cancelled: { search: '', sort: 'newest' }
 };
 
+const printerTemplateState = {
+  templates: [],
+  active: '58mm'
+};
+
 const soundOptions = [
   { name: 'Efek 1', file: '/sounds/sound1.mp3' },
   { name: 'Efek 2', file: '/sounds/sound2.mp3' },
   { name: 'Efek 3', file: '/sounds/sound3.mp3' }
 ];
-
-let selectedSound = localStorage.getItem('notifSound');
-if (!selectedSound || !soundOptions.some(opt => opt.file === selectedSound)) {
-  selectedSound = soundOptions[0].file;
-}
-
-function updateSoundToggleButtonUI() {
-  const btn = document.getElementById('sound-toggle');
-  if (!btn) return;
-  btn.textContent = soundEnabled ? '🔔 Sound: ON' : '🔕 Sound: OFF';
-  btn.classList.toggle('bg-matcha', soundEnabled);
-  btn.classList.toggle('text-white', soundEnabled);
-  btn.classList.toggle('border-transparent', soundEnabled);
-  btn.classList.toggle('bg-white', !soundEnabled);
-  btn.classList.toggle('text-matcha', !soundEnabled);
-  btn.classList.toggle('border-matcha/60', !soundEnabled);
-}
-
-function syncFilterControls(tabName) {
-  const filters = dashboardFilters[tabName];
-  if (!filters) return;
-  const searchInput = document.getElementById(`search-${tabName}`);
-  if (searchInput && searchInput.value !== filters.search) {
-    searchInput.value = filters.search;
-  }
-  const sortSelect = document.getElementById(`sort-${tabName}`);
-  if (sortSelect && sortSelect.value !== filters.sort) {
-    sortSelect.value = filters.sort;
-  }
-}
-
-function renderTab(tabName) {
-  syncFilterControls(tabName);
-  switch (tabName) {
-    case 'cash':
-      renderPendingCashList();
-      break;
-    case 'processing':
-      renderProcessingOrders();
-      break;
-    case 'ready':
-      renderReadyOrders();
-      break;
-    case 'cancelled':
-      renderCancelledCashList();
-      break;
-    case 'qris':
-    default:
-      renderPaymentsList();
-      break;
-  }
-}
-
-function handleSearch(tabName, rawValue) {
-  if (!dashboardFilters[tabName]) return;
-  dashboardFilters[tabName].search = (rawValue || '').trim();
-  renderTab(tabName);
-}
-
-function handleSort(tabName, sortValue) {
-  if (!dashboardFilters[tabName]) return;
-  dashboardFilters[tabName].sort = sortValue || 'newest';
-  renderTab(tabName);
-}
-
-function recordMatchesSearch(record, term) {
-  if (!term) return true;
-  const target = term.toLowerCase();
-  const haystacks = [];
-
-  if (record.orderId !== undefined && record.orderId !== null) haystacks.push(String(record.orderId));
-  if (record.customerName) haystacks.push(String(record.customerName));
-  if (record.userId) haystacks.push(String(record.userId));
-  if (record.customerId) {
-    const id = String(record.customerId);
-    haystacks.push(id);
-    haystacks.push(id.split('@')[0]);
-  }
-  if (record.paymentMethod) haystacks.push(String(record.paymentMethod));
-  if (record.status) haystacks.push(String(record.status));
-
-  if (Array.isArray(record.items)) {
-    record.items.forEach(item => {
-      if (item?.name) haystacks.push(String(item.name));
-      if (item?.notes) haystacks.push(String(item.notes));
-    });
-  }
-
-  return haystacks.some(entry => typeof entry === 'string' && entry.toLowerCase().includes(target));
-}
-
-function getComparableTimestamp(record, tabName) {
-  const priorities = {
-    qris: ['createdAt', 'expiresAt', 'updatedAt'],
-    cash: ['createdAt', 'cashExpiresAt', 'updatedAt'],
-    processing: ['confirmedAt', 'createdAt', 'updatedAt'],
-    ready: ['readyAt', 'confirmedAt', 'createdAt'],
-    cancelled: ['cancelledAt', 'createdAt', 'updatedAt']
-  };
-
-  const fields = priorities[tabName] || ['createdAt', 'updatedAt', 'confirmedAt', 'readyAt', 'cancelledAt', 'expiresAt', 'cashExpiresAt'];
-  for (const field of fields) {
-    const value = record?.[field];
-    if (!value) continue;
-    const ts = new Date(value).getTime();
-    if (!Number.isNaN(ts)) return ts;
-  }
-  return 0;
-}
-
-function getComparableAmount(record) {
-  const candidates = [
-    record?.amount,
-    record?.pricing?.total,
-    record?.pricing?.grandTotal,
-    record?.total
-  ];
-  for (const candidate of candidates) {
-    const numeric = Number(candidate);
-    if (Number.isFinite(numeric)) return numeric;
-  }
-  return 0;
-}
-
 function getComparableName(record) {
   const name = record?.customerName || record?.customer?.name || record?.userId || record?.customerId || '';
   return String(name).toLowerCase();
@@ -269,6 +153,7 @@ function toggleSound() {
 // Change notification sound
 function changeNotifSound(file) {
   selectedSound = file;
+  localStorage.setItem('dashboardNotifSound', file);
   localStorage.setItem('notifSound', file);
   // Play preview (best-effort)
   try {
@@ -276,6 +161,12 @@ function changeNotifSound(file) {
     audio.volume = 0.7;
     audio.play().catch(() => {});
   } catch (_) {}
+}
+
+function updateSoundToggleButtonUI() {
+  const btn = document.getElementById('sound-toggle');
+  if (!btn) return;
+  btn.textContent = `${soundEnabled ? '🔔' : '🔕'} Sound: ${soundEnabled ? 'ON' : 'OFF'}`;
 }
 
 // Tab switching
@@ -731,12 +622,16 @@ function renderProcessingOrders() {
         </div>
 
         <!-- Action Buttons -->
-        <div class="mt-6 flex flex-col gap-3 sm:flex-row">
-          <button class="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-peach bg-white px-4 py-3 text-sm font-semibold text-peach transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printReceipt('${order.orderId}')">
+        <div class="mt-6 grid gap-3 sm:grid-cols-3">
+          <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-charcoal/15 bg-white px-4 py-3 text-sm font-semibold text-charcoal transition hover:-translate-y-0.5 hover:shadow-lg" onclick="previewReceipt('${order.orderId}')">
+            <span>👀</span>
+            <span>Preview Struk</span>
+          </button>
+          <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-peach bg-white px-4 py-3 text-sm font-semibold text-peach transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printReceipt('${order.orderId}')">
             <span>🖨️</span>
             <span>Print & Buka Laci</span>
           </button>
-          <button class="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="markOrderReady('${order.orderId}', '${customerName}')">
+          <button class="flex items-center justify-center gap-2 rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="markOrderReady('${order.orderId}', '${customerName}')">
             <span>✅</span>
             <span>Tandai Siap</span>
           </button>
@@ -879,7 +774,11 @@ function renderPendingCashList() {
         </div>
 
         <!-- Action Buttons -->
-        <div class="mt-6 grid gap-3 sm:grid-cols-2">
+        <div class="mt-6 grid gap-3 sm:grid-cols-3">
+          <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-charcoal/15 bg-white px-4 py-3 text-sm font-semibold text-charcoal transition hover:-translate-y-0.5 hover:shadow-lg" onclick="previewReceipt('${order.orderId}')">
+            <span>👀</span>
+            <span>Preview Struk</span>
+          </button>
           <button class="flex items-center justify-center gap-2 rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="acceptCash('${order.orderId}')">
             <span>✅</span>
             <span>Terima Tunai & Mulai Proses</span>
@@ -1014,6 +913,35 @@ window.addEventListener('DOMContentLoaded', () => {
   const submitBtn = document.getElementById('reject-submit');
   if (cancelBtn) cancelBtn.addEventListener('click', closeRejectModal);
   if (submitBtn) submitBtn.addEventListener('click', submitReject);
+
+  // Preview modal bindings
+  const pClose = document.getElementById('preview-close');
+  const pPrint = document.getElementById('preview-print');
+  if (pClose) pClose.addEventListener('click', closePreviewModal);
+  if (pPrint) pPrint.addEventListener('click', () => {
+    if (previewState.currentOrderId) {
+      printOnly(previewState.currentOrderId);
+    }
+  });
+
+  const previewModal = document.getElementById('preview-modal');
+  if (previewModal) {
+    previewModal.addEventListener('click', (event) => {
+      if (event.target === previewModal) {
+        closePreviewModal();
+      }
+    });
+  }
+
+  document.addEventListener('keydown', (event) => {
+    const modal = document.getElementById('preview-modal');
+    if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+      closePreviewModal();
+    }
+  });
+
+  loadPrinterTemplates();
+  updateTemplateIndicators();
 });
 
 // Auto-refresh every 3 seconds
@@ -1312,12 +1240,16 @@ function renderReadyOrders() {
         </div>
 
         <!-- Action Buttons -->
-        <div class="mt-6 flex flex-col gap-3 sm:flex-row">
-          <button class="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-peach bg-white px-4 py-3 text-sm font-semibold text-peach transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printReceipt('${order.orderId}')">
+        <div class="mt-6 grid gap-3 sm:grid-cols-3">
+          <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-charcoal/15 bg-white px-4 py-3 text-sm font-semibold text-charcoal transition hover:-translate-y-0.5 hover:shadow-lg" onclick="previewReceipt('${order.orderId}')">
+            <span>👀</span>
+            <span>Preview Struk</span>
+          </button>
+          <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-peach bg-white px-4 py-3 text-sm font-semibold text-peach transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printReceipt('${order.orderId}')">
             <span>🖨️</span>
             <span>Print & Buka Laci</span>
           </button>
-          <button class="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-charcoal px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="completeOrder('${order.orderId}', '${customerName}')">
+          <button class="flex items-center justify-center gap-2 rounded-2xl bg-charcoal px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="completeOrder('${order.orderId}', '${customerName}')">
             <span>✔️</span>
             <span>Tandai Sudah Diambil</span>
           </button>
@@ -1357,8 +1289,8 @@ async function printReceipt(orderId) {
   
   try {
     showNotification('🖨️ Mencetak struk...', 'info');
-    
-    const res = await fetch(`/api/printer/print-and-open/${orderId}`, {
+    const templateId = printerTemplateState.active;
+    const res = await fetch(`/api/printer/print-and-open/${orderId}?template=${encodeURIComponent(templateId)}`, {
       method: 'POST'
     });
     
@@ -1448,3 +1380,125 @@ async function testOpenDrawer() {
     showNotification('❌ Error: ' + e.message);
   }
 }
+
+// ===== Receipt Preview =====
+const previewState = { currentOrderId: null, currentTemplate: '58mm' };
+
+function getTemplateLabel(templateId) {
+  const template = printerTemplateState.templates.find(t => t.id === templateId);
+  if (!template) {
+    return templateId === '80mm' ? '80mm (48 kolom)' : '55-58mm (32 kolom)';
+  }
+  return `${template.label} (${template.width} kolom)`;
+}
+
+function updateTemplateIndicators() {
+  const label = getTemplateLabel(printerTemplateState.active);
+  const pill = document.getElementById('preview-template-pill');
+  if (pill) pill.textContent = label;
+
+  document.querySelectorAll('[data-current-template-label]').forEach(el => {
+    el.textContent = label;
+  });
+}
+
+async function loadPrinterTemplates() {
+  try {
+    const res = await fetch('/api/printer/templates');
+    const data = await res.json();
+    if (!data?.success) return;
+    printerTemplateState.templates = Array.isArray(data.templates) ? data.templates : [];
+    const fallback = printerTemplateState.templates[0]?.id || '58mm';
+    printerTemplateState.active = data.active || fallback;
+    previewState.currentTemplate = printerTemplateState.active;
+    updateTemplateIndicators();
+  } catch (err) {
+    console.error('Failed to load printer templates:', err);
+  }
+}
+
+function findOrderMeta(orderId) {
+  const pools = ['processing', 'ready', 'cash', 'qris', 'cancelled'];
+  for (const pool of pools) {
+    const records = dashboardData[pool];
+    if (!Array.isArray(records)) continue;
+    const match = records.find(r => r.orderId === orderId);
+    if (match) return match;
+  }
+  return null;
+}
+
+function openPreviewModal(preview, meta) {
+  const modal = document.getElementById('preview-modal');
+  const content = document.getElementById('preview-content');
+  const subtitle = document.getElementById('preview-order-subtitle');
+  const pill = document.getElementById('preview-template-pill');
+  if (!modal || !content) return;
+
+  previewState.currentOrderId = meta.orderId;
+  previewState.currentTemplate = preview.template;
+  printerTemplateState.active = preview.template;
+
+  if (pill) pill.textContent = getTemplateLabel(preview.template);
+
+  content.textContent = preview.text;
+  if (subtitle) {
+    const payment = meta.paymentMethod === 'CASH' ? 'Tunai' : (meta.paymentMethod || '-');
+    subtitle.textContent = `${meta.orderId} • ${payment} • ${meta.customerName || 'Customer'}`;
+  }
+
+  modal.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    modal.classList.remove('opacity-0');
+    modal.classList.add('opacity-100');
+  });
+}
+
+function closePreviewModal() {
+  const modal = document.getElementById('preview-modal');
+  if (!modal) return;
+  modal.classList.remove('opacity-100');
+  modal.classList.add('opacity-0');
+  setTimeout(() => {
+    if (!modal.classList.contains('opacity-100')) {
+      modal.classList.add('hidden');
+    }
+  }, 200);
+  previewState.currentOrderId = null;
+}
+
+async function previewReceipt(orderId) {
+  try {
+    const templateId = printerTemplateState.active;
+    const res = await fetch(`/api/printer/preview/${orderId}?template=${encodeURIComponent(templateId)}`);
+    const data = await res.json();
+    if (!data?.success) {
+      showNotification('❌ Gagal membuat preview struk');
+      return;
+    }
+    printerTemplateState.active = data.template || templateId;
+    updateTemplateIndicators();
+    const meta = findOrderMeta(orderId) || { orderId, customerName: '-', paymentMethod: '-' };
+    openPreviewModal({ text: data.text, template: printerTemplateState.active }, meta);
+  } catch (error) {
+    showNotification('❌ Error: ' + error.message);
+  }
+}
+
+// Print only (without opening drawer) from preview modal
+async function printOnly(orderId) {
+  try {
+    showNotification('🖨️ Mencetak struk...', 'info');
+    const templateId = printerTemplateState.active;
+    const res = await fetch(`/api/printer/print/${orderId}?template=${encodeURIComponent(templateId)}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showNotification('✅ Struk berhasil dicetak');
+    } else {
+      showNotification('❌ Gagal cetak: ' + (data.message || 'Unknown error'));
+    }
+  } catch (e) {
+    showNotification('❌ Error: ' + e.message);
+  }
+}
+

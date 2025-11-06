@@ -33,6 +33,7 @@ const exportRouter = require('./routes/export');
 const importRouter = require('./routes/import');
 const menuRouter = require('./routes/menu');
 const printerRouter = require('./routes/printer');
+const toolsRouter = require('./routes/tools');
 
 // Mount routes
 app.use('/api/payments', paymentsRouter);
@@ -43,6 +44,7 @@ app.use('/api/menu', menuRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/import', importRouter);
 app.use('/api/printer', printerRouter);
+app.use('/api/tools', toolsRouter);
 
 // Serve dashboard
 app.get('/', (req, res) => {
@@ -87,6 +89,16 @@ app.get('/tools/salary-calculator', (req, res) => {
 // Serve HPP Simulator page
 app.get('/tools/hpp-simulator', (req, res) => {
     res.sendFile(path.join(__dirname, 'views/hpp-simulator.html'));
+});
+
+// Serve DB Reset tool
+app.get('/tools/db-reset', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views/tools-db-reset.html'));
+});
+
+// Serve printer tools page
+app.get('/tools/printer', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views/tools-printer.html'));
 });
 
 // Serve calculators landing

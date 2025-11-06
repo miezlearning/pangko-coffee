@@ -44,10 +44,6 @@ function displayMenuItems(items) {
   emptyState.classList.add('hidden');
   
   tbody.innerHTML = items.map(item => {
-    const finalPrice = item.discount_percent > 0 
-      ? item.price - (item.price * item.discount_percent / 100) 
-      : item.price;
-    
     return `
     <tr class="hover:bg-matcha/5 transition-all">
       <td class="px-4 py-4">
@@ -80,14 +76,13 @@ function displayMenuItems(items) {
         </span>
       </td>
       <td class="px-4 py-4">
-        <div class="font-semibold text-charcoal">
-          ${item.discount_percent > 0 
-            ? `<div class="text-xs text-red-600 line-through">Rp ${formatNumber(item.price)}</div>
-               <div class="text-sm text-matcha">Rp ${formatNumber(finalPrice)}</div>
-               <div class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded inline-block mt-1">-${item.discount_percent}%</div>`
-            : `<span class="text-sm">Rp ${formatNumber(item.price)}</span>`
-          }
-        </div>
+            <div class="font-semibold text-charcoal">
+              ${item.basePrice && Number(item.basePrice) > Number(item.price)
+                ? `<div class="text-xs text-red-500 line-through">Rp ${formatNumber(item.basePrice)}</div>
+                   <div class="text-sm">Rp ${formatNumber(item.price)}</div>`
+                : `<div class="text-sm">Rp ${formatNumber(item.price)}</div>`
+              }
+            </div>
       </td>
       <td class="px-4 py-4">
         ${item.use_stock 
@@ -526,7 +521,8 @@ function editItem(item) {
   document.getElementById('item-category').value = item.category;
   document.getElementById('item-type').value = item.item_type || 'product';
   document.getElementById('item-price').value = item.price;
-  document.getElementById('item-discount').value = item.discount_percent || 0;
+  // Populate base price if present (fallback to price)
+  document.getElementById('item-base-price').value = (item.basePrice !== undefined && item.basePrice !== null) ? item.basePrice : item.price;
   document.getElementById('item-weight').value = item.weight || 0;
   document.getElementById('item-stock').value = item.stock_quantity || 0;
   document.getElementById('item-rack').value = item.rack_location || '';
@@ -603,7 +599,12 @@ async function saveItem(event) {
     category: document.getElementById('item-category').value,
     item_type: document.getElementById('item-type').value,
     price: parseInt(document.getElementById('item-price').value),
-    discount_percent: parseFloat(document.getElementById('item-discount').value) || 0,
+    basePrice: (function(){
+      const v = document.getElementById('item-base-price').value;
+      const n = Number(v);
+      return (v !== '' && Number.isFinite(n)) ? Math.max(0, Math.round(n)) : Math.max(0, Math.round(Number(document.getElementById('item-price').value || 0)));
+    })(),
+    discount_percent: 0, // No discount system
     weight: parseFloat(document.getElementById('item-weight').value) || 0,
     // 'unit' field removed from form; keep null to avoid breaking API
     unit: null,

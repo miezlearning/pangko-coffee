@@ -132,7 +132,9 @@ module.exports = {
         // Baud rate hanya relevan untuk sebagian perangkat serial; tetap disimpan utk referensi
         baudRate: 9600,
 
-    autoPrint: true,             // Auto-print receipt ketika pembayaran terkonfirmasi
+        receiptTemplate: '58mm',   // Default ukuran struk: 58mm | 80mm
+
+        autoPrint: true,             // Auto-print receipt ketika pembayaran terkonfirmasi
         autoOpenDrawer: false,       // Auto-open cash drawer (port RJ11)
         // Pengaturan cash drawer (ESC p m t1 t2)
         // m: 0(pin2) atau 1(pin5), t1/t2: durasi pulsa (0-255) dalam unit ~2ms (80 ≈ 160ms)

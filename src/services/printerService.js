@@ -4,14 +4,24 @@
  */
 const ThermalPrinter = require('node-thermal-printer').printer;
 const PrinterTypes = require('node-thermal-printer').types;
-const moment = require('moment-timezone');
 const { SerialPort } = require('serialport');
+const {
+  RECEIPT_TEMPLATES,
+  DEFAULT_TEMPLATE_ID,
+  formatReceipt
+} = require('./receiptFormatter');
+const {
+  loadSettings,
+  saveSettings
+} = require('./printerSettingsStore');
 
 class PrinterService {
   constructor() {
     this.printer = null;
     this.isConnected = false;
     this.config = null;
+    this.settings = loadSettings();
+    this.receiptTemplateId = this.settings.receiptTemplate || DEFAULT_TEMPLATE_ID;
   }
 
   /**
@@ -67,6 +77,14 @@ class PrinterService {
       this.isConnected = true;
       const where = this.mode === 'serial' ? `COM ${config.serialPort}` : (this.mode === 'tcp' ? `TCP ${config.tcpHost}` : 'local composer');
       console.log(`[Printer] ✅ Initialized in ${this.mode.toUpperCase()} mode (${where})`);
+
+      // Apply template preference from config or persisted settings
+      if (config.receiptTemplate && RECEIPT_TEMPLATES[config.receiptTemplate]) {
+        this.receiptTemplateId = config.receiptTemplate;
+      }
+      if (this.settings.receiptTemplate && RECEIPT_TEMPLATES[this.settings.receiptTemplate]) {
+        this.receiptTemplateId = this.settings.receiptTemplate;
+      }
     } catch (error) {
       console.error('[Printer] ❌ Failed to connect:', error.message);
       this.isConnected = false;
@@ -109,7 +127,7 @@ class PrinterService {
   /**
    * Print receipt for order
    */
-  async printReceipt(order) {
+  async printReceipt(order, templateId) {
     if (!this.isConnected) {
       throw new Error('Printer not connected');
     }
@@ -117,99 +135,44 @@ class PrinterService {
     try {
       // Always start from a clean buffer to avoid duplicated prints
       this.printer.clear();
-      const config = require('../config/config');
-      const tz = config.bot?.timezone || 'Asia/Makassar';
-      const time = moment(order.createdAt).tz(tz).format('DD/MM/YYYY HH:mm');
-      const shopName = config.bot?.shopName || 'PANGKO COFFEE';
+      const activeTemplate = templateId && RECEIPT_TEMPLATES[templateId]
+        ? templateId
+        : this.receiptTemplateId;
+      const receipt = formatReceipt(order, activeTemplate);
 
-      this.printer.alignCenter();
-      this.printer.setTextSize(1, 1);
-      this.printer.bold(true);
-      this.printer.println(shopName);
-      this.printer.bold(false);
-      this.printer.setTextSize(0, 0);
-      this.printer.println('Jl. Contoh No. 123');
-      this.printer.println('Telp: 0812-3456-7890');
-      this.printer.drawLine();
-      
+      const { header, info, items, totals, footer } = receipt.sections;
+
+      // Trim any trailing empty lines in sections to avoid accidental large gaps
+      const trimTrailingEmpty = (arr) => {
+        while (arr.length && String(arr[arr.length - 1]).trim() === '') arr.pop();
+        return arr;
+      };
+
+      trimTrailingEmpty(header);
+      trimTrailingEmpty(info);
+      trimTrailingEmpty(items);
+      trimTrailingEmpty(totals);
+      trimTrailingEmpty(footer);
+
       this.printer.alignLeft();
-      this.printer.println(`Order ID: ${order.orderId}`);
-      this.printer.println(`Waktu   : ${time}`);
-      this.printer.println(`Pelanggan: ${order.customerName || 'Guest'}`);
-      this.printer.println(`Metode  : ${order.paymentMethod === 'QRIS' ? 'QRIS' : 'Tunai'}`);
-      this.printer.drawLine();
-
-      // Items
-      this.printer.println('Item');
-      for (const item of order.items) {
-        const name = (item.name || 'Item').substring(0, 20);
-        this.printer.println(`${name}`);
-        
-        const qty = item.quantity || 1;
-        const price = item.price || 0;
-        const subtotal = price * qty;
-        
-        const qtyStr = `${qty}x`.padStart(4);
-        const priceStr = this.formatRupiah(price).padStart(12);
-        const subtotalStr = this.formatRupiah(subtotal).padStart(12);
-        
-        this.printer.println(`  ${qtyStr} @${priceStr} ${subtotalStr}`);
-        
-        if (item.notes) {
-          this.printer.println(`  Note: ${item.notes}`);
-        }
+      if (header.length) {
+        this.printer.bold(true);
+        this.printer.println(header[0]);
+        this.printer.bold(false);
+        header.slice(1).forEach(line => this.printer.println(line));
       }
-
-      this.printer.drawLine();
-      
-      // Calculate totals
-      const subtotal = order.items.reduce((sum, item) => 
-        sum + ((item.price || 0) * (item.quantity || 1)), 0);
-      const fee = order.pricing?.fee || 0;
-      const discount = order.pricing?.discount || 0;
-      const total = order.pricing?.total || subtotal;
-
-      // Subtotal
-      this.printer.tableCustom([
-        { text: "Subtotal", align: "LEFT", width: 0.5 },
-        { text: this.formatRupiah(subtotal), align: "RIGHT", width: 0.5 }
-      ]);
-
-      // Fee
-      if (fee > 0) {
-        this.printer.tableCustom([
-          { text: "Biaya", align: "LEFT", width: 0.5 },
-          { text: this.formatRupiah(fee), align: "RIGHT", width: 0.5 }
-        ]);
+      info.forEach(line => this.printer.println(line));
+      if (items.length) {
+        items.forEach(line => this.printer.println(line));
       }
+      totals.forEach(line => this.printer.println(line));
+      footer.forEach(line => this.printer.println(line));
 
-      // Discount
-      if (discount > 0) {
-        this.printer.tableCustom([
-          { text: "Diskon", align: "LEFT", width: 0.5 },
-          { text: `- ${this.formatRupiah(discount)}`, align: "RIGHT", width: 0.5 }
-        ]);
-      }
-
-      this.printer.drawLine();
-      
-      // Total
-      this.printer.bold(true);
-      this.printer.setTextSize(1, 1);
-      this.printer.tableCustom([
-        { text: "TOTAL", align: "LEFT", width: 0.5 },
-        { text: this.formatRupiah(total), align: "RIGHT", width: 0.5 }
-      ]);
-      this.printer.bold(false);
-      this.printer.setTextSize(0, 0);
-
-      this.printer.drawLine();
-      this.printer.alignCenter();
-      this.printer.println('Terima kasih!');
-      this.printer.println('Selamat menikmati ☕');
-      this.printer.newLine();
-      this.printer.newLine();
-      this.printer.cut();
+  // Allow optional extra feed lines before cut (configurable)
+  const feedLines = Number(this.config?.cutFeedLines || 0);
+  for (let i = 0; i < feedLines; i++) this.printer.newLine();
+  // Perform cut
+  this.printer.cut();
 
       // HYBRID SEND
       const buffer = this.printer.getBuffer();
@@ -224,9 +187,14 @@ class PrinterService {
       }
       // Clear after send to prevent accumulation
       this.printer.clear();
-      console.log(`[Printer] 🖨️  Receipt printed for ${order.orderId}`);
+      console.log(`[Printer] 🖨️  Receipt printed for ${order.orderId} (template: ${receipt.template})`);
       
-      return { success: true, message: 'Receipt printed successfully' };
+      if (!templateId) {
+        // Ensure persisted template matches active selection
+        this.updateStoredTemplate(this.receiptTemplateId);
+      }
+
+      return { success: true, message: 'Receipt printed successfully', template: receipt.template };
     } catch (error) {
       console.error('[Printer] ❌ Failed to print:', error.message);
       throw error;
@@ -236,10 +204,10 @@ class PrinterService {
   /**
    * Print receipt and open cash drawer
    */
-  async printAndOpenDrawer(order) {
+  async printAndOpenDrawer(order, templateId) {
     try {
       // Print receipt first
-      await this.printReceipt(order);
+      await this.printReceipt(order, templateId);
       
       // Then open cash drawer (always for cash flow)
       await this.openCashDrawer();
@@ -253,8 +221,63 @@ class PrinterService {
   /**
    * Format number to Rupiah
    */
-  formatRupiah(amount) {
-    return `Rp ${(amount || 0).toLocaleString('id-ID')}`;
+  getAvailableTemplates() {
+    return Object.values(RECEIPT_TEMPLATES);
+  }
+
+  getReceiptTemplate() {
+    return this.receiptTemplateId;
+  }
+
+  setReceiptTemplate(templateId) {
+    const template = RECEIPT_TEMPLATES[templateId] ? templateId : DEFAULT_TEMPLATE_ID;
+    this.receiptTemplateId = template;
+    this.updateStoredTemplate(template);
+    console.log(`[Printer] 🧾 Receipt template now ${template}`);
+    return template;
+  }
+
+  updateStoredTemplate(templateId) {
+    this.settings = this.settings || {};
+    this.settings.receiptTemplate = templateId;
+    saveSettings(this.settings);
+  }
+
+  composeReceipt(order, templateId) {
+    const activeTemplate = templateId && RECEIPT_TEMPLATES[templateId]
+      ? templateId
+      : this.receiptTemplateId;
+    return formatReceipt(order, activeTemplate);
+  }
+
+  composeSampleReceipt(templateId) {
+    const sampleOrder = this.buildSampleOrder();
+    return this.composeReceipt(sampleOrder, templateId);
+  }
+
+  async printSampleReceipt(templateId) {
+    const sampleOrder = this.buildSampleOrder();
+    return this.printReceipt(sampleOrder, templateId);
+  }
+
+  buildSampleOrder() {
+    const now = new Date().toISOString();
+    return {
+      orderId: 'SAMPLE-ORDER',
+      createdAt: now,
+      customerName: 'Sample Customer',
+      paymentMethod: 'CASH',
+      items: [
+        { name: 'Iced Latte', quantity: 1, price: 25000 },
+        { name: 'Caramel Macchiato', quantity: 2, price: 28000, notes: 'Less ice', addons: [{ name: 'Extra Shot', quantity: 2, unitPrice: 5000 }] },
+      ],
+      pricing: {
+        subtotal: 25000 + (2 * 28000),
+        fee: 0,
+        discount: 0,
+        total: 25000 + (2 * 28000)
+      }
+    };
   }
 
   /**

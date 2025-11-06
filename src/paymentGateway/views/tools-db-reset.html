@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DB Reset · Pangko Coffee</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="min-h-screen bg-cream text-charcoal antialiased">
+    <div id="navbar-container"></div>
+    <main class="mx-auto max-w-4xl p-8">
+      <h1 class="text-2xl font-bold">🚨 Database Reset</h1>
+      <p class="text-sm text-charcoal/70 mt-2">Pilih tabel yang ingin Anda kosongkan. Tindakan ini menghapus semua baris di tabel yang dipilih dan tidak dapat dikembalikan. Pastikan Anda memiliki cadangan sebelum melanjutkan.</p>
+
+      <div class="mt-6 bg-white rounded-xl p-6 border border-charcoal/10">
+        <div id="tables-list" class="grid gap-3"></div>
+
+        <div class="mt-6 flex items-center gap-3">
+          <button id="refresh-tables" class="px-4 py-2 bg-matcha text-white rounded-lg">Muat Ulang Daftar</button>
+          <button id="reset-selected" class="px-4 py-2 bg-red-600 text-white rounded-lg">Reset Tabel Terpilih</button>
+        </div>
+
+        <div id="tool-result" class="mt-4 text-sm"></div>
+      </div>
+    </main>
+
+    <script>
+      async function fetchTables(){
+        const res = await fetch('/api/tools/tables');
+        const j = await res.json();
+        const container = document.getElementById('tables-list');
+        container.innerHTML = '';
+        if(!j.success){ container.innerHTML = `<div class="text-red-600">Gagal memuat tabel: ${j.message||'unknown'}</div>`; return; }
+        j.tables.forEach(t => {
+          const id = 'table-'+t;
+          const el = document.createElement('label');
+          el.className = 'flex items-center gap-3 p-3 border rounded-lg';
+          el.innerHTML = `<input type="checkbox" value="${t}" id="${id}" class="table-checkbox"><div class="flex-1 font-semibold">${t}</div>`;
+          container.appendChild(el);
+        });
+      }
+
+      document.getElementById('refresh-tables').addEventListener('click', fetchTables);
+      document.getElementById('reset-selected').addEventListener('click', async ()=>{
+        const boxes = Array.from(document.querySelectorAll('.table-checkbox')).filter(x=>x.checked);
+        if(boxes.length===0) return alert('Pilih minimal 1 tabel untuk direset');
+        const names = boxes.map(b=>b.value).join(', ');
+        if(!confirm(`KONFIRMASI: Anda akan mengosongkan tabel berikut: ${names} \n\nIni tidak dapat dibatalkan. Lanjutkan?`)) return;
+
+        const resultDiv = document.getElementById('tool-result');
+        resultDiv.textContent = 'Memproses...';
+        const outcomes = [];
+        for(const b of boxes){
+          try{
+            const res = await fetch('/api/tools/reset-table',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ table: b.value, confirm: true })});
+            const j = await res.json();
+            if(j.success) outcomes.push({table: b.value, ok:true, msg:j.message}); else outcomes.push({table:b.value, ok:false, msg:j.message||j.error});
+          }catch(e){ outcomes.push({table:b.value, ok:false, msg:e.message}); }
+        }
+        resultDiv.innerHTML = outcomes.map(o=> `<div class="p-2 ${o.ok? 'text-green-700':'text-red-700'}">${o.table}: ${o.ok? o.msg : o.msg}</div>`).join('');
+        fetchTables();
+      });
+
+      // Initial load
+      fetchTables();
+    </script>
+    <script src="/js/navbar.js"></script>
+  </body>
+</html>

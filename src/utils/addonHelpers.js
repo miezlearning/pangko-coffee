@@ -22,12 +22,9 @@ function getAddonUnitPrice(addon) {
     return 0;
 }
 
-function computeMenuUnitPrice(item = {}) {
-    const base = Number(item.price || 0);
-    const discountPercent = Number(item.discount_percent || item.discountPercent || 0);
-    if (!discountPercent) return base;
-    const discounted = base - base * (discountPercent / 100);
-    return Math.max(0, Math.round(discounted));
+function computeMenuUnitPrice(item) {
+    // No discount system - just return the base price
+    return Number(item.price || 0);
 }
 
 function normalizeAddons(addons = [], { includeIndex = false } = {}) {
