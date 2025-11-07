@@ -275,7 +275,7 @@ class OrderManager {
     /**
      * Set QRIS for order
      */
-    setOrderQRIS(orderId, qrisCode) {
+    setOrderQRIS(orderId, qrisCode, meta = {}) {
         const order = this.getOrder(orderId);
         if (!order) {
             throw new Error('Order not found');
@@ -284,6 +284,14 @@ class OrderManager {
         order.qrisCode = qrisCode;
         order.qrisGenerated = true;
         order.qrisGeneratedAt = new Date();
+        if (meta && typeof meta === 'object') {
+            if (meta.provider) order.paymentProvider = meta.provider;
+            if (meta.referenceNumber) order.qrisReference = meta.referenceNumber;
+            if (meta.externalId) order.qrisExternalId = meta.externalId;
+            if (meta.expiresAt) order.qrisExpiresAt = new Date(meta.expiresAt);
+            if (meta.deeplink) order.qrisDeeplink = meta.deeplink;
+            if (meta.raw) order.qrisRawResponse = meta.raw;
+        }
         
         this.orders.set(orderId, order);
         this._persistAll();

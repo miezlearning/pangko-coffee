@@ -5,6 +5,9 @@ const printerToolsState = {
   active: null,
   selected: null,
   sampleText: 'Memuat preview…',
+  customHeaderText: '',
+  customFooterText: '',
+  useCustomTemplate: false,
 };
 
 function showPrinterToast(message, type = 'info') {
@@ -241,9 +244,133 @@ function bindPrinterToolEvents() {
       }
     });
   }
+
+  const saveCustomBtn = document.getElementById('save-custom-text');
+  if (saveCustomBtn) {
+    saveCustomBtn.addEventListener('click', saveCustomText);
+  }
+  const refreshPreviewBtn = document.getElementById('refresh-preview');
+  if (refreshPreviewBtn) {
+    refreshPreviewBtn.addEventListener('click', () => loadSamplePreview(printerToolsState.selected || printerToolsState.active));
+  }
+
+  const saveCustomTemplateBtn = document.getElementById('save-custom-template');
+  if (saveCustomTemplateBtn) {
+    saveCustomTemplateBtn.addEventListener('click', saveFullCustomTemplate);
+  }
+  const loadCustomTemplateBtn = document.getElementById('load-custom-template');
+  if (loadCustomTemplateBtn) {
+    loadCustomTemplateBtn.addEventListener('click', loadFullCustomTemplate);
+  }
+  const toggleCustomTemplate = document.getElementById('toggle-custom-template');
+  if (toggleCustomTemplate) {
+    toggleCustomTemplate.addEventListener('change', (e) => setUseCustomTemplate(e.target.checked));
+  }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
   bindPrinterToolEvents();
   loadTemplates();
+  loadCustomText();
+  // Load custom template state last to update toggle and textarea
+  loadFullCustomTemplate();
 });
+
+async function loadCustomText() {
+  try {
+    const res = await fetch('/api/printer/custom-text');
+    const data = await res.json();
+    if (!data?.success) throw new Error(data?.message || 'Gagal memuat custom text');
+    printerToolsState.customHeaderText = data.customHeaderText || '';
+    printerToolsState.customFooterText = data.customFooterText || '';
+    const headerEl = document.getElementById('custom-header');
+    const footerEl = document.getElementById('custom-footer');
+    if (headerEl) headerEl.value = printerToolsState.customHeaderText;
+    if (footerEl) footerEl.value = printerToolsState.customFooterText;
+  } catch (error) {
+    console.error('Failed to load custom text:', error);
+    showPrinterToast('Gagal memuat custom text', 'error');
+  }
+}
+
+async function saveCustomText() {
+  try {
+    const headerEl = document.getElementById('custom-header');
+    const footerEl = document.getElementById('custom-footer');
+    const payload = {
+      customHeaderText: headerEl ? headerEl.value : '',
+      customFooterText: footerEl ? footerEl.value : ''
+    };
+    const res = await fetch('/api/printer/custom-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!data?.success) throw new Error(data?.message || 'Gagal menyimpan custom text');
+    printerToolsState.customHeaderText = data.customHeaderText || '';
+    printerToolsState.customFooterText = data.customFooterText || '';
+    showPrinterToast('Custom teks disimpan', 'success');
+    // Refresh preview to reflect changes
+    loadSamplePreview(printerToolsState.selected || printerToolsState.active);
+  } catch (error) {
+    console.error('Failed to save custom text:', error);
+    showPrinterToast('Gagal menyimpan custom text', 'error');
+  }
+}
+
+async function loadFullCustomTemplate() {
+  try {
+    const id = printerToolsState.selected || printerToolsState.active;
+    const res = await fetch(`/api/printer/custom-template?template=${encodeURIComponent(id)}`);
+    const data = await res.json();
+    if (!data?.success) throw new Error(data?.message || 'Gagal memuat custom template');
+    const area = document.getElementById('custom-template-text');
+    if (area) area.value = data.text || '';
+    const toggle = document.getElementById('toggle-custom-template');
+    if (toggle) toggle.checked = !!data.useCustomTemplate;
+    printerToolsState.useCustomTemplate = !!data.useCustomTemplate;
+  } catch (error) {
+    console.error('Failed to load full custom template:', error);
+    showPrinterToast('Gagal memuat full custom template', 'error');
+  }
+}
+
+async function saveFullCustomTemplate() {
+  try {
+    const id = printerToolsState.selected || printerToolsState.active;
+    const area = document.getElementById('custom-template-text');
+    const text = area ? area.value : '';
+    const res = await fetch('/api/printer/custom-template', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ templateId: id, text })
+    });
+    const data = await res.json();
+    if (!data?.success) throw new Error(data?.message || 'Gagal menyimpan custom template');
+    showPrinterToast('Custom template disimpan', 'success');
+    // Refresh preview so the sample reflects changes
+    loadSamplePreview(id);
+  } catch (error) {
+    console.error('Failed to save full custom template:', error);
+    showPrinterToast('Gagal menyimpan full custom template', 'error');
+  }
+}
+
+async function setUseCustomTemplate(enabled) {
+  try {
+    const res = await fetch('/api/printer/custom-template/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled })
+    });
+    const data = await res.json();
+    if (!data?.success) throw new Error(data?.message || 'Gagal mengubah mode custom template');
+    printerToolsState.useCustomTemplate = !!data.useCustomTemplate;
+    showPrinterToast(`Mode custom template: ${printerToolsState.useCustomTemplate ? 'AKTIF' : 'NONAKTIF'}`, 'success');
+    loadSamplePreview(printerToolsState.selected || printerToolsState.active);
+  } catch (error) {
+    console.error('Failed to toggle full custom template:', error);
+    showPrinterToast('Gagal mengubah mode custom template', 'error');
+  }
+}

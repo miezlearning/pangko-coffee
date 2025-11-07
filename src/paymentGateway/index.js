@@ -21,7 +21,12 @@ const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+    limit: '1mb',
+    verify: (req, _res, buf) => {
+        req.rawBody = buf.toString();
+    }
+}));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Import routes

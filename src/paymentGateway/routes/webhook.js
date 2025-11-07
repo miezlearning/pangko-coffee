@@ -8,6 +8,8 @@ const dataStore = require('../dataStore');
 const path = require('path');
 const PaymentProvider = require('../../services/paymentProvider');
 const { formatAddonLines } = require('../../utils/addonHelpers');
+const briSnapClient = require('../../services/briSnapClient');
+const appConfig = require('../../config/config');
 
 /**
  * Format number helper
@@ -35,7 +37,6 @@ function describeOrderItem(item, idx) {
 async function triggerBotConfirmation(payment) {
     const botInstance = dataStore.getBotInstance();
     const orderManager = require('../../services/orderManager');
-    const config = require('../../config/config');
     
     if (!botInstance || !botInstance.sock) {
         throw new Error('Bot not connected');
@@ -74,7 +75,7 @@ async function triggerBotConfirmation(payment) {
         `Silakan proses pesanan ini! 👨‍🍳`;
     
     // Send to all baristas
-    for (const baristaNumber of config.baristaNumbers) {
+    for (const baristaNumber of (appConfig.baristaNumbers || appConfig.shop?.baristaNumbers || [])) {
         try {
             await botInstance.sock.sendMessage(baristaNumber, { text: baristaText });
         } catch (err) {
@@ -178,6 +179,47 @@ router.post('/simulate', async (req, res) => {
     }
 });
 
+async function handleProviderPayload(payload, sourceLabel, res) {
+    if (!payload.orderId) {
+        return res.status(400).json({ success: false, message: 'Missing order reference' });
+    }
+
+    const payment = dataStore.findPendingPayment(payload.orderId);
+    if (!payment) {
+        return res.json({ success: true, message: 'Payment already processed or not pending' });
+    }
+
+    if (payload.status === 'paid') {
+        payment.status = 'confirmed';
+        payment.confirmedAt = payload.paidAt || new Date();
+        payment.confirmedBy = sourceLabel || payload.provider || (appConfig.paymentProvider && appConfig.paymentProvider.name) || 'provider';
+        payment.paymentMethod = 'QRIS';
+        if (payload.amount) payment.amount = payload.amount;
+        if (payload.externalId) payment.externalId = payload.externalId;
+        if (payload.referenceNumber) payment.referenceNumber = payload.referenceNumber;
+        dataStore.removePendingPayment(payload.orderId);
+        dataStore.addToHistory(payment);
+
+        try {
+            await triggerBotConfirmation(payment);
+        } catch (e) {
+            console.warn('[webhook] bot notify failed:', e.message);
+        }
+        return res.json({ success: true, message: 'Payment confirmed' });
+    }
+
+    if (payload.status === 'failed') {
+        payment.status = 'rejected';
+        payment.rejectedAt = new Date();
+        payment.rejectionReason = `Provider: ${payload.rawStatus || 'failed'}`;
+        dataStore.removePendingPayment(payload.orderId);
+        dataStore.addToHistory(payment);
+        return res.json({ success: true, message: 'Payment marked failed' });
+    }
+
+    return res.json({ success: true, message: 'Event acknowledged', status: payload.status });
+}
+
 /**
  * GET /webhook-tester
  * Webhook testing page
@@ -203,44 +245,26 @@ router.post('/provider', async (req, res) => {
             return res.status(401).json({ success: false, message: 'Invalid signature' });
         }
         const payload = PaymentProvider.parseWebhook(req);
-        if (!payload.orderId) {
-            return res.status(400).json({ success: false, message: 'Missing order reference' });
-        }
-
-        const payment = dataStore.findPendingPayment(payload.orderId);
-        if (!payment) {
-            // Idempotency or already processed; accept silently
-            return res.json({ success: true, message: 'Payment already processed or not pending' });
-        }
-
-        if (payload.status === 'paid') {
-            // Confirm payment
-            payment.status = 'confirmed';
-            payment.confirmedAt = new Date();
-            payment.confirmedBy = (require('../../config/config').paymentProvider.name || 'provider');
-            payment.paymentMethod = 'QRIS';
-            dataStore.removePendingPayment(payload.orderId);
-            dataStore.addToHistory(payment);
-
-            try {
-                await triggerBotConfirmation(payment);
-            } catch (e) {
-                console.warn('[provider webhook] bot notify failed:', e.message);
-            }
-            return res.json({ success: true, message: 'Payment confirmed' });
-        } else if (payload.status === 'failed') {
-            payment.status = 'rejected';
-            payment.rejectedAt = new Date();
-            payment.rejectionReason = `Provider: ${payload.rawStatus || 'failed'}`;
-            dataStore.removePendingPayment(payload.orderId);
-            dataStore.addToHistory(payment);
-            return res.json({ success: true, message: 'Payment marked failed' });
-        } else {
-            // pending or unknown → acknowledge
-            return res.json({ success: true, message: 'Event acknowledged', status: payload.status });
-        }
+        return handleProviderPayload(payload, payload.provider || (appConfig.paymentProvider && appConfig.paymentProvider.name) || 'provider', res);
     } catch (err) {
         console.error('Provider webhook error:', err);
+        return res.status(500).json({ success: false, message: 'Internal error' });
+    }
+});
+
+router.post('/bri', async (req, res) => {
+    try {
+        if (!briSnapClient.isConfigured()) {
+            return res.status(400).json({ success: false, message: 'BRI SNAP not configured' });
+        }
+        const ok = PaymentProvider.verifySignature(req);
+        if (!ok) {
+            return res.status(401).json({ success: false, message: 'Invalid signature' });
+        }
+        const payload = PaymentProvider.parseWebhook(req);
+        return handleProviderPayload(payload, 'bri-snap', res);
+    } catch (err) {
+        console.error('BRI webhook error:', err);
         return res.status(500).json({ success: false, message: 'Internal error' });
     }
 });

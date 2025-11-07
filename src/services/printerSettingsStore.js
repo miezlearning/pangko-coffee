@@ -3,7 +3,11 @@ const path = require('path');
 
 const SETTINGS_PATH = path.join(__dirname, '../data/printer-settings.json');
 const DEFAULT_SETTINGS = {
-  receiptTemplate: '58mm'
+  receiptTemplate: '58mm',
+  customHeaderText: '',
+  customFooterText: '',
+  useCustomTemplate: false,
+  customTemplates: {}
 };
 
 function ensureDirExists(filePath) {

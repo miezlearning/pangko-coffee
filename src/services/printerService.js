@@ -138,7 +138,9 @@ class PrinterService {
       const activeTemplate = templateId && RECEIPT_TEMPLATES[templateId]
         ? templateId
         : this.receiptTemplateId;
-      const receipt = formatReceipt(order, activeTemplate);
+  const { customHeaderText, customFooterText } = this.getCustomText();
+  const maybeCustom = this.getUseCustomTemplate() ? this.getCustomTemplate(activeTemplate) : '';
+  const receipt = formatReceipt(order, activeTemplate, { customHeaderText, customFooterText, customTemplateText: maybeCustom });
 
       const { header, info, items, totals, footer } = receipt.sections;
 
@@ -154,25 +156,37 @@ class PrinterService {
       trimTrailingEmpty(totals);
       trimTrailingEmpty(footer);
 
-      this.printer.alignLeft();
-      if (header.length) {
-        this.printer.bold(true);
-        this.printer.println(header[0]);
-        this.printer.bold(false);
-        header.slice(1).forEach(line => this.printer.println(line));
-      }
-      info.forEach(line => this.printer.println(line));
-      if (items.length) {
-        items.forEach(line => this.printer.println(line));
-      }
-      totals.forEach(line => this.printer.println(line));
-      footer.forEach(line => this.printer.println(line));
+      // Build final lines array and ensure no trailing blank lines remain
+      const finalLines = [].concat(header, info, items, totals, footer).map(l => String(l || ''));
+      while (finalLines.length && finalLines[finalLines.length - 1].trim() === '') finalLines.pop();
 
-  // Allow optional extra feed lines before cut (configurable)
-  const feedLines = Number(this.config?.cutFeedLines || 0);
-  for (let i = 0; i < feedLines; i++) this.printer.newLine();
-  // Perform cut
-  this.printer.cut();
+      this.printer.alignLeft();
+      // Print using the composed finalLines to avoid accidental extra lines
+      if (finalLines.length) {
+        // If header exists and we want it bold
+        if (header.length) {
+          this.printer.bold(true);
+          this.printer.println(finalLines[0]);
+          this.printer.bold(false);
+          finalLines.slice(1).forEach(line => this.printer.println(line));
+        } else {
+          finalLines.forEach(line => this.printer.println(line));
+        }
+      }
+
+      // Allow optional extra feed lines before cut (configurable)
+      const feedLines = Number(this.config?.cutFeedLines || 0);
+      for (let i = 0; i < feedLines; i++) this.printer.newLine();
+      // Perform cut
+      this.printer.cut();
+
+      // Debug: log final lines tail to help diagnose long gaps
+      try {
+        const sampleTail = finalLines.slice(-6).join(' | ');
+        console.log(`[Printer][DEBUG] finalLines count=${finalLines.length} tail="${sampleTail}"`);
+      } catch (e) {
+        // ignore debug errors
+      }
 
       // HYBRID SEND
       const buffer = this.printer.getBuffer();
@@ -243,11 +257,56 @@ class PrinterService {
     saveSettings(this.settings);
   }
 
+  // Custom template settings
+  getUseCustomTemplate() {
+    this.settings = this.settings || {};
+    return !!this.settings.useCustomTemplate;
+  }
+
+  setUseCustomTemplate(enabled) {
+    this.settings = this.settings || {};
+    this.settings.useCustomTemplate = !!enabled;
+    saveSettings(this.settings);
+    return this.getUseCustomTemplate();
+  }
+
+  getCustomTemplate(templateId) {
+    this.settings = this.settings || {};
+    const store = this.settings.customTemplates || {};
+    return store[templateId] || '';
+  }
+
+  setCustomTemplate(templateId, text) {
+    this.settings = this.settings || {};
+    this.settings.customTemplates = this.settings.customTemplates || {};
+    this.settings.customTemplates[templateId] = String(text || '');
+    saveSettings(this.settings);
+    return this.getCustomTemplate(templateId);
+  }
+
+  getCustomText() {
+    this.settings = this.settings || {};
+    return {
+      customHeaderText: this.settings.customHeaderText || '',
+      customFooterText: this.settings.customFooterText || ''
+    };
+  }
+
+  setCustomText({ customHeaderText = '', customFooterText = '' } = {}) {
+    this.settings = this.settings || {};
+    this.settings.customHeaderText = String(customHeaderText || '');
+    this.settings.customFooterText = String(customFooterText || '');
+    saveSettings(this.settings);
+    return this.getCustomText();
+  }
+
   composeReceipt(order, templateId) {
     const activeTemplate = templateId && RECEIPT_TEMPLATES[templateId]
       ? templateId
       : this.receiptTemplateId;
-    return formatReceipt(order, activeTemplate);
+    const { customHeaderText, customFooterText } = this.getCustomText();
+    const maybeCustom = this.getUseCustomTemplate() ? this.getCustomTemplate(activeTemplate) : '';
+    return formatReceipt(order, activeTemplate, { customHeaderText, customFooterText, customTemplateText: maybeCustom });
   }
 
   composeSampleReceipt(templateId) {

@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const config = require('../config/config');
 const QRISGenerator = require('../utils/qris');
+const briSnapClient = require('./briSnapClient');
 
 /**
  * Payment Provider Abstraction (Skeleton)
@@ -10,34 +11,23 @@ const QRISGenerator = require('../utils/qris');
  */
 
 function isEnabled() {
+  if (briSnapClient.isConfigured()) return true;
   return !!config.paymentProvider && !!config.paymentProvider.enabled;
 }
 
 async function createDynamicQR(order) {
-  if (!isEnabled()) {
-    // Fallback to local generator: generate dynamic QR from static base
-    const qrString = QRISGenerator.generateOrderQRIS(
-      config.shop.qrisStatic,
-      order.pricing.total,
-      config.order.serviceFee
-    );
-    return {
-      qrString,
-      externalId: order.orderId, // use orderId as external id
-      expiresAt: order.paymentExpiry
-    };
+  if (briSnapClient.isConfigured()) {
+    return await briSnapClient.createDynamicQR(order);
   }
 
-  // TODO: Replace with real API call to provider (e.g., Xendit/Midtrans)
-  // Example (pseudo):
-  // const resp = await axios.post('https://api.provider.com/qris/charges', { amount: order.pricing.total, reference_id: order.orderId, ... });
-  // return { qrString: resp.data.qr_string, externalId: resp.data.id, expiresAt: resp.data.expires_at };
+  // Local fallback generator if no provider configured
   const qrString = QRISGenerator.generateOrderQRIS(
     config.shop.qrisStatic,
     order.pricing.total,
     config.order.serviceFee
   );
   return {
+    provider: 'local-static',
     qrString,
     externalId: order.orderId,
     expiresAt: order.paymentExpiry
@@ -45,6 +35,9 @@ async function createDynamicQR(order) {
 }
 
 function verifySignature(req) {
+  if (briSnapClient.isConfigured()) {
+    return briSnapClient.verifyWebhookSignature(req);
+  }
   const pp = config.paymentProvider || {};
   // Simple token header (many providers: X-Callback-Token)
   if (pp.signatureHeader && req.headers && req.headers[pp.signatureHeader]) {
@@ -64,6 +57,9 @@ function verifySignature(req) {
 }
 
 function parseWebhook(req) {
+  if (briSnapClient.isConfigured()) {
+    return briSnapClient.parseWebhookPayload(req.body);
+  }
   // Generic mapper: expect body to include orderId/status/amount/externalId
   const b = req.body || {};
   const status = (b.status || b.transaction_status || b.payment_status || '').toLowerCase();

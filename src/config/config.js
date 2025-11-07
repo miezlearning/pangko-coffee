@@ -21,6 +21,25 @@ module.exports = {
         }
     },
 
+    // BRI SNAP QRIS configuration
+    briSnap: {
+        enabled: process.env.BRI_SNAP_ENABLED === 'true',
+        environment: process.env.BRI_SNAP_ENV || 'sandbox',
+        clientId: process.env.BRI_SNAP_CLIENT_ID || '',
+        clientSecret: process.env.BRI_SNAP_CLIENT_SECRET || '',
+        partnerId: process.env.BRI_SNAP_PARTNER_ID || '',
+        institutionCode: process.env.BRI_SNAP_INSTITUTION_CODE || '',
+        merchantId: process.env.BRI_SNAP_MERCHANT_ID || '',
+        terminalId: process.env.BRI_SNAP_TERMINAL_ID || '',
+        storeName: process.env.BRI_SNAP_STORE_NAME || 'Pangko Coffee',
+        webhookSecret: process.env.BRI_SNAP_WEBHOOK_SECRET || '',
+        qrExpiryMinutes: Number.isFinite(Number(process.env.BRI_SNAP_QR_EXPIRY)) && Number(process.env.BRI_SNAP_QR_EXPIRY) > 0
+            ? Number(process.env.BRI_SNAP_QR_EXPIRY)
+            : 10,
+        sandboxBaseUrl: 'https://sandbox.partner.api.bri.co.id',
+        productionBaseUrl: 'https://partner.api.bri.co.id'
+    },
+
     // Coffee Shop Configuration
     shop: {
         name: 'Pangko Coffee',
@@ -29,7 +48,7 @@ module.exports = {
         contact: '6281345028895',
         
         // QRIS Static (Base QRIS dari merchant)
-        qrisStatic: '00020101021126610014COM.GO-JEK.WWW01189360091433658182180210G3658182180303UMI51440014ID.CO.QRIS.WWW0215ID10254499802480303UMI5204581253033605802ID5914Pangko Coffee 6009SAMARINDA61057524262070703A0163047707', // Ganti dengan QRIS asli kamu
+    qrisStatic: '00020101021126580013ID.CO.BRI.WWW01189360000200424118380208424118380303UMI51440014ID.CO.QRIS.WWW0215ID10254500161890303UMI5204581253033605802ID5914PANGKO COFFEE.6009SAMARINDA61057511162070703A0163043492', // QRIS merchant terbaru
         
         // Barista WhatsApp Numbers (untuk notifikasi & akses command barista)
         // ⚠️ PENTING: Hanya masukkan nomor barista/kasir ASLI disini
@@ -132,7 +151,10 @@ module.exports = {
         // Baud rate hanya relevan untuk sebagian perangkat serial; tetap disimpan utk referensi
         baudRate: 9600,
 
-        receiptTemplate: '58mm',   // Default ukuran struk: 58mm | 80mm
+    receiptTemplate: '58mm',   // Default ukuran struk: 58mm | 80mm
+    // Jumlah feed line tambahan sebelum cut (untuk beberapa printer yang memotong terlalu dekat).
+    // Set ke 0 untuk tidak menambah baris kosong.
+    cutFeedLines: 0,
 
         autoPrint: true,             // Auto-print receipt ketika pembayaran terkonfirmasi
         autoOpenDrawer: false,       // Auto-open cash drawer (port RJ11)
@@ -147,7 +169,9 @@ module.exports = {
         // Kustomisasi struk (58mm)
         shopName: 'PANGKO COFFEE',
         shopAddress: 'Jl. Contoh No. 123',
-        shopPhone: '0812-3456-7890'
+        shopPhone: '0812-3456-7890',
+        // Tampilkan rincian harga item yang terpisah (harga dasar, add-on, total per item)
+        detailedItemBreakdown: true
     },
 
     // Messages Template

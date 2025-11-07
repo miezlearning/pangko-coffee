@@ -285,7 +285,14 @@ router.post('/create', async (req, res) => {
         if (pm === 'QRIS') {
             // Create dynamic QR
             const qr = await paymentProvider.createDynamicQR(order);
-            orderManager.setOrderQRIS(order.orderId, qr.qrString);
+            orderManager.setOrderQRIS(order.orderId, qr.qrString, {
+                provider: qr.provider,
+                referenceNumber: qr.referenceNumber,
+                externalId: qr.externalId,
+                expiresAt: qr.expiresAt,
+                deeplink: qr.deeplink,
+                raw: qr.raw
+            });
             payment = {
                 id: order.orderId,
                 orderId: order.orderId,
@@ -295,7 +302,11 @@ router.post('/create', async (req, res) => {
                 status: 'pending',
                 qrisCode: qr.qrString,
                 createdAt: new Date(),
-                expiresAt: qr.expiresAt
+                expiresAt: qr.expiresAt,
+                provider: qr.provider || 'bri-snap',
+                referenceNumber: qr.referenceNumber,
+                externalId: qr.externalId,
+                deeplink: qr.deeplink
             };
             dataStore.addPendingPayment(payment);
         }

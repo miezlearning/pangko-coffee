@@ -101,7 +101,163 @@ function buildAddonLines(addons = [], width) {
   return lines;
 }
 
-function formatReceipt(order, templateId) {
+// Try to get the intended base unit price (without add-ons)
+function getBaseUnitPrice(item) {
+  if (!item) return 0;
+  const qty = Math.max(1, Number(item.quantity || 1));
+  const addonsTotal = sumAddons(item.addons);
+  // Explicit base price provided by builder/cart
+  if (item.basePrice != null && !isNaN(Number(item.basePrice))) {
+    return Number(item.basePrice);
+  }
+  // Explicit original price takes precedence when present
+  if (item.originalPrice != null && !isNaN(Number(item.originalPrice))) {
+    return Number(item.originalPrice);
+  }
+  // Try to look up current menu price by id or name (best-effort)
+  try {
+    const menuItems = (config.menu && Array.isArray(config.menu.items)) ? config.menu.items : [];
+    if (menuItems.length) {
+      let found = null;
+      if (item.id) {
+        found = menuItems.find(mi => mi && mi.id === item.id);
+      }
+      if (!found && item.name) {
+        found = menuItems.find(mi => mi && mi.name === item.name);
+      }
+      if (found && found.price != null) return Number(found.price);
+    }
+  } catch (_) {}
+  // Derive base by subtracting add-ons from stored price when possible
+  if (item.price != null && !isNaN(Number(item.price))) {
+    if (addonsTotal > 0) {
+      const derived = (Number(item.price) * qty - addonsTotal) / qty;
+      if (Number.isFinite(derived) && derived >= 0) {
+        return derived;
+      }
+    }
+    return Number(item.price);
+  }
+  // Fallback to the item's current price
+  return 0;
+}
+
+// Sum add-ons monetary total for a line item (does not multiply by item quantity; assumes addon.quantity already reflects desired total)
+function sumAddons(addons = []) {
+  if (!Array.isArray(addons)) return 0;
+  return addons.reduce((acc, addon) => {
+    if (!addon) return acc;
+    const qty = Number(addon.quantity || 0);
+    const unit = Number(addon.unitPrice ?? addon.price ?? 0);
+    if (qty <= 0 || isNaN(unit)) return acc;
+    return acc + (unit * qty);
+  }, 0);
+}
+
+function renderCustomTemplate(order, template, templateText, options = {}) {
+  const width = template.width;
+  const tz = config.bot?.timezone || 'Asia/Jakarta';
+  const createdAt = order?.createdAt ? moment(order.createdAt).tz(tz) : moment().tz(tz);
+
+  const shopName = config.printer?.shopName || config.shop?.name || 'KEDAI KOPI';
+  const shopAddress = config.printer?.shopAddress || config.shop?.address || '';
+  const shopPhone = config.printer?.shopPhone || config.shop?.contact || '';
+
+  const orderItems = Array.isArray(order?.items) ? order.items : [];
+  const subtotal = orderItems.reduce((sum, item) => {
+    const base = getBaseUnitPrice(item) * Number(item?.quantity || 1);
+    const addons = sumAddons(item?.addons);
+    return sum + base + addons;
+  }, 0);
+  const fee = Number(order?.pricing?.fee || 0);
+  const discount = Number(order?.pricing?.discount || 0);
+  const total = subtotal + fee - discount;
+
+  const ctx = {
+    shopName,
+    shopAddress,
+    shopPhone,
+    orderId: order?.orderId || '-',
+    createdAt: createdAt.format('DD/MM/YYYY HH:mm'),
+    customerName: order?.customerName || 'Customer',
+    paymentMethod: order?.paymentMethod === 'CASH' ? 'Tunai' : 'QRIS',
+    subtotal: formatCurrency(subtotal),
+    fee: fee > 0 ? formatCurrency(fee) : '',
+    discount: discount > 0 ? '-' + formatCurrency(discount) : '',
+    total: formatCurrency(total),
+  };
+
+  const itemRenderer = (block) => {
+    const lines = [];
+    orderItems.forEach(item => {
+      const baseUnit = getBaseUnitPrice(item);
+      const subtotalItem = baseUnit * Number(item?.quantity || 1);
+    const itemCtx = {
+        'item.name': String(item?.name || 'Item'),
+        'item.quantity': String(item?.quantity || 1),
+        'item.price': formatCurrency(baseUnit),
+        'item.subtotal': formatCurrency(subtotalItem),
+        'item.total': formatCurrency(subtotalItem + sumAddons(item?.addons)),
+        'item.notes': item?.notes ? String(item.notes) : ''
+      };
+      let rendered = block;
+      Object.keys(itemCtx).forEach(key => {
+        const value = itemCtx[key];
+        const re = new RegExp('{{\\s*' + key.replace('.', '\\.') + '\\s*}}', 'g');
+        rendered = rendered.replace(re, value);
+      });
+      lines.push(...rendered.split('\n'));
+    });
+    return lines;
+  };
+
+  let raw = String(templateText || '').replace(/\r\n/g, '\n');
+  // Handle items loop: {{#items}}...{{/items}}
+  raw = raw.replace(/{{#items}}([\s\S]*?){{\/items}}/g, (_, block) => {
+    return itemRenderer(block).join('\n');
+  });
+
+  // Replace simple variables
+  Object.keys(ctx).forEach(key => {
+    const re = new RegExp('{{\\s*' + key + '\\s*}}', 'g');
+    raw = raw.replace(re, ctx[key]);
+  });
+
+  // Inject optional custom header/footer text after rendering
+  const headerLines = [];
+  if (options.customHeaderText) {
+    String(options.customHeaderText).split(/\r?\n/).map(s => s.trim()).filter(Boolean)
+      .forEach(line => headerLines.push(...wrapText(line, width)));
+  }
+  const footerLines = [];
+  if (options.customFooterText) {
+    String(options.customFooterText).split(/\r?\n/).map(s => s.trim()).filter(Boolean)
+      .forEach(line => footerLines.push(...wrapText(line, width)));
+  }
+
+  const body = raw.split('\n').flatMap(line => wrapText(line, width));
+  const lines = [
+    ...headerLines.map(l => centerLine(l, width)),
+    ...body,
+    ...footerLines.map(l => centerLine(l, width))
+  ];
+
+  return {
+    template: template.id,
+    width,
+    sections: {
+      header: headerLines,
+      info: [],
+      items: [],
+      totals: [],
+      footer: footerLines
+    },
+    lines,
+    text: lines.join('\n')
+  };
+}
+
+function formatReceipt(order, templateId, options = {}) {
   const template = getTemplate(templateId);
   const width = template.width;
   const tz = config.bot?.timezone || 'Asia/Jakarta';
@@ -114,9 +270,21 @@ function formatReceipt(order, templateId) {
   const header = [
     centerLine(shopName, width),
     ...wrapText(shopAddress, width).map(line => centerLine(line, width)),
-    ...wrapText(shopPhone, width).map(line => centerLine(line, width)),
-    repeatChar('=', width)
+    ...wrapText(shopPhone, width).map(line => centerLine(line, width))
   ];
+
+  // Inject optional custom header lines (centered)
+  if (options.customHeaderText) {
+    String(options.customHeaderText)
+      .split(/\r?\n/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+      .forEach(line => {
+        wrapText(line, width).forEach(w => header.push(centerLine(w, width)));
+      });
+  }
+
+  header.push(repeatChar('=', width));
 
   const info = [
     rightAlign('Order ID', order?.orderId || '-', width),
@@ -133,14 +301,32 @@ function formatReceipt(order, templateId) {
     wrapText(name, width).forEach(line => items.push(line));
 
     const qty = Number(item?.quantity || 1);
-    const price = Number(item?.price || 0);
-    const subtotal = qty * price;
-    const qtyLabel = `${qty}x`;
-    const priceLabel = formatCurrency(price);
+    const baseUnit = getBaseUnitPrice(item);
+    const addonSum = sumAddons(item?.addons);
+    const subtotal = (qty * baseUnit) + addonSum;
+    const priceLabel = formatCurrency(baseUnit);
     const subtotalLabel = formatCurrency(subtotal);
-    const left = `  ${qtyLabel} @${priceLabel}`;
-    const spaces = Math.max(1, width - left.length - subtotalLabel.length);
-    items.push(left + ' '.repeat(spaces) + subtotalLabel);
+
+    // helper to print key/value aligned
+    const kv = (label, value) => {
+      const left = `  ${label}`;
+      const right = String(value || '');
+      const spaces = Math.max(1, width - left.length - right.length);
+      return left + ' '.repeat(spaces) + right;
+    };
+
+    const detailed = (config.printer && config.printer.detailedItemBreakdown) !== false; // default true
+    if (detailed) {
+      // Show explicit breakdown when detailed mode is on
+      items.push(kv('Harga 1x', priceLabel));
+      if (addonSum > 0) items.push(kv('Add-on', formatCurrency(addonSum)));
+      items.push(kv(`${qty}x Total`, subtotalLabel));
+    } else {
+      // Legacy single-line style
+      const left = `  ${qty}x @${priceLabel}`;
+      const spaces = Math.max(1, width - left.length - subtotalLabel.length);
+      items.push(left + ' '.repeat(spaces) + subtotalLabel);
+    }
 
     if (item?.notes) {
       wrapText(`  Note: ${item.notes}`, width).forEach(line => items.push(line));
@@ -148,10 +334,14 @@ function formatReceipt(order, templateId) {
     items.push(...buildAddonLines(item?.addons, width));
   });
 
-  const subtotal = orderItems.reduce((sum, item) => sum + Number(item?.price || 0) * Number(item?.quantity || 1), 0);
+  const subtotal = orderItems.reduce((sum, item) => {
+    const base = getBaseUnitPrice(item) * Number(item?.quantity || 1);
+    const addons = sumAddons(item?.addons);
+    return sum + base + addons;
+  }, 0);
   const fee = Number(order?.pricing?.fee || 0);
   const discount = Number(order?.pricing?.discount || 0);
-  const total = Number(order?.pricing?.total ?? (subtotal + fee - discount));
+  const total = subtotal + fee - discount;
 
   const totals = [
     repeatChar('-', width),
@@ -167,6 +357,22 @@ function formatReceipt(order, templateId) {
     centerLine('Terima kasih!', width),
     centerLine('Selamat menikmati ☕', width)
   ];
+
+  // Inject optional custom footer lines (centered)
+  if (options.customFooterText) {
+    String(options.customFooterText)
+      .split(/\r?\n/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+      .forEach(line => {
+        wrapText(line, width).forEach(w => footer.push(centerLine(w, width)));
+      });
+  }
+
+  // If a custom template text is provided, use it instead of default structure
+  if (options.customTemplateText) {
+    return renderCustomTemplate(order, template, options.customTemplateText, options);
+  }
 
   const lines = [...header, ...info, ...items, ...totals, ...footer];
 
@@ -190,4 +396,5 @@ module.exports = {
   DEFAULT_TEMPLATE_ID,
   getTemplate,
   formatReceipt,
+  renderCustomTemplate,
 };

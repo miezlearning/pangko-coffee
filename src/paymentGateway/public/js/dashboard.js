@@ -47,6 +47,55 @@ function getComparableName(record) {
   return String(name).toLowerCase();
 }
 
+// Get a comparable timestamp (ms) for sorting. Tries common fields depending on record shape.
+function getComparableTimestamp(record, tabName) {
+  if (!record) return 0;
+  // prefer explicit timestamps depending on tab/context
+  const candidates = [
+    record.createdAt,
+    record.confirmedAt,
+    record.readyAt,
+    record.updatedAt,
+    record.expiresAt,
+    record.cashExpiresAt
+  ];
+  for (const c of candidates) {
+    if (c) {
+      const t = Date.parse(c);
+      if (!isNaN(t)) return t;
+    }
+  }
+  // If record has numeric timestamp property
+  if (record.timestamp && !isNaN(Number(record.timestamp))) return Number(record.timestamp);
+  return 0;
+}
+
+// Get comparable numeric amount for sorting
+function getComparableAmount(record) {
+  if (!record) return 0;
+  const maybe = record.amount ?? record.total ?? (record.pricing && record.pricing.total) ?? 0;
+  return Number(maybe || 0);
+}
+
+// Basic search matcher across common fields (orderId, customerName, userId, item names)
+function recordMatchesSearch(record, term) {
+  if (!record) return false;
+  const fields = [];
+  if (record.orderId) fields.push(String(record.orderId));
+  if (record.customerName) fields.push(String(record.customerName));
+  if (record.userId) fields.push(String(record.userId));
+  if (record.customerId) fields.push(String(record.customerId));
+  if (record.paymentMethod) fields.push(String(record.paymentMethod));
+  if (record.items && Array.isArray(record.items)) {
+    record.items.forEach(it => {
+      if (it.name) fields.push(String(it.name));
+      if (it.notes) fields.push(String(it.notes));
+    });
+  }
+  const hay = fields.join(' ').toLowerCase();
+  return hay.indexOf(term) !== -1;
+}
+
 function sortRecords(records, sortKey, tabName) {
   const key = sortKey || 'newest';
   const list = Array.isArray(records) ? [...records] : [];
@@ -195,7 +244,34 @@ function switchTab(tabName) {
     activeTab.classList.add('border-matcha', 'bg-white', 'text-matcha');
   }
 
-  renderTab(tabName);
+  // Ensure the appropriate renderer runs for the active tab
+  // renderTab used to be missing in some edits; provide a lightweight dispatcher
+  try {
+    renderTab(tabName);
+  } catch (e) {
+    // If renderTab is not defined (older edits), fallback to direct dispatch
+    // and log for debugging
+    console.warn('[Dashboard] renderTab missing, using fallback dispatcher');
+    if (tabName === 'qris') renderPaymentsList();
+    else if (tabName === 'cash') renderPendingCashList();
+    else if (tabName === 'processing') renderProcessingOrders();
+    else if (tabName === 'ready') renderReadyOrders();
+    else if (tabName === 'cancelled') renderCancelledCashList();
+  }
+}
+
+// Backwards-compatible renderTab dispatcher (kept for clarity)
+function renderTab(tabName) {
+  // Debug helper to trace tab rendering
+  console.debug(`[Dashboard] renderTab -> ${tabName}`);
+  switch (tabName) {
+    case 'qris': return renderPaymentsList();
+    case 'cash': return renderPendingCashList();
+    case 'processing': return renderProcessingOrders();
+    case 'ready': return renderReadyOrders();
+    case 'cancelled': return renderCancelledCashList();
+    default: return renderPaymentsList();
+  }
 }
 
 // Global counter state - prevents resetting other counters when updating one
@@ -312,6 +388,7 @@ function renderPaymentsList() {
   if (!list) return;
 
   const payments = applyFilters(dashboardData.qris || [], 'qris');
+  console.debug(`[Dashboard] renderPaymentsList: container=${!!list} source=${(dashboardData.qris||[]).length} filtered=${payments.length}`);
 
   if (payments.length === 0) {
     list.innerHTML = `
@@ -527,6 +604,7 @@ function renderProcessingOrders() {
   if (!list) return;
 
   const orders = applyFilters(dashboardData.processing || [], 'processing');
+  console.debug(`[Dashboard] renderProcessingOrders: container=${!!list} source=${(dashboardData.processing||[]).length} filtered=${orders.length}`);
 
   if (orders.length === 0) {
     list.innerHTML = `
@@ -675,6 +753,7 @@ function renderPendingCashList() {
   if (!list) return;
 
   const orders = applyFilters(dashboardData.cash || [], 'cash');
+  console.debug(`[Dashboard] renderPendingCashList: container=${!!list} source=${(dashboardData.cash||[]).length} filtered=${orders.length}`);
 
   if (orders.length === 0) {
     list.innerHTML = `
@@ -951,6 +1030,8 @@ autoRefresh = setInterval(() => {
   loadReadyOrders();
   loadPendingCash();
   loadCancelledCash();
+  // Keep active template in sync with Tools page changes
+  loadPrinterTemplates();
 }, 3000);
 
 // Expose modal open for inline onclick
@@ -980,6 +1061,7 @@ function renderCancelledCashList() {
   if (!list) return;
 
   const orders = applyFilters(dashboardData.cancelled || [], 'cancelled');
+  console.debug(`[Dashboard] renderCancelledCashList: container=${!!list} source=${(dashboardData.cancelled||[]).length} filtered=${orders.length}`);
 
   if (orders.length === 0) {
     list.innerHTML = `
@@ -1150,6 +1232,7 @@ function renderReadyOrders() {
   if (!list) return;
 
   const orders = applyFilters(dashboardData.ready || [], 'ready');
+  console.debug(`[Dashboard] renderReadyOrders: container=${!!list} source=${(dashboardData.ready||[]).length} filtered=${orders.length}`);
 
   if (orders.length === 0) {
     list.innerHTML = `
@@ -1289,8 +1372,8 @@ async function printReceipt(orderId) {
   
   try {
     showNotification('🖨️ Mencetak struk...', 'info');
-    const templateId = printerTemplateState.active;
-    const res = await fetch(`/api/printer/print-and-open/${orderId}?template=${encodeURIComponent(templateId)}`, {
+    // Use server's active template & settings for full sync
+    const res = await fetch(`/api/printer/print-and-open/${orderId}`, {
       method: 'POST'
     });
     
@@ -1469,14 +1552,14 @@ function closePreviewModal() {
 
 async function previewReceipt(orderId) {
   try {
-    const templateId = printerTemplateState.active;
-    const res = await fetch(`/api/printer/preview/${orderId}?template=${encodeURIComponent(templateId)}`);
+    // Use server's active template & settings for full sync
+    const res = await fetch(`/api/printer/preview/${orderId}`);
     const data = await res.json();
     if (!data?.success) {
       showNotification('❌ Gagal membuat preview struk');
       return;
     }
-    printerTemplateState.active = data.template || templateId;
+    printerTemplateState.active = data.template || printerTemplateState.active;
     updateTemplateIndicators();
     const meta = findOrderMeta(orderId) || { orderId, customerName: '-', paymentMethod: '-' };
     openPreviewModal({ text: data.text, template: printerTemplateState.active }, meta);
@@ -1489,8 +1572,8 @@ async function previewReceipt(orderId) {
 async function printOnly(orderId) {
   try {
     showNotification('🖨️ Mencetak struk...', 'info');
-    const templateId = printerTemplateState.active;
-    const res = await fetch(`/api/printer/print/${orderId}?template=${encodeURIComponent(templateId)}`, { method: 'POST' });
+    // Use server's active template & settings for full sync
+    const res = await fetch(`/api/printer/print/${orderId}`, { method: 'POST' });
     const data = await res.json();
     if (data.success) {
       showNotification('✅ Struk berhasil dicetak');

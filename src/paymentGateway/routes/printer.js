@@ -71,7 +71,8 @@ router.get('/templates/:templateId/sample', (req, res) => {
 router.get('/settings', (req, res) => {
   res.json({
     success: true,
-    receiptTemplate: printerService.getReceiptTemplate()
+    receiptTemplate: printerService.getReceiptTemplate(),
+    useCustomTemplate: printerService.getUseCustomTemplate()
   });
 });
 
@@ -80,7 +81,7 @@ router.get('/settings', (req, res) => {
  * Update receipt template selection
  */
 router.post('/settings', (req, res) => {
-  const { receiptTemplate } = req.body || {};
+  const { receiptTemplate, useCustomTemplate } = req.body || {};
   if (!receiptTemplate) {
     return res.status(400).json({ success: false, message: 'receiptTemplate required' });
   }
@@ -90,7 +91,71 @@ router.post('/settings', (req, res) => {
     return res.status(400).json({ success: false, message: 'Template tidak dikenal' });
   }
   const updated = printerService.setReceiptTemplate(receiptTemplate);
-  res.json({ success: true, receiptTemplate: updated });
+  if (typeof useCustomTemplate !== 'undefined') {
+    printerService.setUseCustomTemplate(!!useCustomTemplate);
+  }
+  res.json({ success: true, receiptTemplate: updated, useCustomTemplate: printerService.getUseCustomTemplate() });
+});
+
+/**
+ * GET /api/printer/custom-text
+ * Get custom header/footer text used in receipt formatting
+ */
+router.get('/custom-text', (req, res) => {
+  try {
+    const payload = printerService.getCustomText();
+    res.json({ success: true, ...payload });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /api/printer/custom-text
+ * Update custom header/footer text
+ */
+router.post('/custom-text', (req, res) => {
+  try {
+    const { customHeaderText = '', customFooterText = '' } = req.body || {};
+    const saved = printerService.setCustomText({ customHeaderText, customFooterText });
+    res.json({ success: true, ...saved });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * Full Custom Template APIs
+ */
+router.get('/custom-template', (req, res) => {
+  try {
+    const templateId = req.query.template || printerService.getReceiptTemplate();
+    const text = printerService.getCustomTemplate(templateId);
+    res.json({ success: true, templateId, text, useCustomTemplate: printerService.getUseCustomTemplate() });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/custom-template', (req, res) => {
+  try {
+    const { templateId, text } = req.body || {};
+    const id = templateId || printerService.getReceiptTemplate();
+    const saved = printerService.setCustomTemplate(id, text || '');
+    res.json({ success: true, templateId: id, text: saved });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/custom-template/toggle', (req, res) => {
+  try {
+    const { enabled } = req.body || {};
+    const current = printerService.setUseCustomTemplate(!!enabled);
+    res.json({ success: true, useCustomTemplate: current });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
 /**

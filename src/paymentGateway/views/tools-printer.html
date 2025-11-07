@@ -62,6 +62,30 @@
               <pre id="sample-preview" class="max-h-[360px] overflow-auto whitespace-pre-wrap font-mono text-[13px] leading-relaxed">Memuat preview…</pre>
             </div>
           </div>
+
+          <!-- Custom Header/Footer Text -->
+          <div class="rounded-3xl border border-white/45 bg-white/90 p-6 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
+            <div class="flex items-start justify-between">
+              <div>
+                <h2 class="text-2xl font-bold">Custom Teks Struk</h2>
+                <p class="mt-1 text-sm text-charcoal/60">Tambahkan teks bebas untuk header/footer struk (misal: slogan, promo, akun sosmed).</p>
+              </div>
+            </div>
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <label for="custom-header" class="mb-1 block text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/60">Header Tambahan</label>
+                <textarea id="custom-header" rows="4" class="w-full rounded-2xl border border-charcoal/10 bg-white/90 p-3 text-sm outline-none ring-matcha/30 focus:ring-2" placeholder="Contoh:\nPANGKO COFFEE\nJl. Contoh No. 123\nIG: @pangko_coffee"></textarea>
+              </div>
+              <div>
+                <label for="custom-footer" class="mb-1 block text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/60">Footer Tambahan</label>
+                <textarea id="custom-footer" rows="4" class="w-full rounded-2xl border border-charcoal/10 bg-white/90 p-3 text-sm outline-none ring-matcha/30 focus:ring-2" placeholder="Contoh:\nFollow IG: @pangko_coffee\nPromo: Beli 4 Gratis 1"></textarea>
+              </div>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-3">
+              <button id="save-custom-text" class="inline-flex items-center gap-2 rounded-2xl bg-matcha px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" type="button">💾 Simpan</button>
+              <button id="refresh-preview" class="inline-flex items-center gap-2 rounded-2xl border border-charcoal/15 bg-white px-4 py-2 text-sm font-semibold text-charcoal transition hover:bg-charcoal/5" type="button">🔄 Refresh Preview</button>
+            </div>
+          </div>
         </div>
 
         <aside class="space-y-6">
@@ -87,8 +111,47 @@
             <ul class="mt-3 space-y-2 list-disc pl-5">
               <li>Simpan perubahan template sebelum test print.</li>
               <li>Jika printer tidak merespon, cek kabel serial / TCP serta restart service.</li>
-              <li>Untuk edit desain struk lebih lanjut, atur bagian header/footer di <code>config/printer</code>.</li>
+              <li>Untuk edit desain struk keseluruhan, gunakan Custom Teks Struk atau Custom Template di halaman ini.</li>
             </ul>
+            <div class="mt-4 rounded-2xl border border-charcoal/15 bg-white/80 p-4">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold">Gunakan Full Custom Template</p>
+                  <p class="text-xs text-charcoal/60">Jika aktif, struk akan dirender menggunakan template kustom yang kamu simpan untuk ukuran yang dipilih.</p>
+                </div>
+                <label class="inline-flex cursor-pointer items-center gap-2 text-sm">
+                  <input id="toggle-custom-template" type="checkbox" class="h-4 w-4 rounded border-charcoal/30" />
+                  <span>Aktif</span>
+                </label>
+              </div>
+              <div class="mt-3">
+                <label for="custom-template-text" class="mb-1 block text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/60">Custom Template (Full)</label>
+                <textarea id="custom-template-text" rows="10" class="w-full rounded-2xl border border-charcoal/10 bg-white/90 p-3 font-mono text-[12px] outline-none ring-matcha/30 focus:ring-2" placeholder="Contoh:
+{{shopName}}
+{{shopAddress}}
+{{shopPhone}}
+================================
+Order: {{orderId}}
+Waktu: {{createdAt}}
+Metode: {{paymentMethod}}
+--------------------------------
+{{#items}}
+- {{item.name}}
+  {{item.quantity}}x @ {{item.price}} = {{item.subtotal}}
+{{/items}}
+--------------------------------
+Subtotal: {{subtotal}}
+Biaya: {{fee}}
+Diskon: {{discount}}
+================================
+TOTAL: {{total}}"></textarea>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <button id="save-custom-template" class="inline-flex items-center gap-2 rounded-2xl bg-matcha px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" type="button">💾 Simpan Template</button>
+                  <button id="load-custom-template" class="inline-flex items-center gap-2 rounded-2xl border border-charcoal/15 bg-white px-4 py-2 text-sm font-semibold text-charcoal transition hover:bg-charcoal/5" type="button">↻ Muat Template</button>
+                </div>
+                <p class="mt-2 text-xs text-charcoal/60">Placeholder: {{shopName}}, {{shopAddress}}, {{shopPhone}}, {{orderId}}, {{createdAt}}, {{customerName}}, {{paymentMethod}}, {{subtotal}}, {{fee}}, {{discount}}, {{total}}, loop item: {{#items}}...{{/items}} dengan {{item.name}}, {{item.quantity}}, {{item.price}}, {{item.subtotal}} (harga asli×qty), {{item.total}} (termasuk add-on)</p>
+              </div>
+            </div>
           </div>
         </aside>
       </section>
