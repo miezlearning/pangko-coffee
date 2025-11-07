@@ -2,9 +2,14 @@
  * Printer Service
  * Handle thermal printer & cash drawer operations
  */
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 const ThermalPrinter = require('node-thermal-printer').printer;
 const PrinterTypes = require('node-thermal-printer').types;
 const { SerialPort } = require('serialport');
+const qrcodeTerminal = require('qrcode-terminal');
+const appConfig = require('../config/config');
 const {
   RECEIPT_TEMPLATES,
   DEFAULT_TEMPLATE_ID,
@@ -14,6 +19,59 @@ const {
   loadSettings,
   saveSettings
 } = require('./printerSettingsStore');
+
+const DEFAULT_FULL_CUSTOM_TEMPLATES = {
+  '58mm': [
+    '{{shopName}}',
+    '{{shopAddress}}',
+    '{{shopPhone}}',
+    '================================',
+    'Order : {{orderId}}',
+    'Nama  : {{customerName}}',
+    'Waktu : {{createdAt}}',
+    'Metode: {{paymentMethod}}',
+    '--------------------------------',
+    '{{#items}}',
+    '{{item.name}}',
+    '  Qty   : {{item.quantity}} x {{item.price}}',
+    '  Total : {{item.total}}',
+    '  Note  : {{item.notes}}',
+    '{{/items}}',
+    '--------------------------------',
+    'Subtotal : {{subtotal}}',
+    'Biaya    : {{fee}}',
+    'Diskon   : {{discount}}',
+    '================================',
+    'TOTAL    : {{total}}',
+    'Terima kasih dan selamat menikmati!'
+  ].join('\n'),
+  '80mm': [
+    '{{shopName}}',
+    '{{shopAddress}}',
+    '{{shopPhone}}',
+    '================================================',
+    'Order   : {{orderId}}',
+    'Nama    : {{customerName}}',
+    'Waktu   : {{createdAt}}',
+    'Metode  : {{paymentMethod}}',
+    '------------------------------------------------',
+    '{{#items}}',
+    '{{item.name}}',
+    '  Qty   : {{item.quantity}} x {{item.price}}',
+    '  Total : {{item.total}}',
+    '  Note  : {{item.notes}}',
+    '{{/items}}',
+    '------------------------------------------------',
+    'Subtotal : {{subtotal}}',
+    'Biaya    : {{fee}}',
+    'Diskon   : {{discount}}',
+    '================================================',
+    'TOTAL    : {{total}}',
+    'Terima kasih dan selamat menikmati!'
+  ].join('\n')
+};
+
+const DEFAULT_FOOTER_QR_LABEL = 'Scan QR di bawah ini';
 
 class PrinterService {
   constructor() {
@@ -138,11 +196,10 @@ class PrinterService {
       const activeTemplate = templateId && RECEIPT_TEMPLATES[templateId]
         ? templateId
         : this.receiptTemplateId;
-  const { customHeaderText, customFooterText } = this.getCustomText();
-  const maybeCustom = this.getUseCustomTemplate() ? this.getCustomTemplate(activeTemplate) : '';
-  const receipt = formatReceipt(order, activeTemplate, { customHeaderText, customFooterText, customTemplateText: maybeCustom });
-
+      const receipt = this.composeReceipt(order, activeTemplate);
       const { header, info, items, totals, footer } = receipt.sections;
+      const footerQr = receipt.footerQr || {};
+      const asciiFallback = receipt.previewAscii || [];
 
       // Trim any trailing empty lines in sections to avoid accidental large gaps
       const trimTrailingEmpty = (arr) => {
@@ -171,6 +228,50 @@ class PrinterService {
           finalLines.slice(1).forEach(line => this.printer.println(line));
         } else {
           finalLines.forEach(line => this.printer.println(line));
+        }
+      }
+
+      // Render QR code at footer when enabled
+      if (footerQr.enabled) {
+        const type = footerQr.type || 'qr';
+        if ((type === 'qr' || type === 'link') && footerQr.value) {
+          const qrValue = String(footerQr.value || '').trim();
+          if (qrValue) {
+            this.printer.newLine();
+            this.printer.alignCenter();
+            const cellSize = this.resolveQrCellSize(footerQr, receipt.width);
+            try {
+              if (typeof this.printer.printQR === 'function') {
+                this.printer.printQR(qrValue, { cellSize });
+              } else if (typeof this.printer.qr === 'function') {
+                this.printer.qr(qrValue, { size: cellSize });
+              } else if (asciiFallback.length) {
+                asciiFallback.forEach(line => this.printer.println(line));
+              } else {
+                this.printer.println('[QR]');
+              }
+            } catch (qrError) {
+              console.warn('[Printer] QR render failed, fallback to text:', qrError.message);
+              if (asciiFallback.length) {
+                asciiFallback.forEach(line => this.printer.println(line));
+              } else {
+                this.printer.println('[QR]');
+              }
+            }
+            this.printer.alignLeft();
+          }
+        } else if (type === 'image' && footerQr.imageData) {
+          this.printer.newLine();
+          this.printer.alignCenter();
+          try {
+            await this.printFooterImage(footerQr.imageData);
+          } catch (imageError) {
+            console.warn('[Printer] Footer image failed, fallback to label only:', imageError.message);
+            if (asciiFallback.length) {
+              asciiFallback.forEach(line => this.printer.println(line));
+            }
+          }
+          this.printer.alignLeft();
         }
       }
 
@@ -273,7 +374,10 @@ class PrinterService {
   getCustomTemplate(templateId) {
     this.settings = this.settings || {};
     const store = this.settings.customTemplates || {};
-    return store[templateId] || '';
+    if (store[templateId]) {
+      return store[templateId];
+    }
+    return DEFAULT_FULL_CUSTOM_TEMPLATES[templateId] || DEFAULT_FULL_CUSTOM_TEMPLATES[DEFAULT_TEMPLATE_ID] || '';
   }
 
   setCustomTemplate(templateId, text) {
@@ -282,6 +386,79 @@ class PrinterService {
     this.settings.customTemplates[templateId] = String(text || '');
     saveSettings(this.settings);
     return this.getCustomTemplate(templateId);
+  }
+
+  getFooterQrSetting() {
+    this.settings = this.settings || {};
+    const fallbackValue = String(appConfig.shop?.qrisStatic || '').trim();
+    const rawEnabled = !!this.settings.footerQrEnabled;
+    const storedValue = String(this.settings.footerQrValue || '').trim();
+    const type = this.settings.footerQrType || 'qr';
+    const imageData = this.settings.footerQrImageData || '';
+    const cellSizeRaw = Number(this.settings.footerQrCellSize);
+    const cellSize = Number.isFinite(cellSizeRaw) && cellSizeRaw >= 1 && cellSizeRaw <= 10 ? cellSizeRaw : 2;
+
+    let resolvedValue = storedValue;
+    if ((type === 'qr' || type === 'link') && !resolvedValue) {
+      resolvedValue = fallbackValue;
+    }
+
+    const hasPayload = type === 'image'
+      ? !!imageData
+      : !!resolvedValue;
+
+    const hasLabel = Object.prototype.hasOwnProperty.call(this.settings, 'footerQrLabel');
+    const storedLabel = hasLabel ? String(this.settings.footerQrLabel || '').trim() : DEFAULT_FOOTER_QR_LABEL;
+    const label = hasLabel ? storedLabel : DEFAULT_FOOTER_QR_LABEL;
+
+    return {
+      enabled: rawEnabled,
+      canRender: rawEnabled && hasPayload,
+      value: storedValue,
+      resolvedValue,
+      label,
+      type,
+      imageData,
+      cellSize,
+      defaultValue: fallbackValue,
+      defaultLabel: DEFAULT_FOOTER_QR_LABEL
+    };
+  }
+
+  setFooterQrSetting({ enabled, value, label, type, imageData, cellSize } = {}) {
+    this.settings = this.settings || {};
+    if (typeof enabled !== 'undefined') {
+      this.settings.footerQrEnabled = !!enabled;
+    }
+    if (typeof value !== 'undefined') {
+      this.settings.footerQrValue = String(value || '').trim();
+    }
+    if (typeof label !== 'undefined') {
+      this.settings.footerQrLabel = String(label || '').trim();
+    }
+    if (typeof type !== 'undefined') {
+      const sanitizedType = ['qr', 'link', 'text', 'image'].includes(type) ? type : 'qr';
+      this.settings.footerQrType = sanitizedType;
+    }
+    if (typeof imageData !== 'undefined') {
+      if (imageData) {
+        this.settings.footerQrImageData = String(imageData);
+      } else if (this.settings.footerQrType !== 'image') {
+        this.settings.footerQrImageData = '';
+      } else if (!imageData) {
+        // retain existing image when empty payload for image type
+        this.settings.footerQrImageData = this.settings.footerQrImageData || '';
+      }
+    }
+    if (typeof cellSize !== 'undefined') {
+      const parsedCellSize = Number(cellSize);
+      if (Number.isFinite(parsedCellSize)) {
+        const clamped = Math.min(10, Math.max(1, Math.round(parsedCellSize)));
+        this.settings.footerQrCellSize = clamped;
+      }
+    }
+    saveSettings(this.settings);
+    return this.getFooterQrSetting();
   }
 
   getCustomText() {
@@ -306,12 +483,127 @@ class PrinterService {
       : this.receiptTemplateId;
     const { customHeaderText, customFooterText } = this.getCustomText();
     const maybeCustom = this.getUseCustomTemplate() ? this.getCustomTemplate(activeTemplate) : '';
-    return formatReceipt(order, activeTemplate, { customHeaderText, customFooterText, customTemplateText: maybeCustom });
+    const footerQrSetting = this.getFooterQrSetting();
+    const footerQr = {
+      ...footerQrSetting,
+      value: footerQrSetting.resolvedValue,
+      sourceValue: footerQrSetting.value,
+      enabled: footerQrSetting.enabled && footerQrSetting.canRender
+    };
+    const receipt = formatReceipt(order, activeTemplate, {
+      customHeaderText,
+      customFooterText,
+      customTemplateText: maybeCustom,
+      footerQr
+    });
+    receipt.footerQr = footerQr;
+    const ascii = this.generateFooterQrAscii(footerQr, receipt.width);
+    receipt.previewAscii = ascii;
+    if (ascii.length && (footerQr.type === 'qr' || footerQr.type === 'link')) {
+      receipt.previewText = `${receipt.text}\n${ascii.join('\n')}`;
+    } else {
+      receipt.previewText = receipt.text;
+    }
+    return receipt;
   }
 
   composeSampleReceipt(templateId) {
     const sampleOrder = this.buildSampleOrder();
     return this.composeReceipt(sampleOrder, templateId);
+  }
+
+  generateFooterQrAscii(setting, width) {
+    if (!setting || !setting.enabled) {
+      return [];
+    }
+
+    const type = setting.type || 'qr';
+    if (type !== 'qr' && type !== 'link') {
+      return [];
+    }
+
+    const qrValue = String(setting.value || '').trim();
+    if (!qrValue) {
+      return [];
+    }
+
+    let qrString = '';
+    try {
+      qrcodeTerminal.generate(qrValue, { small: true }, (qr) => {
+        qrString = qr || '';
+      });
+    } catch (error) {
+      console.error('[Printer] Failed to generate ASCII QR preview:', error.message);
+      return [];
+    }
+
+    if (!qrString) {
+      return [];
+    }
+
+    const stripAnsi = (text) => text.replace(/\u001b\[[0-9;]*m/g, '');
+    const lines = qrString
+      .split(/\r?\n/)
+      .map(line => stripAnsi(line).replace(/\s+$/g, ''))
+      .filter(line => line.trim().length > 0);
+
+    if (!lines.length) {
+      return [];
+    }
+
+    return lines.map(line => this.centerVisual(line, width));
+  }
+
+  resolveQrCellSize(setting, width) {
+    const stored = Number(setting?.cellSize);
+    if (Number.isFinite(stored) && stored >= 1 && stored <= 10) {
+      return Math.round(stored);
+    }
+    if (Number(width) >= 48) {
+      return 3;
+    }
+    return 2;
+  }
+
+  centerVisual(text, width) {
+    const raw = String(text || '');
+    if (!width || raw.length >= width) {
+      return raw;
+    }
+    const padding = Math.max(0, width - raw.length);
+    const left = Math.floor(padding / 2);
+    const right = padding - left;
+    return `${' '.repeat(left)}${raw}${' '.repeat(right)}`;
+  }
+
+  async printFooterImage(imageData) {
+    if (!imageData || typeof imageData !== 'string') {
+      throw new Error('Footer image data kosong');
+    }
+
+    const match = imageData.match(/^data:(image\/(png|jpeg|jpg|gif));base64,(.+)$/i);
+    if (!match) {
+      throw new Error('Format gambar tidak didukung');
+    }
+
+    const mime = match[1].toLowerCase();
+    const extCandidate = match[2].toLowerCase();
+    const ext = extCandidate === 'jpeg' ? 'jpg' : extCandidate;
+    const buffer = Buffer.from(match[3], 'base64');
+
+    const tmpFile = path.join(os.tmpdir(), `pangko-footer-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`);
+
+    await fs.promises.writeFile(tmpFile, buffer);
+
+    try {
+      if (typeof this.printer.printImage === 'function') {
+        await this.printer.printImage(tmpFile);
+      } else {
+        throw new Error('Printer tidak mendukung cetak gambar');
+      }
+    } finally {
+      fs.promises.unlink(tmpFile).catch(() => {});
+    }
   }
 
   async printSampleReceipt(templateId) {

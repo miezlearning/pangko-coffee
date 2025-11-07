@@ -242,6 +242,13 @@ function renderCustomTemplate(order, template, templateText, options = {}) {
     ...footerLines.map(l => centerLine(l, width))
   ];
 
+  if (options.footerQr && options.footerQr.enabled) {
+    const label = options.footerQr.label || 'Scan QR di bawah ini';
+    const qrLabelLines = wrapText(label, width).map(w => centerLine(w, width));
+    footerLines.push(...qrLabelLines);
+    lines.push(...qrLabelLines);
+  }
+
   return {
     template: template.id,
     width,
@@ -367,6 +374,11 @@ function formatReceipt(order, templateId, options = {}) {
       .forEach(line => {
         wrapText(line, width).forEach(w => footer.push(centerLine(w, width)));
       });
+  }
+
+  if (options.footerQr && options.footerQr.enabled) {
+    const label = options.footerQr.label || 'Scan QR di bawah ini';
+    wrapText(label, width).forEach(w => footer.push(centerLine(w, width)));
   }
 
   // If a custom template text is provided, use it instead of default structure

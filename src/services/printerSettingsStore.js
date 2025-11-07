@@ -7,7 +7,13 @@ const DEFAULT_SETTINGS = {
   customHeaderText: '',
   customFooterText: '',
   useCustomTemplate: false,
-  customTemplates: {}
+  customTemplates: {},
+  footerQrEnabled: false,
+  footerQrValue: '',
+  footerQrLabel: 'Scan QR di bawah ini',
+  footerQrType: 'qr',
+  footerQrImageData: '',
+  footerQrCellSize: 2
 };
 
 function ensureDirExists(filePath) {

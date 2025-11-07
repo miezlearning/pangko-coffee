@@ -56,8 +56,10 @@ router.get('/templates/:templateId/sample', (req, res) => {
       success: true,
       template: receipt.template,
       width: receipt.width,
-      text: receipt.text,
-      lines: receipt.lines
+      text: receipt.previewText || receipt.text,
+      lines: receipt.lines,
+      footerQr: receipt.footerQr,
+      footerQrAscii: receipt.previewAscii || []
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -124,6 +126,25 @@ router.post('/custom-text', (req, res) => {
   }
 });
 
+router.get('/footer-qr', (req, res) => {
+  try {
+    const payload = printerService.getFooterQrSetting();
+    res.json({ success: true, ...payload });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/footer-qr', (req, res) => {
+  try {
+    const { enabled, value, label } = req.body || {};
+    const saved = printerService.setFooterQrSetting({ enabled, value, label });
+    res.json({ success: true, ...saved });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 /**
  * Full Custom Template APIs
  */
@@ -177,8 +198,10 @@ router.get('/preview/:orderId', (req, res) => {
       success: true,
       template: receipt.template,
       width: receipt.width,
-      text: receipt.text,
-      lines: receipt.lines
+      text: receipt.previewText || receipt.text,
+      lines: receipt.lines,
+      footerQr: receipt.footerQr,
+      footerQrAscii: receipt.previewAscii || []
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

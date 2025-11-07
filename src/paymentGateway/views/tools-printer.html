@@ -58,8 +58,19 @@
                 📋 Salin Teks
               </button>
             </div>
-            <div class="mt-4 rounded-2xl border border-charcoal/10 bg-charcoal/3 p-4">
-              <pre id="sample-preview" class="max-h-[360px] overflow-auto whitespace-pre-wrap font-mono text-[13px] leading-relaxed">Memuat preview…</pre>
+            <div class="mt-4 flex justify-center">
+              <div class="rounded-2xl border border-charcoal/10 bg-charcoal/3 p-4 shadow-sm">
+                <pre id="sample-preview" class="preview-paper inline-block max-h-[360px] overflow-auto whitespace-pre-wrap font-mono text-[13px] leading-relaxed">Memuat preview…</pre>
+              </div>
+            </div>
+            <div class="mt-4 flex justify-center">
+              <div class="w-full rounded-2xl border border-dashed border-charcoal/15 bg-white/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] sm:w-auto">
+                <div class="flex items-center justify-between gap-3">
+                  <h3 class="text-base font-semibold text-charcoal">Preview QR Footer</h3>
+                  <div class="text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">ASCII Preview</div>
+                </div>
+                <pre id="footer-qr-preview" class="preview-paper mt-3 inline-block max-h-[220px] overflow-auto whitespace-pre font-mono text-[11px] leading-tight text-charcoal/80">QR belum aktif</pre>
+              </div>
             </div>
           </div>
 
@@ -84,6 +95,38 @@
             <div class="mt-4 flex flex-wrap gap-3">
               <button id="save-custom-text" class="inline-flex items-center gap-2 rounded-2xl bg-matcha px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" type="button">💾 Simpan</button>
               <button id="refresh-preview" class="inline-flex items-center gap-2 rounded-2xl border border-charcoal/15 bg-white px-4 py-2 text-sm font-semibold text-charcoal transition hover:bg-charcoal/5" type="button">🔄 Refresh Preview</button>
+            </div>
+          </div>
+
+          <div class="rounded-3xl border border-white/45 bg-white/90 p-6 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
+            <div class="flex items-start justify-between">
+              <div>
+                <h2 class="text-2xl font-bold">QR Code di Footer</h2>
+                <p class="mt-1 text-sm text-charcoal/60">Tambahkan QR (misal QRIS atau akun sosmed) yang akan dicetak di bagian akhir struk.</p>
+              </div>
+            </div>
+            <div class="mt-4 space-y-4">
+              <label class="inline-flex items-center gap-3 text-sm font-semibold text-charcoal">
+                <input id="footer-qr-enabled" type="checkbox" class="h-4 w-4 rounded border-charcoal/30" />
+                Aktifkan QR Footer
+              </label>
+              <div>
+                <label for="footer-qr-value" class="mb-1 block text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/60">Data QR</label>
+                <textarea id="footer-qr-value" rows="3" class="w-full rounded-2xl border border-charcoal/10 bg-white/90 p-3 font-mono text-xs outline-none ring-matcha/30 focus:ring-2" placeholder="Tempelkan string QRIS atau tautan lain"></textarea>
+                <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-charcoal/60">
+                  <button id="use-default-footer-qr" class="inline-flex items-center gap-1 rounded-full border border-charcoal/15 bg-white px-3 py-1 font-semibold text-charcoal transition hover:bg-charcoal/5" type="button">Gunakan QR Default</button>
+                  <span>Default: <span id="footer-qr-default" class="font-semibold text-charcoal/80">—</span></span>
+                </div>
+              </div>
+              <div>
+                <label for="footer-qr-label" class="mb-1 block text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/60">Label Teks</label>
+                <input id="footer-qr-label" type="text" class="w-full rounded-2xl border border-charcoal/10 bg-white/90 p-3 text-sm outline-none ring-matcha/30 focus:ring-2" placeholder="Contoh: Scan untuk bayar" />
+                <p class="mt-1 text-xs text-charcoal/50">Default label: <span id="footer-qr-default-label" class="font-semibold text-charcoal">Scan QR di bawah ini</span></p>
+              </div>
+              <div class="flex flex-wrap gap-3">
+                <button id="save-footer-qr" class="inline-flex items-center gap-2 rounded-2xl bg-matcha px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" type="button">💾 Simpan</button>
+                <button id="refresh-footer-qr" class="inline-flex items-center gap-2 rounded-2xl border border-charcoal/15 bg-white px-4 py-2 text-sm font-semibold text-charcoal transition hover:bg-charcoal/5" type="button">🔄 Refresh Preview</button>
+              </div>
             </div>
           </div>
         </div>
@@ -126,25 +169,7 @@
               </div>
               <div class="mt-3">
                 <label for="custom-template-text" class="mb-1 block text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/60">Custom Template (Full)</label>
-                <textarea id="custom-template-text" rows="10" class="w-full rounded-2xl border border-charcoal/10 bg-white/90 p-3 font-mono text-[12px] outline-none ring-matcha/30 focus:ring-2" placeholder="Contoh:
-{{shopName}}
-{{shopAddress}}
-{{shopPhone}}
-================================
-Order: {{orderId}}
-Waktu: {{createdAt}}
-Metode: {{paymentMethod}}
---------------------------------
-{{#items}}
-- {{item.name}}
-  {{item.quantity}}x @ {{item.price}} = {{item.subtotal}}
-{{/items}}
---------------------------------
-Subtotal: {{subtotal}}
-Biaya: {{fee}}
-Diskon: {{discount}}
-================================
-TOTAL: {{total}}"></textarea>
+                <textarea id="custom-template-text" rows="12" class="w-full rounded-2xl border border-charcoal/10 bg-white/90 p-3 font-mono text-[12px] outline-none ring-matcha/30 focus:ring-2"></textarea>
                 <div class="mt-3 flex flex-wrap gap-2">
                   <button id="save-custom-template" class="inline-flex items-center gap-2 rounded-2xl bg-matcha px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" type="button">💾 Simpan Template</button>
                   <button id="load-custom-template" class="inline-flex items-center gap-2 rounded-2xl border border-charcoal/15 bg-white px-4 py-2 text-sm font-semibold text-charcoal transition hover:bg-charcoal/5" type="button">↻ Muat Template</button>
