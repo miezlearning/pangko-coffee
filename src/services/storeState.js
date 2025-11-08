@@ -55,7 +55,7 @@ function setOpen(open, updatedBy = 'system', message = null) {
 function getClosedMessage(defaultText) {
   const state = readState();
   // Build a clearer, professional closed message that separates the closure notice and the reason
-  const header = '⏸️ Toko saat ini TUTUP';
+  const header = '🔴 Toko saat ini TUTUP';
   const reasonLine = state.message ? `Alasan: ${state.message}` : null;
   const hoursLine = defaultText || null;
   const footer = 'Mohon maaf atas ketidaknyamanan. Silakan kunjungi kembali saat toko buka.';
