@@ -44,6 +44,26 @@ function centerLine(text, width) {
   return ' '.repeat(left) + raw + ' '.repeat(right);
 }
 
+function leftAlign(text, width) {
+  const raw = String(text ?? '').trim();
+  if (!raw) return ''.padStart(width, ' ');
+  if (raw.length >= width) return raw;
+  return raw + ' '.repeat(width - raw.length);
+}
+
+function rightAlignText(text, width) {
+  const raw = String(text ?? '').trim();
+  if (!raw) return ''.padStart(width, ' ');
+  if (raw.length >= width) return raw;
+  return ' '.repeat(width - raw.length) + raw;
+}
+
+function applyAlignment(text, width, align = 'center') {
+  if (align === 'left') return leftAlign(text, width);
+  if (align === 'right') return rightAlignText(text, width);
+  return centerLine(text, width);
+}
+
 function wrapText(text, width) {
   const raw = String(text ?? '');
   if (raw.length <= width) return [raw];
@@ -154,6 +174,313 @@ function sumAddons(addons = []) {
   }, 0);
 }
 
+function buildAddonDetails(addons = []) {
+  if (!Array.isArray(addons)) return [];
+  return addons
+    .map(addon => {
+      if (!addon) return null;
+      const name = addon.name || '';
+      const qty = Number(addon.quantity || 0);
+      const unit = Number(addon.unitPrice ?? addon.price ?? 0);
+      if (!name || qty <= 0 || !Number.isFinite(unit)) {
+        return null;
+      }
+      const total = unit * qty;
+      return {
+        name,
+        quantity: qty,
+        unitPrice: unit,
+        unitPriceFormatted: formatCurrency(unit),
+        total,
+        totalFormatted: formatCurrency(total)
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildItemMeta(item) {
+  if (!item) return null;
+  const quantity = Math.max(1, Number(item.quantity || 1));
+  const unitPrice = getBaseUnitPrice(item);
+  const addons = buildAddonDetails(item.addons);
+  const addonTotal = addons.reduce((sum, addon) => sum + addon.total, 0);
+  const subtotal = (unitPrice * quantity) + addonTotal;
+  return {
+    name: item.name || 'Item',
+    quantity,
+    unitPrice,
+    unitPriceFormatted: formatCurrency(unitPrice),
+    addons,
+    addonTotal,
+    addonTotalFormatted: addonTotal > 0 ? formatCurrency(addonTotal) : '',
+    notes: item.notes || '',
+    subtotal,
+    subtotalFormatted: formatCurrency(subtotal)
+  };
+}
+
+function buildReceiptMeta({
+  order,
+  template,
+  createdAt,
+  shopName,
+  shopAddress,
+  shopPhone,
+  shopSocials,
+  orderItems,
+  subtotal,
+  fee,
+  discount,
+  total,
+  footerLines,
+  footerQrLabel
+}) {
+  const itemsMeta = Array.isArray(orderItems)
+    ? orderItems.map(buildItemMeta).filter(Boolean)
+    : [];
+
+  const paymentMethodRaw = order?.paymentMethod || '';
+  const paymentMethodLabel = paymentMethodRaw === 'CASH'
+    ? 'Tunai'
+    : (paymentMethodRaw || 'QRIS');
+
+  return {
+    template: template?.id,
+    width: template?.width,
+    shop: {
+      name: shopName || '',
+      address: shopAddress || '',
+      phone: shopPhone || '',
+      socials: shopSocials || ''
+    },
+    order: {
+      id: order?.orderId || '-',
+      customerName: order?.customerName || '',
+      paymentMethod: paymentMethodRaw,
+      paymentMethodLabel,
+      createdAtIso: createdAt?.clone().toISOString(),
+      createdAtLabel: createdAt ? createdAt.format('DD MMM YYYY') : '',
+      createdAtTime: createdAt ? createdAt.format('HH:mm:ss') : '',
+      tableName: order?.tableName || order?.table || '',
+      additionalInfo: order?.notes || order?.description || ''
+    },
+    items: itemsMeta,
+    totals: {
+      subtotal,
+      subtotalFormatted: formatCurrency(subtotal),
+      fee,
+      feeFormatted: formatCurrency(fee),
+      discount,
+      discountFormatted: discount > 0 ? formatCurrency(discount) : formatCurrency(discount),
+      total,
+      totalFormatted: formatCurrency(total)
+    },
+    footer: {
+      lines: Array.isArray(footerLines) ? footerLines.slice() : [],
+      label: footerQrLabel || ''
+    }
+  };
+}
+
+function formatReceipt(order, receiptTemplate, options = {}) {
+  const {
+    customHeaderText = '',
+    customFooterText = '',
+    useCustomTemplate = false,
+    customTemplates = {},
+    headerPreset = 'shop-name',
+    footerPreset = 'thank-you',
+    showOrderId = true,
+    showTime = true,
+    showCustomer = true,
+    showPaymentMethod = true,
+    showHeaderSeparator = true,
+    showFooterSeparator = true,
+    detailedItemBreakdown = true,
+    showItemNotes = true,
+    showItemAddons = true,
+    lineSpacing, // Not implemented yet
+    headerFontSize, // Not implemented yet
+    footerFontSize, // Not implemented yet
+  } = options;
+
+  const template = getTemplate(receiptTemplate);
+  const width = template.width;
+
+  // If user explicitly wants to use the old full custom template, let them.
+  const customTemplateText = customTemplates ? customTemplates[template.id] : null;
+  if (useCustomTemplate && customTemplateText) {
+    return renderCustomTemplate(order, template, customTemplateText, options);
+  }
+
+  // --- Start New Per-Section Build Logic ---
+
+  const tz = config.bot?.timezone || 'Asia/Jakarta';
+  const createdAt = order?.createdAt ? moment(order.createdAt).tz(tz) : moment().tz(tz);
+  const shopName = config.printer?.shopName || config.shop?.name || 'KEDAI KOPI';
+  const shopAddress = config.printer?.shopAddress || config.shop?.address || '';
+  const shopPhone = config.printer?.shopPhone || config.shop?.contact || '';
+  const shopSocials = config.printer?.shopSocials || config.shop?.socials || '';
+
+  const header = [];
+  // Build header based on preset
+  switch (headerPreset) {
+    case 'shop-name':
+      header.push(centerLine(shopName, width));
+      break;
+    case 'shop-details':
+      header.push(centerLine(shopName, width));
+      if (shopAddress) header.push(...wrapText(shopAddress, width).map(line => centerLine(line, width)));
+      break;
+    case 'shop-contact':
+      header.push(centerLine(shopName, width));
+      if (shopPhone) header.push(...wrapText(shopPhone, width).map(line => centerLine(line, width)));
+      break;
+    case 'custom':
+      if (customHeaderText) {
+        String(customHeaderText).split(/\r?\n/).forEach(line => {
+            header.push(centerLine(line, width));
+        });
+      }
+      break;
+    case 'none':
+      // Do nothing
+      break;
+    default:
+      header.push(centerLine(shopName, width));
+  }
+
+  if (header.length > 0 && showHeaderSeparator) {
+    header.push(repeatChar('=', width));
+  }
+
+  const info = [];
+  if (showOrderId && order?.orderId) info.push(rightAlign('Order ID', order.orderId, width));
+  if (showTime) info.push(rightAlign('Waktu', createdAt.format('DD/MM/YYYY HH:mm'), width));
+  if (showCustomer && order?.customerName) info.push(rightAlign('Pelanggan', order.customerName, width));
+  if (showPaymentMethod && order?.paymentMethod) info.push(rightAlign('Metode', order.paymentMethod === 'CASH' ? 'Tunai' : 'QRIS', width));
+  
+  if (info.length > 0) {
+      info.push(repeatChar('-', width));
+  }
+
+  const items = [];
+  const orderItems = Array.isArray(order?.items) ? order.items : [];
+  orderItems.forEach(item => {
+    const name = item?.name || 'Item';
+    wrapText(name, width).forEach(line => items.push(line));
+
+    const qty = Number(item?.quantity || 1);
+    const baseUnit = getBaseUnitPrice(item);
+    const addonSum = sumAddons(item?.addons);
+    const subtotal = (qty * baseUnit) + addonSum;
+    const priceLabel = formatCurrency(baseUnit);
+    const subtotalLabel = formatCurrency(subtotal);
+
+    const kv = (label, value) => rightAlign(`  ${label}`, value, width);
+
+    if (detailedItemBreakdown) {
+      items.push(kv('Harga 1x', priceLabel));
+      if (addonSum > 0) items.push(kv('Add-on', formatCurrency(addonSum)));
+      items.push(kv(`${qty}x Total`, subtotalLabel));
+    } else {
+      const left = `  ${qty}x @${priceLabel}`;
+      items.push(rightAlign(left, subtotalLabel, width));
+    }
+
+    if (showItemNotes && item?.notes) {
+      wrapText(`  Note: ${item.notes}`, width).forEach(line => items.push(line));
+    }
+    if (showItemAddons) {
+      items.push(...buildAddonLines(item?.addons, width));
+    }
+  });
+
+  const subtotal = orderItems.reduce((sum, item) => {
+    const base = getBaseUnitPrice(item) * Number(item?.quantity || 1);
+    const addons = sumAddons(item?.addons);
+    return sum + base + addons;
+  }, 0);
+  const fee = Number(order?.pricing?.fee || 0);
+  const discount = Number(order?.pricing?.discount || 0);
+  const total = subtotal + fee - discount;
+
+  const totals = [
+    repeatChar('-', width),
+    rightAlign('Subtotal', formatCurrency(subtotal), width)
+  ];
+  if (fee > 0) totals.push(rightAlign('Biaya', formatCurrency(fee), width));
+  if (discount > 0) totals.push(rightAlign('Diskon', `- ${formatCurrency(discount)}`, width));
+  totals.push(repeatChar('=', width));
+  totals.push(rightAlign('TOTAL', formatCurrency(total), width));
+  totals.push(repeatChar('=', width));
+
+  const footer = [];
+  // Build footer based on preset
+  switch (footerPreset) {
+    case 'thank-you':
+      footer.push(centerLine('Terima kasih!', width));
+      footer.push(centerLine('Selamat menikmati ☕', width));
+      break;
+    case 'social-media':
+      if (shopSocials) {
+        String(shopSocials).split(/\r?\n/).forEach(line => {
+          footer.push(centerLine(line, width));
+        });
+      } else {
+        footer.push(centerLine('Follow us on social media!', width));
+      }
+      break;
+    case 'custom':
+      if (customFooterText) {
+        String(customFooterText).split(/\r?\n/).forEach(line => {
+            footer.push(centerLine(line, width));
+        });
+      }
+      break;
+    case 'none':
+      // Do nothing
+      break;
+    default:
+      footer.push(centerLine('Terima kasih!', width));
+  }
+
+  if (footer.length > 0 && showFooterSeparator) {
+      footer.unshift(repeatChar('=', width));
+  }
+
+  if (options.footerQr && options.footerQr.enabled) {
+    const label = options.footerQr.label || 'Scan QR di bawah ini';
+    wrapText(label, width).forEach(w => footer.push(centerLine(w, width)));
+  }
+
+  const lines = [...header, ...info, ...items, ...totals, ...footer];
+
+  return {
+    template: template.id,
+    width,
+    sections: { header, info, items, totals, footer },
+    lines,
+    text: lines.join('\n'),
+    meta: buildReceiptMeta({
+      order,
+      template,
+      createdAt,
+      shopName,
+      shopAddress,
+      shopPhone,
+      shopSocials,
+      orderItems,
+      subtotal,
+      fee,
+      discount,
+      total,
+      footerLines: footer,
+      footerQrLabel: options.footerQr?.label
+    })
+  };
+}
+
 function renderCustomTemplate(order, template, templateText, options = {}) {
   const width = template.width;
   const tz = config.bot?.timezone || 'Asia/Jakarta';
@@ -198,7 +525,9 @@ function renderCustomTemplate(order, template, templateText, options = {}) {
         'item.price': formatCurrency(baseUnit),
         'item.subtotal': formatCurrency(subtotalItem),
         'item.total': formatCurrency(subtotalItem + sumAddons(item?.addons)),
-        'item.notes': item?.notes ? String(item.notes) : ''
+        'item.notes': item?.notes ? String(item.notes) : '',
+        // Expand add-ons into lines; exposed as a single multiline placeholder
+        'item.addons': (buildAddonLines(item?.addons, width) || []).join('\n')
       };
       let rendered = block;
       Object.keys(itemCtx).forEach(key => {
@@ -222,6 +551,12 @@ function renderCustomTemplate(order, template, templateText, options = {}) {
     const re = new RegExp('{{\\s*' + key + '\\s*}}', 'g');
     raw = raw.replace(re, ctx[key]);
   });
+
+  // Remove lines that become dangling labels (e.g., "Biaya    : ") after replacement
+  raw = raw
+    .split('\n')
+    .filter(line => !/\:\s*$/.test(line))
+    .join('\n');
 
   // Inject optional custom header/footer text after rendering
   const headerLines = [];
@@ -264,7 +599,9 @@ function renderCustomTemplate(order, template, templateText, options = {}) {
   };
 }
 
-function formatReceipt(order, templateId, options = {}) {
+// This function is now deprecated in favor of the new per-section logic
+// but kept for backward compatibility if a user still has `useCustomTemplate` enabled.
+function oldFormatReceipt(order, templateId, options = {}) {
   const template = getTemplate(templateId);
   const width = template.width;
   const tz = config.bot?.timezone || 'Asia/Jakarta';
@@ -280,26 +617,30 @@ function formatReceipt(order, templateId, options = {}) {
     ...wrapText(shopPhone, width).map(line => centerLine(line, width))
   ];
 
-  // Inject optional custom header lines (centered)
+  // Inject optional custom header lines with custom alignment
+  const headerAlign = options.headerAlign || 'center';
   if (options.customHeaderText) {
     String(options.customHeaderText)
       .split(/\r?\n/)
       .map(s => s.trim())
       .filter(s => s.length > 0)
       .forEach(line => {
-        wrapText(line, width).forEach(w => header.push(centerLine(w, width)));
+        wrapText(line, width).forEach(w => header.push(applyAlignment(w, width, headerAlign)));
       });
   }
 
   header.push(repeatChar('=', width));
 
-  const info = [
-    rightAlign('Order ID', order?.orderId || '-', width),
-    rightAlign('Waktu', createdAt.format('DD/MM/YYYY HH:mm'), width),
-    rightAlign('Pelanggan', order?.customerName || 'Customer', width),
-    rightAlign('Metode', order?.paymentMethod === 'CASH' ? 'Tunai' : 'QRIS', width),
-    repeatChar('-', width)
-  ];
+  const info = [];
+  const showOrderId = options.showOrderId !== false;
+  const showTime = options.showTime !== false;
+  const showCustomer = options.showCustomer !== false;
+  const showPaymentMethod = options.showPaymentMethod !== false;
+  if (showOrderId) info.push(rightAlign('Order ID', order?.orderId || '-', width));
+  if (showTime) info.push(rightAlign('Waktu', createdAt.format('DD/MM/YYYY HH:mm'), width));
+  if (showCustomer) info.push(rightAlign('Pelanggan', order?.customerName || 'Customer', width));
+  if (showPaymentMethod) info.push(rightAlign('Metode', order?.paymentMethod === 'CASH' ? 'Tunai' : 'QRIS', width));
+  info.push(repeatChar('-', width));
 
   const items = [];
   const orderItems = Array.isArray(order?.items) ? order.items : [];
@@ -322,7 +663,9 @@ function formatReceipt(order, templateId, options = {}) {
       return left + ' '.repeat(spaces) + right;
     };
 
-    const detailed = (config.printer && config.printer.detailedItemBreakdown) !== false; // default true
+    const detailed = (options.detailedItemBreakdown !== undefined)
+      ? !!options.detailedItemBreakdown
+      : ((config.printer && config.printer.detailedItemBreakdown) !== false); // default true
     if (detailed) {
       // Show explicit breakdown when detailed mode is on
       items.push(kv('Harga 1x', priceLabel));
@@ -335,10 +678,13 @@ function formatReceipt(order, templateId, options = {}) {
       items.push(left + ' '.repeat(spaces) + subtotalLabel);
     }
 
-    if (item?.notes) {
+    const allowNotes = options.showItemNotes !== false;
+    if (allowNotes && item?.notes) {
       wrapText(`  Note: ${item.notes}`, width).forEach(line => items.push(line));
     }
-    items.push(...buildAddonLines(item?.addons, width));
+    if (options.showItemAddons !== false) {
+      items.push(...buildAddonLines(item?.addons, width));
+    }
   });
 
   const subtotal = orderItems.reduce((sum, item) => {
@@ -365,14 +711,15 @@ function formatReceipt(order, templateId, options = {}) {
     centerLine('Selamat menikmati ☕', width)
   ];
 
-  // Inject optional custom footer lines (centered)
+  // Inject optional custom footer lines with custom alignment
+  const footerAlign = options.footerAlign || 'center';
   if (options.customFooterText) {
     String(options.customFooterText)
       .split(/\r?\n/)
       .map(s => s.trim())
       .filter(s => s.length > 0)
       .forEach(line => {
-        wrapText(line, width).forEach(w => footer.push(centerLine(w, width)));
+        wrapText(line, width).forEach(w => footer.push(applyAlignment(w, width, footerAlign)));
       });
   }
 
@@ -382,7 +729,8 @@ function formatReceipt(order, templateId, options = {}) {
   }
 
   // If a custom template text is provided, use it instead of default structure
-  if (options.customTemplateText) {
+  // Only use custom template if it has actual content (not empty string)
+  if (options.customTemplateText && String(options.customTemplateText).trim().length > 0) {
     return renderCustomTemplate(order, template, options.customTemplateText, options);
   }
 
@@ -392,14 +740,30 @@ function formatReceipt(order, templateId, options = {}) {
     template: template.id,
     width,
     sections: {
-      header,
-      info,
-      items,
-      totals,
-      footer
+      header: [],
+      info: [],
+      items: [],
+      totals: [],
+      footer: []
     },
     lines,
-    text: lines.join('\n')
+    text: lines.join('\n'),
+    meta: buildReceiptMeta({
+      order,
+      template,
+      createdAt,
+      shopName,
+      shopAddress,
+      shopPhone,
+      shopSocials,
+      orderItems,
+      subtotal,
+      fee,
+      discount,
+      total,
+  footerLines: [],
+      footerQrLabel: options.footerQr?.label
+    })
   };
 }
 

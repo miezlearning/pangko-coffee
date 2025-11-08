@@ -8,7 +8,7 @@ const os = require('os');
 const ThermalPrinter = require('node-thermal-printer').printer;
 const PrinterTypes = require('node-thermal-printer').types;
 const { SerialPort } = require('serialport');
-const qrcodeTerminal = require('qrcode-terminal');
+const QRCode = require('qrcode');
 const appConfig = require('../config/config');
 const {
   RECEIPT_TEMPLATES,
@@ -20,22 +20,59 @@ const {
   saveSettings
 } = require('./printerSettingsStore');
 
+// QR preview image is delivered as base64; we intentionally avoid ASCII rendering
+
+function escapeHtml(value) {
+  if (value === undefined || value === null) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
+
+function truncateMiddle(value, max = 60) {
+  if (!value) return '';
+  const str = String(value);
+  if (str.length <= max) return str;
+  const half = Math.floor((max - 3) / 2);
+  return `${str.slice(0, half)}...${str.slice(-half)}`;
+}
+
+function isLikelyUrl(value) {
+  if (!value) return false;
+  return /^https?:\/\//i.test(String(value).trim());
+}
+
+function formatMultiline(value) {
+  if (!value) return '';
+  return escapeHtml(value).replace(/\r?\n/g, '<br />');
+}
+
+// Default full custom templates with placeholders. Users can toggle full custom mode.
+// Supports loop {{#items}} ... {{/items}} and placeholders: {{item.name}}, {{item.quantity}}, {{item.price}}, {{item.total}}, {{item.notes}}, {{item.addons}}
 const DEFAULT_FULL_CUSTOM_TEMPLATES = {
   '58mm': [
     '{{shopName}}',
     '{{shopAddress}}',
     '{{shopPhone}}',
     '================================',
-    'Order : {{orderId}}',
-    'Nama  : {{customerName}}',
-    'Waktu : {{createdAt}}',
-    'Metode: {{paymentMethod}}',
+    'Order ID : {{orderId}}',
+    'Nama     : {{customerName}}',
+    'Waktu    : {{createdAt}}',
+    'Metode   : {{paymentMethod}}',
     '--------------------------------',
     '{{#items}}',
     '{{item.name}}',
-    '  Qty   : {{item.quantity}} x {{item.price}}',
-    '  Total : {{item.total}}',
-    '  Note  : {{item.notes}}',
+    '  Qty    : {{item.quantity}} x {{item.price}}',
+    '  Total  : {{item.total}}',
+    '  Note   : {{item.notes}}',
+    '{{item.addons}}',
     '{{/items}}',
     '--------------------------------',
     'Subtotal : {{subtotal}}',
@@ -43,31 +80,34 @@ const DEFAULT_FULL_CUSTOM_TEMPLATES = {
     'Diskon   : {{discount}}',
     '================================',
     'TOTAL    : {{total}}',
-    'Terima kasih dan selamat menikmati!'
+    'Terima kasih!',
+    'Selamat menikmati ☕'
   ].join('\n'),
   '80mm': [
     '{{shopName}}',
     '{{shopAddress}}',
     '{{shopPhone}}',
     '================================================',
-    'Order   : {{orderId}}',
-    'Nama    : {{customerName}}',
-    'Waktu   : {{createdAt}}',
-    'Metode  : {{paymentMethod}}',
+    'Order ID  : {{orderId}}',
+    'Nama      : {{customerName}}',
+    'Waktu     : {{createdAt}}',
+    'Metode    : {{paymentMethod}}',
     '------------------------------------------------',
     '{{#items}}',
     '{{item.name}}',
-    '  Qty   : {{item.quantity}} x {{item.price}}',
-    '  Total : {{item.total}}',
-    '  Note  : {{item.notes}}',
+    '  Qty     : {{item.quantity}} x {{item.price}}',
+    '  Total   : {{item.total}}',
+    '  Note    : {{item.notes}}',
+    '{{item.addons}}',
     '{{/items}}',
     '------------------------------------------------',
-    'Subtotal : {{subtotal}}',
-    'Biaya    : {{fee}}',
-    'Diskon   : {{discount}}',
+    'Subtotal  : {{subtotal}}',
+    'Biaya     : {{fee}}',
+    'Diskon    : {{discount}}',
     '================================================',
-    'TOTAL    : {{total}}',
-    'Terima kasih dan selamat menikmati!'
+    'TOTAL     : {{total}}',
+    'Terima kasih!',
+    'Selamat menikmati ☕'
   ].join('\n')
 };
 
@@ -196,10 +236,10 @@ class PrinterService {
       const activeTemplate = templateId && RECEIPT_TEMPLATES[templateId]
         ? templateId
         : this.receiptTemplateId;
-      const receipt = this.composeReceipt(order, activeTemplate);
+      const receipt = await this.composeReceipt(order, activeTemplate);
       const { header, info, items, totals, footer } = receipt.sections;
       const footerQr = receipt.footerQr || {};
-      const asciiFallback = receipt.previewAscii || [];
+      const asciiFallback = []; // Deprecated
 
       // Trim any trailing empty lines in sections to avoid accidental large gaps
       const trimTrailingEmpty = (arr) => {
@@ -397,6 +437,7 @@ class PrinterService {
     const imageData = this.settings.footerQrImageData || '';
     const cellSizeRaw = Number(this.settings.footerQrCellSize);
     const cellSize = Number.isFinite(cellSizeRaw) && cellSizeRaw >= 1 && cellSizeRaw <= 10 ? cellSizeRaw : 2;
+    const position = this.settings.qrPosition || 'after-footer';
 
     let resolvedValue = storedValue;
     if ((type === 'qr' || type === 'link') && !resolvedValue) {
@@ -420,12 +461,13 @@ class PrinterService {
       type,
       imageData,
       cellSize,
+      position,
       defaultValue: fallbackValue,
       defaultLabel: DEFAULT_FOOTER_QR_LABEL
     };
   }
 
-  setFooterQrSetting({ enabled, value, label, type, imageData, cellSize } = {}) {
+  setFooterQrSetting({ enabled, value, label, type, imageData, cellSize, position } = {}) {
     this.settings = this.settings || {};
     if (typeof enabled !== 'undefined') {
       this.settings.footerQrEnabled = !!enabled;
@@ -457,6 +499,10 @@ class PrinterService {
         this.settings.footerQrCellSize = clamped;
       }
     }
+    if (typeof position !== 'undefined') {
+      const sanitizedPosition = ['after-footer', 'before-footer'].includes(position) ? position : 'after-footer';
+      this.settings.qrPosition = sanitizedPosition;
+    }
     saveSettings(this.settings);
     return this.getFooterQrSetting();
   }
@@ -464,151 +510,299 @@ class PrinterService {
   getCustomText() {
     this.settings = this.settings || {};
     return {
+      headerPreset: this.settings.headerPreset || 'shop-name',
+      footerPreset: this.settings.footerPreset || 'thank-you',
       customHeaderText: this.settings.customHeaderText || '',
-      customFooterText: this.settings.customFooterText || ''
+      customFooterText: this.settings.customFooterText || '',
+      lineSpacing: this.settings.lineSpacing || 'normal',
+      showHeaderSeparator: this.settings.showHeaderSeparator !== false,
+      showFooterSeparator: this.settings.showFooterSeparator !== false,
+      showOrderId: this.settings.showOrderId !== false,
+      showTime: this.settings.showTime !== false,
+      showCustomer: this.settings.showCustomer !== false,
+      showPaymentMethod: this.settings.showPaymentMethod !== false,
+      showItemNotes: this.settings.showItemNotes !== false,
+      showItemAddons: this.settings.showItemAddons !== false,
+      detailedItemBreakdown: this.settings.detailedItemBreakdown !== false
     };
   }
 
-  setCustomText({ customHeaderText = '', customFooterText = '' } = {}) {
+  setCustomText(params = {}) {
     this.settings = this.settings || {};
-    this.settings.customHeaderText = String(customHeaderText || '');
-    this.settings.customFooterText = String(customFooterText || '');
+    // Still save custom text for the 'custom' preset option
+    if (params.customHeaderText !== undefined) this.settings.customHeaderText = String(params.customHeaderText || '');
+    if (params.customFooterText !== undefined) this.settings.customFooterText = String(params.customFooterText || '');
+    
+    if (params.headerPreset) this.settings.headerPreset = params.headerPreset;
+    if (params.footerPreset) this.settings.footerPreset = params.footerPreset;
+    if (params.lineSpacing) this.settings.lineSpacing = params.lineSpacing;
+    if (params.showHeaderSeparator !== undefined) this.settings.showHeaderSeparator = !!params.showHeaderSeparator;
+    if (params.showFooterSeparator !== undefined) this.settings.showFooterSeparator = !!params.showFooterSeparator;
+    // Section & details
+    if (params.showOrderId !== undefined) this.settings.showOrderId = !!params.showOrderId;
+    if (params.showTime !== undefined) this.settings.showTime = !!params.showTime;
+    if (params.showCustomer !== undefined) this.settings.showCustomer = !!params.showCustomer;
+    if (params.showPaymentMethod !== undefined) this.settings.showPaymentMethod = !!params.showPaymentMethod;
+    if (params.showItemNotes !== undefined) this.settings.showItemNotes = !!params.showItemNotes;
+    if (params.showItemAddons !== undefined) this.settings.showItemAddons = !!params.showItemAddons;
+    if (params.detailedItemBreakdown !== undefined) this.settings.detailedItemBreakdown = !!params.detailedItemBreakdown;
+    
     saveSettings(this.settings);
     return this.getCustomText();
   }
 
-  composeReceipt(order, templateId) {
-    const activeTemplate = templateId && RECEIPT_TEMPLATES[templateId]
-      ? templateId
-      : this.receiptTemplateId;
-    const { customHeaderText, customFooterText } = this.getCustomText();
+  async composeReceipt(order, optionsOrTemplateId) {
+    const isOptions = typeof optionsOrTemplateId === 'object' && optionsOrTemplateId !== null;
+    const activeTemplate = isOptions 
+      ? optionsOrTemplateId.receiptTemplate 
+      : (optionsOrTemplateId && RECEIPT_TEMPLATES[optionsOrTemplateId] ? optionsOrTemplateId : this.receiptTemplateId);
+
+    const settings = isOptions ? optionsOrTemplateId : this.getCustomText();
+
     const maybeCustom = this.getUseCustomTemplate() ? this.getCustomTemplate(activeTemplate) : '';
-    const footerQrSetting = this.getFooterQrSetting();
-    const footerQr = {
-      ...footerQrSetting,
-      value: footerQrSetting.resolvedValue,
-      sourceValue: footerQrSetting.value,
-      enabled: footerQrSetting.enabled && footerQrSetting.canRender
+
+    const persistedQr = this.getFooterQrSetting();
+    const requestQr = isOptions && optionsOrTemplateId && typeof optionsOrTemplateId.footerQr === 'object'
+      ? optionsOrTemplateId.footerQr
+      : {};
+
+    const qrSettingsSource = isOptions
+      ? {
+          ...persistedQr,
+          ...requestQr,
+          enabled: requestQr.enabled !== undefined ? !!requestQr.enabled : persistedQr.enabled,
+          type: requestQr.type || persistedQr.type,
+          label: requestQr.label !== undefined ? requestQr.label : persistedQr.label,
+          cellSize: requestQr.cellSize !== undefined ? requestQr.cellSize : persistedQr.cellSize,
+          position: requestQr.position || persistedQr.position,
+          imageData: requestQr.imageData !== undefined ? requestQr.imageData : persistedQr.imageData,
+          value: requestQr.value !== undefined ? requestQr.value : (requestQr.content !== undefined ? requestQr.content : persistedQr.value),
+          resolvedValue: requestQr.content !== undefined ? requestQr.content : persistedQr.resolvedValue,
+        }
+      : persistedQr;
+
+    const normalizeContent = (val) => {
+      if (val === undefined || val === null) return undefined;
+      if (typeof val === 'string') {
+        const trimmed = val.trim();
+        return trimmed.length ? trimmed : undefined;
+      }
+      return val;
     };
+
+    const fallbackContent = normalizeContent(qrSettingsSource.resolvedValue) ??
+      normalizeContent(qrSettingsSource.value) ??
+      normalizeContent(qrSettingsSource.defaultValue);
+
+    const requestedContent = normalizeContent(requestQr.content);
+    const requestedValue = normalizeContent(requestQr.value);
+
+    let effectiveImageData = qrSettingsSource.type === 'image'
+      ? normalizeContent(qrSettingsSource.imageData) ?? normalizeContent(persistedQr.imageData)
+      : qrSettingsSource.imageData;
+
+    let qrContent = '';
+    if (qrSettingsSource.type === 'image') {
+      qrContent = effectiveImageData || '';
+    } else {
+      qrContent = requestedContent ?? requestedValue ?? fallbackContent ?? '';
+    }
+
+    const hasQrPayload = qrSettingsSource.type === 'image'
+      ? !!effectiveImageData
+      : !!qrContent;
+
+    const footerQr = {
+      ...qrSettingsSource,
+      imageData: qrSettingsSource.type === 'image' ? (effectiveImageData || '') : qrSettingsSource.imageData,
+      value: qrContent,
+      resolvedValue: qrContent || fallbackContent || '',
+      enabled: qrSettingsSource.enabled && hasQrPayload,
+    };
+
     const receipt = formatReceipt(order, activeTemplate, {
-      customHeaderText,
-      customFooterText,
+      ...settings,
       customTemplateText: maybeCustom,
       footerQr
     });
     receipt.footerQr = footerQr;
-    const ascii = this.generateFooterQrAscii(footerQr, receipt.width);
-    receipt.previewAscii = ascii;
-    if (ascii.length && (footerQr.type === 'qr' || footerQr.type === 'link')) {
-      receipt.previewText = `${receipt.text}\n${ascii.join('\n')}`;
-    } else {
-      receipt.previewText = receipt.text;
+    
+    // Generate base64 QR for preview if enabled
+    if (footerQr.enabled && footerQr.value && (footerQr.type === 'qr' || footerQr.type === 'link')) {
+      try {
+        receipt.footerQrBase64 = await QRCode.toDataURL(footerQr.value, {
+          errorCorrectionLevel: 'M',
+          margin: 2,
+          width: 180, // Consistent preview sizing
+        });
+      } catch (e) {
+        console.error('[Printer] Failed to generate QR data URL for preview:', e.message);
+        receipt.footerQrBase64 = '';
+      }
+    } else if (footerQr.enabled && footerQr.type === 'image' && footerQr.imageData) {
+      receipt.footerQrBase64 = footerQr.imageData;
     }
+    
+    receipt.previewText = receipt.text;
+    try {
+      receipt.htmlPreview = this.buildHtmlPreview(order, receipt);
+    } catch (htmlError) {
+      console.warn('[Printer] Failed to build HTML preview:', htmlError.message);
+      receipt.htmlPreview = '';
+    }
+    
     return receipt;
   }
 
-  composeSampleReceipt(templateId) {
+  async composeSampleReceipt(options) {
     const sampleOrder = this.buildSampleOrder();
-    return this.composeReceipt(sampleOrder, templateId);
+    return await this.composeReceipt(sampleOrder, options);
   }
 
-  generateFooterQrAscii(setting, width) {
-    if (!setting || !setting.enabled) {
-      return [];
+  buildHtmlPreview(_order, receipt) {
+    const meta = receipt && receipt.meta ? receipt.meta : null;
+    const safeText = escapeHtml(receipt?.previewText || receipt?.text || '');
+
+    if (!meta || !meta.shop || !meta.order) {
+      return `
+        <div style="width:100%;display:flex;justify-content:center;">
+          <div style="max-width:320px;background:#ffffff;border-radius:18px;border:1px solid rgba(148,163,184,0.3);padding:18px;box-shadow:0 30px 60px -45px rgba(51,51,51,0.4);">
+            <pre style="margin:0;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.5;color:#111827;white-space:pre-wrap;">${safeText}</pre>
+          </div>
+        </div>`;
     }
 
-    const type = setting.type || 'qr';
-    if (type !== 'qr' && type !== 'link') {
-      return [];
-    }
+    const shop = meta.shop || {};
+    const orderMeta = meta.order || {};
+    const totals = meta.totals || {};
+    const items = Array.isArray(meta.items) ? meta.items : [];
+    const footerInfo = meta.footer || {};
+    const footerQr = receipt.footerQr || {};
+    const qrImageSrc = typeof receipt.footerQrBase64 === 'string' && receipt.footerQrBase64.startsWith('data:image')
+      ? receipt.footerQrBase64
+      : '';
 
-    const qrValue = String(setting.value || '').trim();
-    if (!qrValue) {
-      return [];
-    }
+    const infoRows = [];
+    if (orderMeta.id) infoRows.push({ label: 'No. Order', value: orderMeta.id });
+    if (orderMeta.createdAtLabel) infoRows.push({ label: 'Tanggal', value: orderMeta.createdAtLabel });
+    if (orderMeta.createdAtTime) infoRows.push({ label: 'Jam', value: orderMeta.createdAtTime });
+    if (orderMeta.customerName) infoRows.push({ label: 'Customer', value: orderMeta.customerName });
+    if (orderMeta.paymentMethodLabel) infoRows.push({ label: 'Pembayaran', value: orderMeta.paymentMethodLabel });
+    if (orderMeta.tableName) infoRows.push({ label: 'Meja', value: orderMeta.tableName });
+    if (orderMeta.additionalInfo) infoRows.push({ label: 'Catatan', value: orderMeta.additionalInfo });
 
-    let qrString = '';
-    try {
-      qrcodeTerminal.generate(qrValue, { small: true }, (qr) => {
-        qrString = qr || '';
-      });
-    } catch (error) {
-      console.error('[Printer] Failed to generate ASCII QR preview:', error.message);
-      return [];
-    }
+    const infoRowsHtml = infoRows.map(row => (
+      `<div style="display:flex;justify-content:space-between;font-size:12px;color:#4b5563;margin-bottom:4px;">
+        <span>${escapeHtml(row.label)}</span>
+        <span style="font-weight:600;">${escapeHtml(row.value)}</span>
+      </div>`
+    )).join('');
 
-    if (!qrString) {
-      return [];
-    }
+    const itemsHtml = items.length
+      ? items.map((item, index) => {
+          const addons = Array.isArray(item.addons) ? item.addons : [];
+          const addonsHtml = addons.map(addon => (
+            `<div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;margin-top:3px;">
+              <span>+ ${escapeHtml(addon.name)} x${escapeHtml(addon.quantity)}</span>
+              <span>${escapeHtml(addon.totalFormatted || '')}</span>
+            </div>`
+          )).join('');
+          const notesHtml = item.notes
+            ? `<div style="margin-top:4px;font-size:11px;color:#f97316;">Catatan: ${escapeHtml(item.notes)}</div>`
+            : '';
+          const borderStyle = index === items.length - 1 ? '' : 'border-bottom:1px dashed #e5e7eb;';
+          return `
+            <div style="padding:12px 0;${borderStyle}">
+              <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:#1f2937;">
+                <span>${escapeHtml(item.name)}</span>
+                <span>${escapeHtml(item.subtotalFormatted || '')}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7280;margin-top:4px;">
+                <span>${escapeHtml(item.quantity)} × ${escapeHtml(item.unitPriceFormatted || '')}</span>
+                <span></span>
+              </div>
+              ${addonsHtml}
+              ${notesHtml}
+            </div>`;
+        }).join('')
+      : `<div style="padding:16px;border:1px dashed #d1d5db;border-radius:12px;font-size:12px;color:#6b7280;text-align:center;">Belum ada item dalam order</div>`;
 
-    const stripAnsi = (text) => text.replace(/\u001b\[[0-9;]*m/g, '');
-    const lines = qrString
-      .split(/\r?\n/)
-      .map(line => stripAnsi(line).replace(/\s+$/g, ''))
-      .filter(line => line.trim().length > 0);
+    const feeLine = totals.fee > 0
+      ? `<div style="display:flex;justify-content:space-between;font-size:12px;color:#047857;margin-top:6px;"><span>Biaya</span><span>${escapeHtml(totals.feeFormatted || '')}</span></div>`
+      : '';
+    const discountLine = totals.discount > 0
+      ? `<div style="display:flex;justify-content:space-between;font-size:12px;color:#b91c1c;margin-top:6px;"><span>Diskon</span><span>- ${escapeHtml(totals.discountFormatted || '')}</span></div>`
+      : '';
+    const totalsHtml = `
+      <div style="margin-top:16px;padding:16px;border:1px solid rgba(34,197,94,0.35);border-radius:14px;background:rgba(34,197,94,0.08);">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#047857;">
+          <span>Subtotal</span>
+          <span>${escapeHtml(totals.subtotalFormatted || '')}</span>
+        </div>
+        ${feeLine}
+        ${discountLine}
+        <div style="margin-top:10px;padding:10px 12px;border-radius:12px;background:#16a34a;color:#ffffff;display:flex;justify-content:space-between;font-size:14px;font-weight:700;">
+          <span>Total</span>
+          <span>${escapeHtml(totals.totalFormatted || '')}</span>
+        </div>
+      </div>`;
 
-    if (!lines.length) {
-      return [];
-    }
-
-    return lines.map(line => this.centerVisual(line, width));
-  }
-
-  resolveQrCellSize(setting, width) {
-    const stored = Number(setting?.cellSize);
-    if (Number.isFinite(stored) && stored >= 1 && stored <= 10) {
-      return Math.round(stored);
-    }
-    if (Number(width) >= 48) {
-      return 3;
-    }
-    return 2;
-  }
-
-  centerVisual(text, width) {
-    const raw = String(text || '');
-    if (!width || raw.length >= width) {
-      return raw;
-    }
-    const padding = Math.max(0, width - raw.length);
-    const left = Math.floor(padding / 2);
-    const right = padding - left;
-    return `${' '.repeat(left)}${raw}${' '.repeat(right)}`;
-  }
-
-  async printFooterImage(imageData) {
-    if (!imageData || typeof imageData !== 'string') {
-      throw new Error('Footer image data kosong');
-    }
-
-    const match = imageData.match(/^data:(image\/(png|jpeg|jpg|gif));base64,(.+)$/i);
-    if (!match) {
-      throw new Error('Format gambar tidak didukung');
-    }
-
-    const mime = match[1].toLowerCase();
-    const extCandidate = match[2].toLowerCase();
-    const ext = extCandidate === 'jpeg' ? 'jpg' : extCandidate;
-    const buffer = Buffer.from(match[3], 'base64');
-
-    const tmpFile = path.join(os.tmpdir(), `pangko-footer-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`);
-
-    await fs.promises.writeFile(tmpFile, buffer);
-
-    try {
-      if (typeof this.printer.printImage === 'function') {
-        await this.printer.printImage(tmpFile);
-      } else {
-        throw new Error('Printer tidak mendukung cetak gambar');
+    let qrHtml = '';
+    if (footerQr.enabled && qrImageSrc) {
+      const label = footerQr.label ? escapeHtml(footerQr.label) : 'Scan QR di bawah ini';
+      let linkHtml = '';
+      if (footerQr.type === 'link' && footerQr.value) {
+        const truncated = truncateMiddle(footerQr.value, 56);
+        const href = escapeAttr(footerQr.value);
+        linkHtml = `<a href="${href}" target="_blank" rel="noopener" style="display:block;margin-top:6px;font-size:11px;color:#2563eb;word-break:break-word;">${escapeHtml(truncated)}</a>`;
+      } else if ((footerQr.type === 'qr' || footerQr.type === 'text') && footerQr.value && isLikelyUrl(footerQr.value)) {
+        const truncated = truncateMiddle(footerQr.value, 56);
+        const href = escapeAttr(footerQr.value);
+        linkHtml = `<a href="${href}" target="_blank" rel="noopener" style="display:block;margin-top:6px;font-size:11px;color:#2563eb;word-break:break-word;">${escapeHtml(truncated)}</a>`;
       }
-    } finally {
-      fs.promises.unlink(tmpFile).catch(() => {});
+      qrHtml = `
+        <div style="margin-top:18px;padding:18px;border:1px dashed #d1d5db;border-radius:16px;text-align:center;background:#f9fafb;">
+          <div style="font-size:12px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.12em;">${label}</div>
+          ${linkHtml}
+          <img src="${qrImageSrc}" alt="QR Code" style="margin-top:12px;width:150px;height:150px;border-radius:12px;border:1px solid #e5e7eb;display:inline-block;background:#ffffff;padding:10px;" />
+        </div>`;
     }
+
+    const footerLines = Array.isArray(footerInfo.lines)
+      ? footerInfo.lines.filter(line => line && !/^[-=\s]+$/.test(String(line).trim()))
+      : [];
+    const footerHtml = footerLines.length
+      ? `<div style="margin-top:18px;text-align:center;font-size:11px;color:#9ca3af;line-height:1.4;">
+          ${footerLines.map(line => `<div>${escapeHtml(line)}</div>`).join('')}
+        </div>`
+      : '';
+
+    const headerSubtitleParts = [];
+    if (shop.address) headerSubtitleParts.push(formatMultiline(shop.address));
+    if (shop.phone) headerSubtitleParts.push(escapeHtml(shop.phone));
+    const headerSubtitle = headerSubtitleParts.join('<br />');
+
+    return `
+      <div style="width:100%;display:flex;justify-content:center;">
+        <div style="width:100%;max-width:320px;background:#ffffff;border-radius:22px;border:1px solid rgba(148,163,184,0.35);box-shadow:0 30px 60px -45px rgba(51,51,51,0.45);overflow:hidden;">
+          <div style="background:#16a34a;color:#ffffff;text-align:center;padding:18px 22px;">
+            <div style="font-size:18px;font-weight:700;letter-spacing:0.02em;">${escapeHtml(shop.name || 'Struk Pembayaran')}</div>
+            ${headerSubtitle ? `<div style="margin-top:6px;font-size:11px;opacity:0.9;line-height:1.5;">${headerSubtitle}</div>` : ''}
+          </div>
+          <div style="padding:20px 22px;font-family:'Manrope','Segoe UI',sans-serif;color:#111827;">
+            ${infoRowsHtml ? `<div style="margin-bottom:16px;">${infoRowsHtml}</div>` : ''}
+            <div>${itemsHtml}</div>
+            ${totalsHtml}
+            ${qrHtml}
+            ${footerHtml}
+          </div>
+        </div>
+      </div>`;
   }
 
   async printSampleReceipt(templateId) {
     const sampleOrder = this.buildSampleOrder();
-    return this.printReceipt(sampleOrder, templateId);
+    return await this.printReceipt(sampleOrder, templateId);
   }
 
   buildSampleOrder() {

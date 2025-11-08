@@ -45,21 +45,53 @@ router.get('/templates', (req, res) => {
 });
 
 /**
- * GET /api/printer/templates/:templateId/sample
- * Return sample preview text for the given template
+ * GET /api/printer/sample-preview
+ * Return sample preview text based on query params
  */
-router.get('/templates/:templateId/sample', (req, res) => {
+router.get('/sample-preview', async (req, res) => {
   try {
-    const { templateId } = req.params;
-    const receipt = printerService.composeSampleReceipt(templateId);
+    // All options are passed via query string for live preview
+    const options = {
+      receiptTemplate: req.query.template,
+      // Presets and custom text
+      headerPreset: req.query.headerPreset,
+      footerPreset: req.query.footerPreset,
+      customHeaderText: req.query.customHeaderText,
+      customFooterText: req.query.customFooterText,
+      // Formatting
+      lineSpacing: req.query.lineSpacing,
+      // Section visibility
+      showHeaderSeparator: req.query.showHeaderSeparator === 'true',
+      showFooterSeparator: req.query.showFooterSeparator === 'true',
+      showOrderId: req.query.showOrderId === 'true',
+      showTime: req.query.showTime === 'true',
+      showCustomer: req.query.showCustomer === 'true',
+      showPaymentMethod: req.query.showPaymentMethod === 'true',
+      showItemNotes: req.query.showItemNotes === 'true',
+      showItemAddons: req.query.showItemAddons === 'true',
+      detailedItemBreakdown: req.query.detailedItemBreakdown === 'true',
+      // QR settings from live preview
+      footerQr: {
+        enabled: req.query.footerQrEnabled === 'true',
+        type: req.query.footerQrType || 'qr',
+        content: req.query.footerQrContent,
+        label: req.query.footerQrLabel,
+        cellSize: Number(req.query.footerQrSize) || undefined,
+        position: req.query.qrPosition || 'after-footer',
+      }
+    };
+    
+    const receipt = await printerService.composeSampleReceipt(options);
     res.json({
       success: true,
       template: receipt.template,
       width: receipt.width,
       text: receipt.previewText || receipt.text,
       lines: receipt.lines,
-      footerQr: receipt.footerQr,
-      footerQrAscii: receipt.previewAscii || []
+      html: receipt.htmlPreview || '',
+      footerQrBase64: receipt.footerQrBase64 || '', // Send base64 image
+      footerQrLabel: receipt.footerQr && receipt.footerQr.label ? receipt.footerQr.label : '',
+      footerQrEnabled: !!(receipt.footerQr && receipt.footerQr.enabled),
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -114,12 +146,45 @@ router.get('/custom-text', (req, res) => {
 
 /**
  * POST /api/printer/custom-text
- * Update custom header/footer text
+ * Update custom header/footer text and formatting
  */
 router.post('/custom-text', (req, res) => {
   try {
-    const { customHeaderText = '', customFooterText = '' } = req.body || {};
-    const saved = printerService.setCustomText({ customHeaderText, customFooterText });
+    const { 
+      headerPreset,
+      footerPreset,
+      customHeaderText,
+      customFooterText,
+      lineSpacing,
+      // Section visibility
+      showHeaderSeparator,
+      showFooterSeparator,
+      showOrderId,
+      showTime,
+      showCustomer,
+      showPaymentMethod,
+      showItemNotes,
+      showItemAddons,
+      detailedItemBreakdown
+    } = req.body || {};
+    
+    const saved = printerService.setCustomText({ 
+      headerPreset,
+      footerPreset,
+      customHeaderText,
+      customFooterText,
+      lineSpacing,
+      // Section visibility
+      showHeaderSeparator,
+      showFooterSeparator,
+      showOrderId,
+      showTime,
+      showCustomer,
+      showPaymentMethod,
+      showItemNotes,
+      showItemAddons,
+      detailedItemBreakdown
+    });
     res.json({ success: true, ...saved });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -137,8 +202,17 @@ router.get('/footer-qr', (req, res) => {
 
 router.post('/footer-qr', (req, res) => {
   try {
-    const { enabled, value, label } = req.body || {};
-    const saved = printerService.setFooterQrSetting({ enabled, value, label });
+    const { enabled, type, value, link, imageData, cellSize, label, position } = req.body || {};
+    const saved = printerService.setFooterQrSetting({ 
+      enabled, 
+      type, 
+      value, 
+      link, 
+      imageData, 
+      cellSize, 
+      label,
+      position
+    });
     res.json({ success: true, ...saved });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -183,7 +257,7 @@ router.post('/custom-template/toggle', (req, res) => {
  * GET /api/printer/preview/:orderId
  * Compose receipt preview text on the server
  */
-router.get('/preview/:orderId', (req, res) => {
+router.get('/preview/:orderId', async (req, res) => {
   const { orderId } = req.params;
   const templateId = req.query.template;
 
@@ -193,15 +267,20 @@ router.get('/preview/:orderId', (req, res) => {
   }
 
   try {
-    const receipt = printerService.composeReceipt(order, templateId);
+    const receipt = await printerService.composeReceipt(order, templateId);
+    const footerQr = receipt.footerQr || {};
     res.json({
       success: true,
       template: receipt.template,
       width: receipt.width,
       text: receipt.previewText || receipt.text,
       lines: receipt.lines,
-      footerQr: receipt.footerQr,
-      footerQrAscii: receipt.previewAscii || []
+      html: receipt.htmlPreview || '',
+      footerQr,
+      footerQrAscii: receipt.previewAscii || [],
+      footerQrBase64: receipt.footerQrBase64 || '',
+      footerQrLabel: footerQr.label || '',
+      footerQrEnabled: !!footerQr.enabled
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -230,7 +309,7 @@ router.post('/test', async (req, res) => {
  */
 router.post('/print-sample', async (req, res) => {
   try {
-    const templateId = req.body?.template;
+  const templateId = req.body && req.body.template;
     const result = await printerService.printSampleReceipt(templateId);
     res.json(result);
   } catch (error) {

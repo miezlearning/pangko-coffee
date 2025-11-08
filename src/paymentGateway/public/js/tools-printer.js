@@ -5,17 +5,103 @@ const printerToolsState = {
   active: null,
   selected: null,
   sampleText: 'Memuat preview…',
+  // Presets & Custom Text
+  headerPreset: 'shop-name',
+  footerPreset: 'thank-you',
   customHeaderText: '',
   customFooterText: '',
-  useCustomTemplate: false,
+  // QR Code
   footerQrEnabled: false,
-  footerQrValue: '',
+  footerQrContent: '',
   footerQrLabel: '',
-  footerQrDefault: '',
+  footerQrType: 'qr',
+  footerQrLink: '',
+  footerQrImageData: '',
+  footerQrSize: 2,
+  qrPosition: 'after-footer',
+  footerQrDefaultValue: '',
   footerQrDefaultLabel: '',
-  footerQrAscii: [],
-  previewColumns: 32
+  // Formatting
+  lineSpacing: 'normal',
+  showHeaderSeparator: true,
+  showFooterSeparator: true,
+  // Section visibility
+  showOrderId: true,
+  showTime: true,
+  showCustomer: true,
+  showPaymentMethod: true,
+  showItemNotes: true,
+  showItemAddons: true,
+  detailedItemBreakdown: true,
+  // Internal
+  previewColumns: 32,
+  livePreviewTimer: null,
 };
+
+// Debounced live preview update
+function schedulePreviewUpdate() {
+  if (printerToolsState.livePreviewTimer) {
+    clearTimeout(printerToolsState.livePreviewTimer);
+  }
+  printerToolsState.livePreviewTimer = setTimeout(() => {
+    const templateId = printerToolsState.selected || printerToolsState.active;
+    loadSamplePreview(templateId);
+  }, 500); // 500ms delay
+}
+
+// Toggle custom container visibility
+function toggleCustomContainer(presetValue, containerId) {
+  const container = document.getElementById(containerId);
+  if (container) {
+    if (presetValue === 'custom') {
+      container.classList.remove('hidden');
+    } else {
+      container.classList.add('hidden');
+    }
+  }
+}
+
+function setQrPanelInteractivity(enabled) {
+  const panel = document.getElementById('qr-config-panel');
+  if (!panel) return;
+  panel.classList.toggle('pointer-events-none', !enabled);
+  panel.classList.toggle('opacity-50', !enabled);
+}
+
+function updateQrInputVisibility() {
+  const type = printerToolsState.footerQrType || 'qr';
+  const sections = {
+    qr: document.getElementById('qr-input-qr'),
+    link: document.getElementById('qr-input-link'),
+    image: document.getElementById('qr-input-image')
+  };
+  Object.entries(sections).forEach(([key, section]) => {
+    if (!section) return;
+    if (key === type) {
+      section.classList.remove('hidden');
+    } else {
+      section.classList.add('hidden');
+    }
+  });
+}
+
+function updateQrSizeDisplay() {
+  const display = document.getElementById('footer-qr-size-display');
+  if (display) {
+    display.textContent = printerToolsState.footerQrSize || 2;
+  }
+}
+
+function updateQrDefaultBadges() {
+  const labelBadge = document.getElementById('footer-qr-default-label');
+  if (labelBadge) {
+    labelBadge.textContent = printerToolsState.footerQrDefaultLabel || 'Scan QR';
+  }
+  const valueBadge = document.getElementById('footer-qr-default');
+  if (valueBadge) {
+    valueBadge.textContent = printerToolsState.footerQrDefaultValue || '—';
+  }
+}
 
 function showPrinterToast(message, type = 'info') {
   const toast = document.getElementById('printer-toast');
@@ -130,37 +216,74 @@ function renderFooterQrForm() {
   if (toggle) {
     toggle.checked = !!printerToolsState.footerQrEnabled;
   }
-  const valueArea = document.getElementById('footer-qr-value');
-  if (valueArea) {
-    valueArea.value = printerToolsState.footerQrValue || '';
+
+  // Toggle panel visibility based on enabled state
+  const panel = document.getElementById('qr-config-panel');
+  if (panel) {
+    if (printerToolsState.footerQrEnabled) {
+      panel.classList.remove('opacity-50', 'pointer-events-none');
+    } else {
+      panel.classList.add('opacity-50', 'pointer-events-none');
+    }
   }
+
+  // Populate inputs
+  const contentInput = document.getElementById('footer-qr-content');
+  if (contentInput) {
+    contentInput.value = printerToolsState.footerQrContent || '';
+  }
+
   const labelInput = document.getElementById('footer-qr-label');
   if (labelInput) {
-    labelInput.value = printerToolsState.footerQrLabel || printerToolsState.footerQrDefaultLabel || '';
+    labelInput.value = printerToolsState.footerQrLabel || '';
   }
+  
+  const positionSelect = document.getElementById('qr-position');
+  if (positionSelect) {
+    positionSelect.value = printerToolsState.qrPosition || 'after-footer';
+  }
+
   const defaultLabelBadge = document.getElementById('footer-qr-default-label');
   if (defaultLabelBadge) {
     defaultLabelBadge.textContent = printerToolsState.footerQrDefaultLabel || '';
   }
+
   const defaultValueBadge = document.getElementById('footer-qr-default');
   if (defaultValueBadge) {
     defaultValueBadge.textContent = printerToolsState.footerQrDefault || '—';
   }
-  renderFooterQrPreview();
+
+  // Show image preview if image data exists
+  if (printerToolsState.footerQrImageData && printerToolsState.footerQrType === 'image') {
+    const preview = document.getElementById('qr-image-preview');
+    const img = document.getElementById('qr-image-preview-img');
+    const name = document.getElementById('qr-image-preview-name');
+    const size = document.getElementById('qr-image-preview-size');
+    
+    if (preview) preview.classList.remove('hidden');
+    if (img) img.src = printerToolsState.footerQrImageData;
+    if (name) name.textContent = printerToolsState.footerQrImageName || 'Gambar QR';
+    if (size) {
+      const bytes = Math.round((printerToolsState.footerQrImageData.length * 3) / 4);
+      size.textContent = `${(bytes / 1024).toFixed(1)} KB`;
+    }
+  }
+
+  updateQrStatusBadge();
 }
 
-function renderFooterQrPreview() {
-  const preview = document.getElementById('footer-qr-preview');
-  if (!preview) return;
-  applyPreviewWidth();
-  if (!printerToolsState.footerQrEnabled) {
-    preview.textContent = 'QR belum aktif';
-    return;
-  }
-  if (printerToolsState.footerQrAscii && printerToolsState.footerQrAscii.length) {
-    preview.textContent = printerToolsState.footerQrAscii.join('\n');
+function updateQrStatusBadge() {
+  const badge = document.getElementById('footer-qr-status-badge');
+  if (!badge) return;
+  
+  if (printerToolsState.footerQrEnabled) {
+    badge.textContent = 'Aktif';
+    badge.classList.remove('bg-charcoal/10', 'text-charcoal/60');
+    badge.classList.add('bg-matcha/15', 'text-matcha');
   } else {
-    preview.textContent = 'QR akan dicetak oleh printer (preview belum tersedia).';
+    badge.textContent = 'Nonaktif';
+    badge.classList.add('bg-charcoal/10', 'text-charcoal/60');
+    badge.classList.remove('bg-matcha/15', 'text-matcha');
   }
 }
 
@@ -171,11 +294,6 @@ function applyPreviewWidth() {
   if (sample) {
     sample.style.width = `${widthCh}ch`;
     sample.style.minWidth = `${widthCh}ch`;
-  }
-  const footerPreview = document.getElementById('footer-qr-preview');
-  if (footerPreview) {
-    footerPreview.style.width = `${widthCh}ch`;
-    footerPreview.style.minWidth = `${widthCh}ch`;
   }
 }
 
@@ -206,13 +324,67 @@ async function loadTemplates() {
 
 async function loadSamplePreview(templateId) {
   const preview = document.getElementById('sample-preview');
+  const htmlPreview = document.getElementById('sample-preview-html');
+  const qrContainer = document.getElementById('footer-qr-preview-container');
+  const qrImage = document.getElementById('footer-qr-preview-image');
+  const qrLabelEl = document.getElementById('footer-qr-preview-label');
+
   if (preview) {
     preview.textContent = 'Memuat preview…';
     applyPreviewWidth();
   }
+  if (htmlPreview) {
+    htmlPreview.innerHTML = '';
+    htmlPreview.classList.add('hidden');
+  }
+  if (qrContainer) qrContainer.classList.add('hidden');
+  if (qrImage) qrImage.src = '';
+
   try {
     const id = templateId || printerToolsState.active || '58mm';
-    const res = await fetch(`/api/printer/templates/${encodeURIComponent(id)}/sample`);
+    
+    // Construct the query parameters from the current state
+    const qrType = printerToolsState.footerQrType || 'qr';
+    let qrContent = '';
+    if (qrType === 'link') {
+      qrContent = document.getElementById('footer-qr-link')?.value?.trim() || printerToolsState.footerQrLink || '';
+    } else if (qrType === 'image') {
+      qrContent = printerToolsState.footerQrImageData || '';
+    } else {
+      qrContent = document.getElementById('footer-qr-content')?.value?.trim() || printerToolsState.footerQrContent || '';
+    }
+  printerToolsState.footerQrContent = qrType === 'qr' ? qrContent : printerToolsState.footerQrContent;
+  printerToolsState.footerQrLink = qrType === 'link' ? qrContent : printerToolsState.footerQrLink;
+  const qrLabel = document.getElementById('footer-qr-label')?.value || printerToolsState.footerQrLabel || '';
+  printerToolsState.footerQrLabel = qrLabel;
+
+    const params = new URLSearchParams({
+      template: id,
+      headerPreset: printerToolsState.headerPreset,
+      footerPreset: printerToolsState.footerPreset,
+      customHeaderText: document.getElementById('custom-header')?.value || '',
+      customFooterText: document.getElementById('custom-footer')?.value || '',
+      lineSpacing: printerToolsState.lineSpacing,
+      qrPosition: printerToolsState.qrPosition,
+      // Section visibility
+      showHeaderSeparator: printerToolsState.showHeaderSeparator,
+      showFooterSeparator: printerToolsState.showFooterSeparator,
+      showOrderId: printerToolsState.showOrderId,
+      showTime: printerToolsState.showTime,
+      showCustomer: printerToolsState.showCustomer,
+      showPaymentMethod: printerToolsState.showPaymentMethod,
+      showItemNotes: printerToolsState.showItemNotes,
+      showItemAddons: printerToolsState.showItemAddons,
+      detailedItemBreakdown: printerToolsState.detailedItemBreakdown,
+      // QR settings for live preview
+      footerQrEnabled: printerToolsState.footerQrEnabled,
+      footerQrType: qrType,
+      footerQrContent: qrContent,
+      footerQrLabel: qrLabel,
+      footerQrSize: printerToolsState.footerQrSize,
+    });
+
+    const res = await fetch(`/api/printer/sample-preview?${params.toString()}`);
     const data = await res.json();
     if (!data?.success) {
       throw new Error(data?.message || 'Preview gagal dimuat');
@@ -222,19 +394,55 @@ async function loadSamplePreview(templateId) {
     if (Number.isFinite(width) && width > 0) {
       printerToolsState.previewColumns = width;
     }
-    printerToolsState.footerQrAscii = Array.isArray(data.footerQrAscii) ? data.footerQrAscii : [];
     applyPreviewWidth();
     if (preview) {
       preview.textContent = data.text;
     }
-    renderFooterQrPreview();
+
+    if (htmlPreview) {
+      if (data.html) {
+        htmlPreview.innerHTML = data.html;
+        htmlPreview.classList.remove('hidden');
+      } else {
+        htmlPreview.innerHTML = '';
+        htmlPreview.classList.add('hidden');
+      }
+    }
+
+    const textWrapper = document.getElementById('sample-preview-text-wrapper');
+    if (textWrapper) {
+      textWrapper.open = !data.html;
+    }
+
+    const qrEnabled = data.footerQrEnabled ?? printerToolsState.footerQrEnabled;
+    const qrLabelText = data.footerQrLabel || printerToolsState.footerQrLabel || printerToolsState.footerQrDefaultLabel || 'Scan QR';
+
+    if (qrContainer) {
+      if (!data.html && qrEnabled && data.footerQrBase64) {
+        if (qrImage) qrImage.src = data.footerQrBase64;
+        if (qrLabelEl) qrLabelEl.textContent = qrLabelText;
+        qrContainer.classList.remove('hidden');
+      } else {
+        if (qrImage) qrImage.src = '';
+        qrContainer.classList.add('hidden');
+      }
+    }
+    
+    updateQrStatusBadge();
   } catch (error) {
     console.error('Failed to load sample preview:', error);
-    printerToolsState.footerQrAscii = [];
+    updateQrStatusBadge();
     applyPreviewWidth();
-    renderFooterQrPreview();
     if (preview) {
       preview.textContent = 'Preview tidak tersedia.';
+    }
+    if (htmlPreview) {
+      htmlPreview.innerHTML = '';
+      htmlPreview.classList.add('hidden');
+    }
+    const textWrapper = document.getElementById('sample-preview-text-wrapper');
+    if (textWrapper) {
+      textWrapper.open = true;
     }
   }
 }
@@ -247,12 +455,44 @@ async function loadFooterQrSettings() {
       throw new Error(data?.message || 'Gagal memuat QR footer');
     }
     printerToolsState.footerQrEnabled = !!data.enabled;
-    printerToolsState.footerQrValue = data.value || '';
-    printerToolsState.footerQrLabel = data.label || data.defaultLabel || '';
-    printerToolsState.footerQrDefault = data.defaultValue || '';
-    printerToolsState.footerQrDefaultLabel = data.defaultLabel || '';
-    printerToolsState.footerQrAscii = Array.isArray(data.footerQrAscii) ? data.footerQrAscii : [];
-    renderFooterQrForm();
+    printerToolsState.footerQrContent = data.value || '';
+    printerToolsState.footerQrLabel = data.label || '';
+    printerToolsState.footerQrType = data.type || 'qr';
+    printerToolsState.footerQrLink = data.type === 'link' ? (data.value || '') : '';
+    printerToolsState.footerQrImageData = data.type === 'image' ? (data.imageData || '') : '';
+    printerToolsState.footerQrSize = Number.isFinite(Number(data.cellSize)) ? Number(data.cellSize) : 2;
+    printerToolsState.qrPosition = data.position || 'after-footer';
+    printerToolsState.footerQrDefaultValue = data.defaultValue || '';
+    printerToolsState.footerQrDefaultLabel = data.defaultLabel || 'Scan QR';
+
+    const toggle = document.getElementById('footer-qr-enabled');
+    if (toggle) toggle.checked = printerToolsState.footerQrEnabled;
+    setQrPanelInteractivity(printerToolsState.footerQrEnabled);
+
+    const contentInput = document.getElementById('footer-qr-content');
+    if (contentInput) contentInput.value = printerToolsState.footerQrContent;
+
+    const linkInput = document.getElementById('footer-qr-link');
+    if (linkInput) linkInput.value = printerToolsState.footerQrLink;
+
+    const labelInput = document.getElementById('footer-qr-label');
+    if (labelInput) labelInput.value = printerToolsState.footerQrLabel;
+
+    const sizeInput = document.getElementById('footer-qr-size');
+    if (sizeInput) {
+      sizeInput.value = printerToolsState.footerQrSize;
+    }
+    updateQrSizeDisplay();
+
+    const positionSelect = document.getElementById('qr-position');
+    if (positionSelect) positionSelect.value = printerToolsState.qrPosition;
+
+    document.querySelectorAll('input[name="qr-type"]').forEach((input) => {
+      input.checked = input.value === printerToolsState.footerQrType;
+    });
+    updateQrInputVisibility();
+    updateQrDefaultBadges();
+
     await loadSamplePreview(printerToolsState.selected || printerToolsState.active);
   } catch (error) {
     console.error('Failed to load footer QR settings:', error);
@@ -357,51 +597,199 @@ function bindPrinterToolEvents() {
   if (saveCustomBtn) {
     saveCustomBtn.addEventListener('click', saveCustomText);
   }
-  const refreshPreviewBtn = document.getElementById('refresh-preview');
-  if (refreshPreviewBtn) {
-    refreshPreviewBtn.addEventListener('click', () => loadSamplePreview(printerToolsState.selected || printerToolsState.active));
+  const resetCustomBtn = document.getElementById('reset-custom-text');
+  if (resetCustomBtn) {
+    resetCustomBtn.addEventListener('click', async () => {
+      if (confirm('Anda yakin ingin mengembalikan semua pengaturan kustomisasi ke default?')) {
+        await resetCustomTextToDefault();
+        showPrinterToast('Pengaturan dikembalikan ke default', 'success');
+      }
+    });
+  }
+  
+  // Function to toggle custom text area visibility is defined globally above
+  
+  // Live preview for presets
+  const headerPreset = document.getElementById('header-preset');
+  if (headerPreset) {
+    headerPreset.addEventListener('change', (e) => {
+      printerToolsState.headerPreset = e.target.value;
+      toggleCustomContainer(e.target.value, 'custom-header-container');
+      schedulePreviewUpdate();
+    });
+  }
+  const footerPreset = document.getElementById('footer-preset');
+  if (footerPreset) {
+    footerPreset.addEventListener('change', (e) => {
+      printerToolsState.footerPreset = e.target.value;
+      toggleCustomContainer(e.target.value, 'custom-footer-container');
+      schedulePreviewUpdate();
+    });
+  }
+  
+  // Live preview for custom text areas
+  const customHeader = document.getElementById('custom-header');
+  if (customHeader) {
+    customHeader.addEventListener('input', (e) => {
+      printerToolsState.customHeaderText = e.target.value;
+      schedulePreviewUpdate();
+    });
+  }
+  const customFooter = document.getElementById('custom-footer');
+  if (customFooter) {
+    customFooter.addEventListener('input', (e) => {
+      printerToolsState.customFooterText = e.target.value;
+      schedulePreviewUpdate();
+    });
+  }
+  
+  // Advanced formatting controls with live preview
+  const lineSpacing = document.getElementById('line-spacing');
+  if (lineSpacing) {
+    lineSpacing.addEventListener('change', (e) => {
+      printerToolsState.lineSpacing = e.target.value;
+      schedulePreviewUpdate();
+    });
+  }
+  
+  const showHeaderSeparator = document.getElementById('show-header-separator');
+  if (showHeaderSeparator) {
+    showHeaderSeparator.addEventListener('change', (e) => {
+      printerToolsState.showHeaderSeparator = e.target.checked;
+      schedulePreviewUpdate();
+    });
+  }
+  
+  const showFooterSeparator = document.getElementById('show-footer-separator');
+  if (showFooterSeparator) {
+    showFooterSeparator.addEventListener('change', (e) => {
+      printerToolsState.showFooterSeparator = e.target.checked;
+      schedulePreviewUpdate();
+    });
   }
 
-  const saveCustomTemplateBtn = document.getElementById('save-custom-template');
-  if (saveCustomTemplateBtn) {
-    saveCustomTemplateBtn.addEventListener('click', saveFullCustomTemplate);
-  }
-  const loadCustomTemplateBtn = document.getElementById('load-custom-template');
-  if (loadCustomTemplateBtn) {
-    loadCustomTemplateBtn.addEventListener('click', loadFullCustomTemplate);
-  }
-  const toggleCustomTemplate = document.getElementById('toggle-custom-template');
-  if (toggleCustomTemplate) {
-    toggleCustomTemplate.addEventListener('change', (e) => setUseCustomTemplate(e.target.checked));
-  }
-
+  const mapToggle = (id, key) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', (e) => {
+      printerToolsState[key] = !!e.target.checked;
+      schedulePreviewUpdate();
+    });
+  };
+  mapToggle('show-order-id', 'showOrderId');
+  mapToggle('show-time', 'showTime');
+  mapToggle('show-customer', 'showCustomer');
+  mapToggle('show-payment-method', 'showPaymentMethod');
+  mapToggle('show-item-notes', 'showItemNotes');
+  mapToggle('show-item-addons', 'showItemAddons');
+  mapToggle('detailed-item-breakdown', 'detailedItemBreakdown');
+  
   const footerQrToggle = document.getElementById('footer-qr-enabled');
   if (footerQrToggle) {
     footerQrToggle.addEventListener('change', (event) => {
       printerToolsState.footerQrEnabled = !!event.target.checked;
-      renderFooterQrPreview();
+      setQrPanelInteractivity(printerToolsState.footerQrEnabled);
+      schedulePreviewUpdate(); // Live preview
     });
   }
 
-  const useDefaultFooterQr = document.getElementById('use-default-footer-qr');
-  if (useDefaultFooterQr) {
-    useDefaultFooterQr.addEventListener('click', () => {
-      const valueArea = document.getElementById('footer-qr-value');
-      if (valueArea) {
-        valueArea.value = printerToolsState.footerQrDefault || '';
+  const qrTypeInputs = document.querySelectorAll('input[name="qr-type"]');
+  if (qrTypeInputs.length) {
+    qrTypeInputs.forEach((input) => {
+      input.addEventListener('change', (event) => {
+        if (!event.target.checked) return;
+        printerToolsState.footerQrType = event.target.value;
+        updateQrInputVisibility();
+        schedulePreviewUpdate();
+      });
+    });
+  }
+
+  // Live preview for QR content and label
+  const qrContentInput = document.getElementById('footer-qr-content');
+  if (qrContentInput) {
+    qrContentInput.addEventListener('input', (e) => {
+      printerToolsState.footerQrContent = e.target.value;
+      schedulePreviewUpdate();
+    });
+  }
+  const qrLabelInput = document.getElementById('footer-qr-label');
+  if (qrLabelInput) {
+    qrLabelInput.addEventListener('input', (e) => {
+      printerToolsState.footerQrLabel = e.target.value;
+      schedulePreviewUpdate();
+    });
+  }
+
+  const qrLinkInput = document.getElementById('footer-qr-link');
+  if (qrLinkInput) {
+    qrLinkInput.addEventListener('input', (e) => {
+      printerToolsState.footerQrLink = e.target.value;
+      schedulePreviewUpdate();
+    });
+  }
+
+  const qrSizeInput = document.getElementById('footer-qr-size');
+  if (qrSizeInput) {
+    qrSizeInput.addEventListener('input', (e) => {
+      const rawValue = Number(e.target.value);
+      printerToolsState.footerQrSize = Number.isFinite(rawValue) ? rawValue : 2;
+      updateQrSizeDisplay();
+      schedulePreviewUpdate();
+    });
+  }
+
+  const qrPositionSelect = document.getElementById('qr-position');
+  if (qrPositionSelect) {
+    qrPositionSelect.addEventListener('change', (e) => {
+      printerToolsState.qrPosition = e.target.value;
+      schedulePreviewUpdate();
+    });
+  }
+
+  const useDefaultQrBtn = document.getElementById('use-default-footer-qr');
+  if (useDefaultQrBtn) {
+    useDefaultQrBtn.addEventListener('click', () => {
+      const value = printerToolsState.footerQrDefaultValue || '';
+      const contentArea = document.getElementById('footer-qr-content');
+      if (contentArea && value) {
+        contentArea.value = value;
+        printerToolsState.footerQrContent = value;
+        schedulePreviewUpdate();
+        showPrinterToast('Menggunakan QR default dari pengaturan toko', 'info');
+      } else {
+        showPrinterToast('Tidak ada QR default tersedia', 'error');
       }
     });
   }
 
-  const saveFooterQrBtn = document.getElementById('save-footer-qr');
-  if (saveFooterQrBtn) {
-    saveFooterQrBtn.addEventListener('click', saveFooterQrSettings);
+  const clearQrBtn = document.getElementById('clear-footer-qr');
+  if (clearQrBtn) {
+    clearQrBtn.addEventListener('click', () => {
+      printerToolsState.footerQrContent = '';
+      printerToolsState.footerQrLink = '';
+      printerToolsState.footerQrLabel = '';
+      const contentArea = document.getElementById('footer-qr-content');
+      if (contentArea) contentArea.value = '';
+      const linkArea = document.getElementById('footer-qr-link');
+      if (linkArea) linkArea.value = '';
+      const labelInputEl = document.getElementById('footer-qr-label');
+      if (labelInputEl) labelInputEl.value = '';
+      schedulePreviewUpdate();
+      showPrinterToast('QR footer dibersihkan', 'info');
+    });
+  }
+  
+  // Save QR settings button
+  const saveQrBtn = document.getElementById('save-footer-qr');
+  if (saveQrBtn) {
+    saveQrBtn.addEventListener('click', saveFooterQrSettings);
   }
 
-  const refreshFooterQrBtn = document.getElementById('refresh-footer-qr');
-  if (refreshFooterQrBtn) {
-    refreshFooterQrBtn.addEventListener('click', () => loadSamplePreview(printerToolsState.selected || printerToolsState.active));
-  }
+  updateQrInputVisibility();
+  updateQrSizeDisplay();
+  updateQrDefaultBadges();
+  setQrPanelInteractivity(printerToolsState.footerQrEnabled);
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -418,12 +806,53 @@ async function loadCustomText() {
     const res = await fetch('/api/printer/custom-text');
     const data = await res.json();
     if (!data?.success) throw new Error(data?.message || 'Gagal memuat custom text');
+    
+    printerToolsState.headerPreset = data.headerPreset || 'shop-name';
+    printerToolsState.footerPreset = data.footerPreset || 'thank-you';
     printerToolsState.customHeaderText = data.customHeaderText || '';
     printerToolsState.customFooterText = data.customFooterText || '';
-    const headerEl = document.getElementById('custom-header');
-    const footerEl = document.getElementById('custom-footer');
-    if (headerEl) headerEl.value = printerToolsState.customHeaderText;
-    if (footerEl) footerEl.value = printerToolsState.customFooterText;
+    printerToolsState.lineSpacing = data.lineSpacing || 'normal';
+    printerToolsState.showHeaderSeparator = data.showHeaderSeparator !== false;
+    printerToolsState.showFooterSeparator = data.showFooterSeparator !== false;
+    printerToolsState.showOrderId = data.showOrderId !== false;
+    printerToolsState.showTime = data.showTime !== false;
+    printerToolsState.showCustomer = data.showCustomer !== false;
+    printerToolsState.showPaymentMethod = data.showPaymentMethod !== false;
+    printerToolsState.showItemNotes = data.showItemNotes !== false;
+    printerToolsState.showItemAddons = data.showItemAddons !== false;
+    printerToolsState.detailedItemBreakdown = data.detailedItemBreakdown !== false;
+    
+    const headerPresetEl = document.getElementById('header-preset');
+    if (headerPresetEl) headerPresetEl.value = printerToolsState.headerPreset;
+    toggleCustomContainer(printerToolsState.headerPreset, 'custom-header-container');
+    
+    const footerPresetEl = document.getElementById('footer-preset');
+    if (footerPresetEl) footerPresetEl.value = printerToolsState.footerPreset;
+    toggleCustomContainer(printerToolsState.footerPreset, 'custom-footer-container');
+
+    const customHeaderEl = document.getElementById('custom-header');
+    if (customHeaderEl) customHeaderEl.value = printerToolsState.customHeaderText;
+
+    const customFooterEl = document.getElementById('custom-footer');
+    if (customFooterEl) customFooterEl.value = printerToolsState.customFooterText;
+    
+    const lineSpacingEl = document.getElementById('line-spacing');
+    if (lineSpacingEl) lineSpacingEl.value = printerToolsState.lineSpacing;
+    
+    const showHeaderSepEl = document.getElementById('show-header-separator');
+    if (showHeaderSepEl) showHeaderSepEl.checked = printerToolsState.showHeaderSeparator;
+    
+    const showFooterSepEl = document.getElementById('show-footer-separator');
+    if (showFooterSepEl) showFooterSepEl.checked = printerToolsState.showFooterSeparator;
+
+    const setToggle = (id, value) => { const el = document.getElementById(id); if (el) el.checked = !!value; };
+    setToggle('show-order-id', printerToolsState.showOrderId);
+    setToggle('show-time', printerToolsState.showTime);
+    setToggle('show-customer', printerToolsState.showCustomer);
+    setToggle('show-payment-method', printerToolsState.showPaymentMethod);
+    setToggle('show-item-notes', printerToolsState.showItemNotes);
+    setToggle('show-item-addons', printerToolsState.showItemAddons);
+    setToggle('detailed-item-breakdown', printerToolsState.detailedItemBreakdown);
   } catch (error) {
     console.error('Failed to load custom text:', error);
     showPrinterToast('Gagal memuat custom text', 'error');
@@ -432,11 +861,21 @@ async function loadCustomText() {
 
 async function saveCustomText() {
   try {
-    const headerEl = document.getElementById('custom-header');
-    const footerEl = document.getElementById('custom-footer');
     const payload = {
-      customHeaderText: headerEl ? headerEl.value : '',
-      customFooterText: footerEl ? footerEl.value : ''
+      headerPreset: document.getElementById('header-preset')?.value || 'shop-name',
+      footerPreset: document.getElementById('footer-preset')?.value || 'thank-you',
+      customHeaderText: document.getElementById('custom-header')?.value || '',
+      customFooterText: document.getElementById('custom-footer')?.value || '',
+      lineSpacing: printerToolsState.lineSpacing,
+      showHeaderSeparator: printerToolsState.showHeaderSeparator,
+      showFooterSeparator: printerToolsState.showFooterSeparator,
+      showOrderId: printerToolsState.showOrderId,
+      showTime: printerToolsState.showTime,
+      showCustomer: printerToolsState.showCustomer,
+      showPaymentMethod: printerToolsState.showPaymentMethod,
+      showItemNotes: printerToolsState.showItemNotes,
+      showItemAddons: printerToolsState.showItemAddons,
+      detailedItemBreakdown: printerToolsState.detailedItemBreakdown
     };
     const res = await fetch('/api/printer/custom-text', {
       method: 'POST',
@@ -445,9 +884,14 @@ async function saveCustomText() {
     });
     const data = await res.json();
     if (!data?.success) throw new Error(data?.message || 'Gagal menyimpan custom text');
+    
+    // Update state from server response
+    printerToolsState.headerPreset = data.headerPreset || 'shop-name';
+    printerToolsState.footerPreset = data.footerPreset || 'thank-you';
     printerToolsState.customHeaderText = data.customHeaderText || '';
     printerToolsState.customFooterText = data.customFooterText || '';
-    showPrinterToast('Custom teks disimpan', 'success');
+
+    showPrinterToast('✅ Pengaturan kustomisasi disimpan', 'success');
     // Refresh preview to reflect changes
     loadSamplePreview(printerToolsState.selected || printerToolsState.active);
   } catch (error) {
@@ -456,16 +900,55 @@ async function saveCustomText() {
   }
 }
 
+async function resetCustomTextToDefault() {
+  try {
+    // Reset local state to defaults
+    Object.assign(printerToolsState, {
+      headerPreset: 'shop-name',
+      footerPreset: 'thank-you',
+      customHeaderText: '',
+      customFooterText: '',
+      lineSpacing: 'normal',
+      showHeaderSeparator: true,
+      showFooterSeparator: true,
+      showOrderId: true,
+      showTime: true,
+      showCustomer: true,
+      showPaymentMethod: true,
+      showItemNotes: true,
+      showItemAddons: true,
+      detailedItemBreakdown: true
+    });
+    await saveCustomText();
+    await loadCustomText();
+  } catch (_) {}
+}
+
 async function saveFooterQrSettings() {
   try {
     const toggle = document.getElementById('footer-qr-enabled');
-    const valueArea = document.getElementById('footer-qr-value');
+    const contentInput = document.getElementById('footer-qr-content');
+    const linkInput = document.getElementById('footer-qr-link');
     const labelInput = document.getElementById('footer-qr-label');
+    const sizeInput = document.getElementById('footer-qr-size');
+    const type = printerToolsState.footerQrType;
+    let value = '';
+    if (type === 'link') {
+      value = linkInput ? linkInput.value.trim() : printerToolsState.footerQrLink || '';
+    } else if (type === 'image') {
+      value = printerToolsState.footerQrImageData || '';
+    } else {
+      value = contentInput ? contentInput.value.trim() : printerToolsState.footerQrContent || '';
+    }
     const payload = {
       enabled: toggle ? toggle.checked : false,
-      value: valueArea ? valueArea.value.trim() : '',
-      label: labelInput ? labelInput.value.trim() : ''
+      type,
+      value,
+      label: labelInput ? labelInput.value.trim() : '',
+      cellSize: sizeInput ? Number(sizeInput.value) : printerToolsState.footerQrSize,
+      position: printerToolsState.qrPosition,
     };
+    
     const res = await fetch('/api/printer/footer-qr', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -475,12 +958,14 @@ async function saveFooterQrSettings() {
     if (!data?.success) {
       throw new Error(data?.message || 'Gagal menyimpan QR footer');
     }
-    printerToolsState.footerQrEnabled = !!data.enabled;
-    printerToolsState.footerQrValue = data.value || '';
-    printerToolsState.footerQrLabel = data.label || '';
-    renderFooterQrForm();
-    showPrinterToast('Pengaturan QR footer disimpan', 'success');
-    // Refresh preview agar ASCII ikut ter-update
+  printerToolsState.footerQrEnabled = !!data.enabled;
+  printerToolsState.footerQrContent = data.value || '';
+  printerToolsState.footerQrLabel = data.label || '';
+  printerToolsState.footerQrType = data.type || printerToolsState.footerQrType;
+  printerToolsState.footerQrSize = data.cellSize || printerToolsState.footerQrSize;
+  printerToolsState.qrPosition = data.position || printerToolsState.qrPosition;
+    showPrinterToast('✅ Pengaturan QR footer disimpan', 'success');
+    // Refresh preview to reflect changes
     await loadSamplePreview(printerToolsState.selected || printerToolsState.active);
   } catch (error) {
     console.error('Failed to save footer QR settings:', error);

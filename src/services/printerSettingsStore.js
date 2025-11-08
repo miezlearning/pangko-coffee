@@ -4,16 +4,38 @@ const path = require('path');
 const SETTINGS_PATH = path.join(__dirname, '../data/printer-settings.json');
 const DEFAULT_SETTINGS = {
   receiptTemplate: '58mm',
+  // Deprecated but kept for backward compatibility and potential future use
   customHeaderText: '',
   customFooterText: '',
   useCustomTemplate: false,
   customTemplates: {},
+  // End Deprecated
+  
   footerQrEnabled: false,
   footerQrValue: '',
   footerQrLabel: 'Scan QR di bawah ini',
   footerQrType: 'qr',
   footerQrImageData: '',
-  footerQrCellSize: 2
+  footerQrCellSize: 2,
+  
+  // Advanced text formatting
+  headerAlign: 'center',
+  footerAlign: 'center',
+  headerFontSize: 'normal',
+  footerFontSize: 'normal',
+  lineSpacing: 'normal',
+  qrPosition: 'after-footer',
+
+  // Section visibility & detail controls
+  showHeaderSeparator: true,
+  showFooterSeparator: true,
+  showOrderId: true,
+  showTime: true,
+  showCustomer: true,
+  showPaymentMethod: true,
+  showItemNotes: true,
+  showItemAddons: true,
+  detailedItemBreakdown: true
 };
 
 function ensureDirExists(filePath) {

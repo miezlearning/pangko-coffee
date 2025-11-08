@@ -959,6 +959,8 @@ function bindEvents(){
   });
   
   el('create-order-btn').addEventListener('click', createOrder);
+  // Ensure create-order button reflects store open/closed state
+  checkStoreState();
   // Discounts
   const drp = el('discount-rp');
   const dp = el('discount-pct');
@@ -1014,6 +1016,41 @@ function bindEvents(){
 
   // Unlock audio on any user interaction
   document.body.addEventListener('click', unlockAudio, {once: true});
+}
+
+// Check store state and disable cashier actions when closed
+async function checkStoreState(){
+  try{
+    const res = await fetch('/api/tools/store-state');
+    const j = await res.json();
+    if(!j.success) return;
+    const state = j.state || { open: true };
+    const btn = el('create-order-btn');
+    const draftIndicator = el('draft-indicator');
+    if(btn){
+      if(state.open){
+        btn.disabled = false;
+        btn.classList.remove('opacity-50','cursor-not-allowed');
+      } else {
+        btn.disabled = true;
+        btn.classList.add('opacity-50','cursor-not-allowed');
+      }
+    }
+    if(draftIndicator && !state.open){
+      draftIndicator.textContent = `Toko tutup • ${state.message || ''}`;
+    } else if(draftIndicator && state.open){
+      // restore previously saved status text if present
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if(raw){
+        const data = JSON.parse(raw || '{}');
+        updateDraftIndicator(true, data.ts);
+      } else {
+        updateDraftIndicator(false);
+      }
+    }
+  }catch(e){ /* ignore network errors */ }
+  // re-check periodically (every 8s) to keep UI in sync
+  setTimeout(checkStoreState, 8000);
 }
 
 function saveDraft(){

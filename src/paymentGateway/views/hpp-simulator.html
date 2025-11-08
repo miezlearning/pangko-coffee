@@ -376,6 +376,114 @@
         </form>
       </div>
     </div>
+
+    <!-- Modal: Profil Espresso -->
+    <div id="modal-espresso" class="modal-backdrop fixed inset-0 z-50 hidden items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/50" data-close-modal></div>
+      <div class="relative w-full max-w-[520px] bg-white rounded-2xl shadow-2xl animate-slide-in overflow-hidden">
+        <div class="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4 flex items-center justify-between">
+          <h3 class="text-xl font-bold text-white flex items-center gap-2">
+            <span>☕</span>
+            <span>Profil Espresso</span>
+          </h3>
+          <button type="button" data-close-modal class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+        </div>
+
+        <form id="espresso-form" class="p-6 space-y-5">
+          <input type="hidden" id="espresso-produk-id" />
+
+          <div class="grid grid-cols-1 gap-4">
+            <div>
+              <label class="block text-sm font-bold text-charcoal/80 mb-2">Biji Kopi</label>
+              <select id="espresso-coffee" class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none bg-white">
+                <option value="">Pilih bahan kopi</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-charcoal/80 mb-2">Air</label>
+              <select id="espresso-water" class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none bg-white">
+                <option value="">Pilih bahan air</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm font-bold text-charcoal/80 mb-2">Dose Kopi (gram)</label>
+              <input id="espresso-dose" type="number" min="0" step="0.1" class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none" placeholder="18" />
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-charcoal/80 mb-2">Air Brew (ml)</label>
+              <input id="espresso-water-ml" type="number" min="0" step="0.1" class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none" placeholder="36" />
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-charcoal/80 mb-2">Yield (ml)</label>
+              <input id="espresso-yield-ml" type="number" min="0" step="0.1" class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none" placeholder="Opsional" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-bold text-charcoal/80 mb-2">Brew Ratio</label>
+            <input id="espresso-ratio" type="text" readonly class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-100 text-sm font-semibold text-charcoal/70" value="-" />
+          </div>
+
+          <div id="espresso-summary" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-charcoal/70">
+            <p>Pilih bahan kopi & air untuk melihat ringkasan biaya shot.</p>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+            <button type="button" id="espresso-clear" class="px-4 py-2 rounded-xl border border-amber-300 text-amber-700 font-semibold hover:bg-amber-50 transition">Hapus Profil</button>
+            <div class="flex gap-3">
+              <button type="button" class="px-5 py-2.5 rounded-xl border-2 border-gray-300 font-semibold hover:bg-gray-50 transition" data-close-modal>Batal</button>
+              <button type="submit" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold shadow-lg hover:shadow-xl transition">Simpan</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Formula Bahan -->
+    <div id="modal-bahan-komposisi" class="modal-backdrop fixed inset-0 z-50 hidden items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/50" data-close-modal></div>
+      <div class="relative w-full max-w-[680px] bg-white rounded-2xl shadow-2xl animate-slide-in overflow-hidden">
+        <div class="bg-gradient-to-r from-matcha to-emerald-500 px-6 py-4 flex items-center justify-between">
+          <h3 id="komposisi-bahan-title" class="text-xl font-bold text-white flex items-center gap-2">
+            <span>🧪</span>
+            <span>Formula Bahan</span>
+          </h3>
+          <button type="button" data-close-modal class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+        </div>
+
+        <form id="form-komposisi" class="p-6 space-y-5">
+          <input type="hidden" id="komposisi-bahan-id" />
+          <p class="text-sm text-charcoal/70">Gunakan formula untuk menghitung HPP bahan turunan (misalnya espresso, sirup, premix). Biaya dihitung dari komponen yang dipilih dibagi output bersih per batch.</p>
+
+          <div id="komposisi-items" class="space-y-3"></div>
+
+          <button type="button" id="komposisi-add-row" class="w-full px-4 py-2 rounded-xl border-2 border-matcha/40 text-matcha font-semibold bg-matcha/5 hover:bg-matcha/10 transition flex items-center justify-center gap-2">
+            <span>➕</span>
+            <span>Tambah Komponen</span>
+          </button>
+
+          <div>
+            <label class="block text-sm font-bold text-charcoal/80 mb-2">Output bersih per batch <span id="komposisi-satuan-label" class="text-xs text-charcoal/60 ml-1"></span></label>
+            <input id="komposisi-yield" type="number" min="0" step="0.01" class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-matcha focus:ring-2 focus:ring-matcha/20 outline-none" placeholder="Contoh: 35" />
+          </div>
+
+          <div id="komposisi-summary" class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-charcoal/60">
+            <p>Tambahkan komponen dan output formula untuk melihat ringkasan biaya.</p>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+            <button type="button" id="komposisi-clear" class="px-4 py-2 rounded-xl border border-red-300 text-red-600 font-semibold hover:bg-red-50 transition">Hapus Formula</button>
+            <div class="flex gap-3">
+              <button type="button" class="px-5 py-2.5 rounded-xl border-2 border-gray-300 font-semibold hover:bg-gray-50 transition" data-close-modal>Batal</button>
+              <button type="submit" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-matcha to-emerald-500 text-white font-bold shadow-lg hover:shadow-xl transition">Simpan Formula</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
     <script src="/js/navbar.js"></script>
     <script src="/js/hpp-simulator.js"></script>
   </body>

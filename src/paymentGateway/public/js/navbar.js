@@ -39,6 +39,7 @@ function generateNavbar(activePage = 'dashboard') {
           <div class="hidden items-center gap-5 text-sm font-semibold sm:flex">
             ${navHTML}
           </div>
+          <div id="store-controls" class="ml-4 hidden sm:flex items-center gap-3"></div>
           <div class="sm:hidden flex items-center gap-2">
             <a href="/search" class="rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Cari →</a>
             <a href="/analytics" class="rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Analisis →</a>
@@ -68,9 +69,76 @@ function initNavbar(activePage = 'dashboard') {
   
   // Insert navbar HTML
   navContainer.innerHTML = generateNavbar(activePage);
+  // Initialize store controls
+  initStoreControls();
   
   // Add scroll effect for navbar (optional enhancement)
   addScrollEffect();
+}
+
+// Render store controls and wire actions
+function initStoreControls(){
+  const container = document.getElementById('store-controls');
+  if(!container) return;
+
+  // Build initial skeleton
+  container.innerHTML = `
+    <div id="store-status-pill" class="px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-800">Memuat...</div>
+    <div id="store-actions" class="flex items-center gap-2"></div>
+  `;
+
+  async function refresh(){
+    try{
+      const r = await fetch('/api/tools/store-state');
+      const j = await r.json();
+      if(!j.success) throw new Error('no');
+      const state = j.state || { open:true };
+      const pill = document.getElementById('store-status-pill');
+      const actions = document.getElementById('store-actions');
+      if(!pill || !actions) return;
+      if(state.open){
+        pill.textContent = '🟢 OPEN';
+        pill.className = 'px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800';
+        actions.innerHTML = `<button id="btn-close-store" class="rounded-full px-3 py-1 text-sm font-semibold border border-red-200 bg-white text-red-600">Tutup Toko</button>`;
+      } else {
+        pill.textContent = '🔴 CLOSED';
+        pill.className = 'px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-700';
+        actions.innerHTML = `<button id="btn-open-store" class="rounded-full px-3 py-1 text-sm font-semibold border border-green-200 bg-white text-green-600">Buka Toko</button>`;
+      }
+
+      // Wire buttons
+      const btnOpen = document.getElementById('btn-open-store');
+      const btnClose = document.getElementById('btn-close-store');
+      if(btnOpen) btnOpen.addEventListener('click', () => toggleStore(true));
+      if(btnClose) btnClose.addEventListener('click', () => {
+        const reason = prompt('Alasan tutup (opsional):') || '';
+        toggleStore(false, reason);
+      });
+
+    }catch(e){
+      // ignore
+    }
+  }
+
+  async function toggleStore(open, message){
+    try{
+      const body = { open: !!open, message: message || null, updatedBy: 'dashboard' };
+      const res = await fetch('/api/tools/store-open',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+      const j = await res.json();
+      if(!j.success) return alert('Gagal mengubah status toko: '+(j.message||'unknown'));
+      // Refresh UI
+      refresh();
+      // Notify user briefly
+      const pill = document.getElementById('store-status-pill');
+      if(pill) pill.animate([{opacity:0.6},{opacity:1}],{duration:400,iterations:1});
+    }catch(e){
+      alert('Gagal mengubah status toko: '+(e && e.message));
+    }
+  }
+
+  // Initial load + periodic refresh every 8s
+  refresh();
+  setInterval(refresh, 8000);
 }
 
 /**

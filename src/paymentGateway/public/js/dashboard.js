@@ -32,6 +32,42 @@ const dashboardFilters = {
   cancelled: { search: '', sort: 'newest' }
 };
 
+const ALLOWED_SORT_KEYS = new Set(['newest', 'oldest', 'amount_desc', 'amount_asc', 'name_az', 'name_za']);
+
+function ensureFilterState(tabName) {
+  if (!dashboardFilters[tabName]) {
+    dashboardFilters[tabName] = { search: '', sort: 'newest' };
+  }
+  return dashboardFilters[tabName];
+}
+
+function syncFilterControls(tabName) {
+  const state = ensureFilterState(tabName);
+  const searchInput = document.getElementById(`search-${tabName}`);
+  if (searchInput && searchInput.value !== state.search) {
+    searchInput.value = state.search;
+  }
+  const sortSelect = document.getElementById(`sort-${tabName}`);
+  if (sortSelect && sortSelect.value !== state.sort) {
+    sortSelect.value = state.sort;
+  }
+}
+
+function handleSearch(tabName, rawValue) {
+  const state = ensureFilterState(tabName);
+  state.search = (rawValue || '').trim();
+  syncFilterControls(tabName);
+  renderTab(tabName);
+}
+
+function handleSort(tabName, rawValue) {
+  const state = ensureFilterState(tabName);
+  const normalized = ALLOWED_SORT_KEYS.has(rawValue) ? rawValue : 'newest';
+  state.sort = normalized;
+  syncFilterControls(tabName);
+  renderTab(tabName);
+}
+
 const printerTemplateState = {
   templates: [],
   active: '58mm'
@@ -264,6 +300,7 @@ function switchTab(tabName) {
 function renderTab(tabName) {
   // Debug helper to trace tab rendering
   console.debug(`[Dashboard] renderTab -> ${tabName}`);
+  syncFilterControls(tabName);
   switch (tabName) {
     case 'qris': return renderPaymentsList();
     case 'cash': return renderPendingCashList();
@@ -1514,8 +1551,12 @@ function findOrderMeta(orderId) {
 function openPreviewModal(preview, meta) {
   const modal = document.getElementById('preview-modal');
   const content = document.getElementById('preview-content');
+  const htmlContainer = document.getElementById('preview-html');
   const subtitle = document.getElementById('preview-order-subtitle');
   const pill = document.getElementById('preview-template-pill');
+  const qrContainer = document.getElementById('preview-qr-container');
+  const qrImage = document.getElementById('preview-qr-image');
+  const qrLabel = document.getElementById('preview-qr-label');
   if (!modal || !content) return;
 
   previewState.currentOrderId = meta.orderId;
@@ -1524,7 +1565,35 @@ function openPreviewModal(preview, meta) {
 
   if (pill) pill.textContent = getTemplateLabel(preview.template);
 
-  content.textContent = preview.text;
+  if (htmlContainer) {
+    if (preview.html) {
+      htmlContainer.innerHTML = preview.html;
+      htmlContainer.classList.remove('hidden');
+    } else {
+      htmlContainer.innerHTML = '';
+      htmlContainer.classList.add('hidden');
+    }
+  }
+
+  content.textContent = preview.text || '';
+  const hasHtml = !!preview.html;
+  const textWrapper = document.getElementById('preview-text-wrapper');
+  if (textWrapper) {
+    textWrapper.open = !hasHtml;
+  }
+  if (qrContainer && qrImage && qrLabel) {
+    if (!hasHtml && preview.footerQrBase64 && preview.footerQrEnabled !== false) {
+      qrImage.src = preview.footerQrBase64;
+      qrImage.alt = preview.footerQrLabel ? `QR ${preview.footerQrLabel}` : 'QR Code';
+      qrLabel.textContent = preview.footerQrLabel || 'Scan QR';
+      qrContainer.classList.remove('hidden');
+    } else {
+      qrImage.src = '';
+      qrLabel.textContent = '';
+      qrContainer.classList.add('hidden');
+    }
+  }
+
   if (subtitle) {
     const payment = meta.paymentMethod === 'CASH' ? 'Tunai' : (meta.paymentMethod || '-');
     subtitle.textContent = `${meta.orderId} • ${payment} • ${meta.customerName || 'Customer'}`;
@@ -1562,7 +1631,14 @@ async function previewReceipt(orderId) {
     printerTemplateState.active = data.template || printerTemplateState.active;
     updateTemplateIndicators();
     const meta = findOrderMeta(orderId) || { orderId, customerName: '-', paymentMethod: '-' };
-    openPreviewModal({ text: data.text, template: printerTemplateState.active }, meta);
+    openPreviewModal({
+      text: data.text,
+      html: data.html,
+      template: printerTemplateState.active,
+      footerQrBase64: data.footerQrBase64 || (data.footerQr?.type === 'image' ? data.footerQr?.imageData : ''),
+      footerQrLabel: data.footerQrLabel || data.footerQr?.label || '',
+      footerQrEnabled: data.footerQrEnabled !== undefined ? data.footerQrEnabled : !!data.footerQr?.enabled,
+    }, meta);
   } catch (error) {
     showNotification('❌ Error: ' + error.message);
   }
