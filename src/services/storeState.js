@@ -54,7 +54,19 @@ function setOpen(open, updatedBy = 'system', message = null) {
 
 function getClosedMessage(defaultText) {
   const state = readState();
-  return state.message || defaultText || 'Maaf, toko sedang tutup. Silakan kembali pada jam operasional.';
+  // Build a clearer, professional closed message that separates the closure notice and the reason
+  const header = '⏸️ Toko saat ini TUTUP';
+  const reasonLine = state.message ? `Alasan: ${state.message}` : null;
+  const hoursLine = defaultText || null;
+  const footer = 'Mohon maaf atas ketidaknyamanan. Silakan kunjungi kembali saat toko buka.';
+
+  // Combine parts with spacing for readability
+  const parts = [header];
+  if (reasonLine) parts.push('', reasonLine);
+  if (hoursLine) parts.push('', hoursLine);
+  parts.push('', footer);
+
+  return parts.join('\n');
 }
 
 module.exports = { isOpen, setOpen, getClosedMessage, readState };
