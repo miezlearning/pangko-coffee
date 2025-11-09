@@ -119,11 +119,14 @@ module.exports = {
             }
 
             try {
+                // Include base64 data URL so dashboard can display the image
+                const dataUrl = `data:${image.mimetype};base64,${proofBuffer.toString('base64')}`;
                 orderManager.setPaymentProof(order.orderId, {
                     type: 'image',
                     mimeType: image.mimetype,
                     fileLength: image.fileLength,
-                    sender: userId
+                    sender: userId,
+                    imageData: dataUrl
                 });
             } catch (error) {
                 console.error('Failed to attach payment proof:', error.message);

@@ -69,35 +69,6 @@ function calculateBahanUnitCost(bahan, visited = new Set()) {
     return qty > 0 ? harga / qty : 0;
 }
 
-function calculateEspressoMetrics(profile) {
-    if (!profile) return null;
-    const coffee = getBahanById(profile.coffeeBahanId);
-    const water = getBahanById(profile.waterBahanId);
-    if (!coffee || !water) return null;
-
-    const dose = Number(profile.doseGram || 0);
-    const waterMl = Number(profile.waterMl || 0);
-    const yieldMl = Number(profile.yieldMl || waterMl);
-
-    const coffeeCost = dose > 0 ? hitungIngredientCost(coffee, dose) : 0;
-    const waterCost = waterMl > 0 ? hitungIngredientCost(water, waterMl) : 0;
-    const ratio = dose > 0 && waterMl > 0 ? waterMl / dose : null;
-    const shotsPerBag = dose > 0 && Number(coffee.netto) > 0 ? Math.floor(Number(coffee.netto) / dose) : null;
-
-    return {
-        coffee,
-        water,
-        dose,
-        waterMl,
-        yieldMl,
-        ratio,
-        coffeeCost,
-        waterCost,
-        totalCost: coffeeCost + waterCost,
-        shotsPerBag
-    };
-}
-
 function formatNumber(value, digits = 2) {
     if (value === null || value === undefined || Number.isNaN(value)) return '-';
     const rounded = Number(value);
@@ -105,68 +76,6 @@ function formatNumber(value, digits = 2) {
     return rounded.toLocaleString('id-ID', { maximumFractionDigits: digits, minimumFractionDigits: digits });
 }
 
-function updateEspressoRatioDisplay() {
-    const doseInput = document.getElementById('espresso-dose');
-    const waterInput = document.getElementById('espresso-water-ml');
-    const ratioField = document.getElementById('espresso-ratio');
-    if (!doseInput || !waterInput || !ratioField) return;
-    const dose = parseFloat(doseInput.value);
-    const water = parseFloat(waterInput.value);
-    if (dose > 0 && water > 0) {
-        ratioField.value = formatNumber(water / dose, 2);
-    } else {
-        ratioField.value = '-';
-    }
-    updateEspressoModalSummary();
-}
-
-function updateEspressoModalSummary() {
-    const summaryEl = document.getElementById('espresso-summary');
-    if (!summaryEl) return;
-    const coffeeSelect = document.getElementById('espresso-coffee');
-    const waterSelect = document.getElementById('espresso-water');
-    const dose = parseFloat(document.getElementById('espresso-dose')?.value || '0');
-    const waterMl = parseFloat(document.getElementById('espresso-water-ml')?.value || '0');
-    const yieldMl = parseFloat(document.getElementById('espresso-yield-ml')?.value || '0');
-    const profile = {
-        coffeeBahanId: Number(coffeeSelect?.value || 0),
-        waterBahanId: Number(waterSelect?.value || 0),
-        doseGram: dose,
-        waterMl,
-        yieldMl
-    };
-    const metrics = calculateEspressoMetrics(profile);
-    if (!metrics) {
-        summaryEl.innerHTML = '<p class="text-sm text-charcoal/50">Pilih bahan kopi & air untuk melihat ringkasan biaya.</p>';
-        return;
-    }
-
-    summaryEl.innerHTML = `
-        <div class="rounded-xl border border-matcha/30 bg-matcha/10 px-4 py-3 text-sm text-charcoal/80">
-            <div class="flex flex-wrap gap-4">
-                <div>
-                    <div class="text-xs font-semibold text-charcoal/60">Kopi</div>
-                    <div class="font-semibold">${metrics.coffee.nama}</div>
-                    <div class="text-xs text-charcoal/60">Dose: ${formatNumber(metrics.dose, 1)} g</div>
-                    <div class="text-xs text-charcoal/60">Biaya: ${formatRupiah(metrics.coffeeCost)}</div>
-                </div>
-                <div>
-                    <div class="text-xs font-semibold text-charcoal/60">Air</div>
-                    <div class="font-semibold">${metrics.water.nama}</div>
-                    <div class="text-xs text-charcoal/60">Pemakaian: ${formatNumber(metrics.waterMl, 0)} ml</div>
-                    <div class="text-xs text-charcoal/60">Biaya: ${formatRupiah(metrics.waterCost)}</div>
-                </div>
-                <div>
-                    <div class="text-xs font-semibold text-charcoal/60">Ringkasan</div>
-                    <div class="text-xs text-charcoal/60">Brew ratio: ${metrics.ratio ? `1 : ${formatNumber(metrics.ratio, 2)}` : '-'}</div>
-                    <div class="text-xs text-charcoal/60">Yield: ${yieldMl > 0 ? `${formatNumber(yieldMl, 0)} ml` : '-'}</div>
-                    <div class="text-xs text-charcoal/60">Total biaya shot: <span class="font-semibold text-charcoal">${formatRupiah(metrics.totalCost)}</span></div>
-                    ${metrics.shotsPerBag ? `<div class="text-xs text-charcoal/60">Per ${metrics.coffee.netto} ${metrics.coffee.satuan}: ~${metrics.shotsPerBag} shot</div>` : ''}
-                </div>
-            </div>
-        </div>
-    `;
-}
 
 // Load from localStorage
 function loadData() {
@@ -194,7 +103,6 @@ function loadData() {
     }
 
     normalizeBahanData();
-    autoCreateEspressoFormula();
     produkList = (produkList || []).map(p => ({ ...p, resep: Array.isArray(p.resep) ? p.resep : [] }));
 }
 
@@ -206,25 +114,7 @@ function normalizeBahanData() {
     }));
 }
 
-function autoCreateEspressoFormula() {
-    // If there is a bahan named 'Espresso' and it has no komposisi, try to auto-create from Biji Kopi + Air
-    const espresso = bahanBaku.find(b => /espresso/i.test(b.nama || ''));
-    if (!espresso) return;
-    if (isBahanCompound(espresso) && espresso.komposisi.length > 0) return;
-
-    const coffee = bahanBaku.find(b => /biji kopi|kopi/i.test(b.nama || '') && (b.satuan === 'gram' || b.satuan === 'pcs'));
-    const water = bahanBaku.find(b => /air/i.test(b.nama || '') && (b.satuan === 'ml' || b.satuan === 'gram'));
-    if (!coffee || !water) return;
-
-    const defaultDose = defaultEspressoDose(); // grams
-    const defaultWater = defaultEspressoWater(); // ml
-    // Use yield ~= defaultWater
-    espresso.komposisi = [
-        { bahanId: coffee.id, jumlah: defaultDose },
-        { bahanId: water.id, jumlah: defaultWater }
-    ];
-    espresso.komposisiYield = defaultWater;
-}
+// espresso builder removed
 
 // Save to localStorage
 function saveData() {
@@ -583,7 +473,7 @@ function renderProdukCard(produk) {
     const laba = produk.hargaJual - totalHPP;
     const margin = produk.hargaJual > 0 ? (laba / produk.hargaJual * 100) : 0;
     const marginColor = margin >= 50 ? 'green' : margin >= 30 ? 'blue' : margin >= 10 ? 'yellow' : 'red';
-    const espressoBlock = produk.espressoProfile ? renderEspressoSummary(produk) : '';
+    // removed espresso block
 
     return `
         <div class="rounded-2xl bg-white border-2 border-gray-100 shadow-md hover:shadow-xl transition-all duration-200">
@@ -626,10 +516,7 @@ function renderProdukCard(produk) {
                         <span>➕</span>
                         <span>Tambah Bahan</span>
                     </button>
-                    <button onclick="openEspressoModal(${produk.id})" class="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:shadow-lg hover:scale-105 transition-all flex items-center gap-1.5" title="Atur dosis kopi & air untuk shot espresso">
-                        <span>⚙️</span>
-                        <span>Espresso Builder</span>
-                    </button>
+                    <!-- Espresso builder removed -->
                     <button onclick="duplikatProduk(${produk.id})" class="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-2 rounded-xl text-sm font-bold hover:shadow-lg hover:scale-105 transition-all flex items-center gap-1.5" title="Duplikat">
                         <span>📄</span>
                         <span>Duplikat</span>
@@ -651,7 +538,7 @@ function renderProdukCard(produk) {
                     <span>🧾</span>
                     <span>RESEP & KOMPOSISI</span>
                 </h4>
-                ${espressoBlock}
+                
                 <div class="overflow-hidden rounded-xl border border-gray-200">
                     <table class="w-full text-sm">
                         <thead class="bg-gray-50">
@@ -709,30 +596,7 @@ function renderProdukCard(produk) {
     `;
 }
 
-function renderEspressoSummary(produk) {
-    const metrics = calculateEspressoMetrics(produk.espressoProfile);
-    if (!metrics) return '';
-    const ratioLabel = metrics.ratio ? `1 : ${formatNumber(metrics.ratio, 2)}` : '-';
-    const shotsInfo = metrics.shotsPerBag ? `<span class="inline-flex items-center gap-1 rounded-full bg-matcha/15 px-3 py-1 text-xs font-semibold text-matcha">${metrics.shotsPerBag} shot / ${metrics.coffee.netto} ${metrics.coffee.satuan}</span>` : '';
-    return `
-        <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-charcoal/80">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <div class="text-xs font-semibold text-amber-600">Profil Espresso</div>
-                    <div class="font-semibold text-charcoal mt-1">Dose ${formatNumber(metrics.dose, 1)} g • Brew ratio ${ratioLabel}</div>
-                    <div class="text-xs text-charcoal/60">Air digunakan: ${formatNumber(metrics.waterMl, 0)} ml • Yield: ${metrics.yieldMl ? `${formatNumber(metrics.yieldMl, 0)} ml` : '-'}</div>
-                    <div class="text-xs text-charcoal/60">Biaya kopi: ${formatRupiah(metrics.coffeeCost)} • Biaya air: ${formatRupiah(metrics.waterCost)}</div>
-                </div>
-                <div class="text-right">
-                    ${shotsInfo}
-                    <div class="text-xs text-charcoal/60 mt-1">Total biaya shot</div>
-                    <div class="text-lg font-extrabold text-amber-700">${formatRupiah(metrics.totalCost)}</div>
-                    <button onclick="clearEspressoProfile(${produk.id})" class="mt-2 inline-flex items-center gap-1 rounded-lg border border-amber-300 px-3 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition">Reset</button>
-                </div>
-            </div>
-        </div>
-    `;
-}
+// espresso summary removed
 
 function hitungTotalHPP(resep) {
     return resep.reduce((total, item) => {
@@ -754,155 +618,7 @@ function editResepItem(produkId, idx) {
     openResepModal(produkId, idx);
 }
 
-function defaultEspressoDose() {
-    return 18;
-}
-
-function defaultEspressoWater() {
-    return 36;
-}
-
-function findDefaultWaterBahanId() {
-    const waterCandidate = bahanBaku.find(b => /air/i.test(b.nama || '') && (b.satuan === 'ml' || b.satuan === 'gram'));
-    return waterCandidate ? waterCandidate.id : null;
-}
-
-function populateEspressoSelect(select, items, selectedId, placeholder) {
-    if (!select) return;
-    select.innerHTML = '';
-    const optionPlaceholder = document.createElement('option');
-    optionPlaceholder.value = '';
-    optionPlaceholder.disabled = true;
-    optionPlaceholder.selected = !selectedId;
-    optionPlaceholder.textContent = placeholder;
-    select.appendChild(optionPlaceholder);
-    items.forEach(item => {
-        const opt = document.createElement('option');
-        opt.value = item.id;
-        const hargaPerUnit = hitungHargaPerUnit(item);
-        opt.textContent = `${item.nama} • ${item.satuan} • ${formatRupiah(hargaPerUnit)}/unit`;
-        if (selectedId && item.id === selectedId) {
-            opt.selected = true;
-        }
-        select.appendChild(opt);
-    });
-    if (selectedId) {
-        select.value = selectedId;
-    }
-}
-
-function openEspressoModal(produkId) {
-    const produk = produkList.find(p => p.id === produkId);
-    if (!produk) {
-        showToast('Produk tidak ditemukan', 'error');
-        return;
-    }
-
-    const profile = produk.espressoProfile || {};
-    const fidProduk = document.getElementById('espresso-produk-id');
-    const coffeeSelect = document.getElementById('espresso-coffee');
-    const waterSelect = document.getElementById('espresso-water');
-    const doseInput = document.getElementById('espresso-dose');
-    const waterInput = document.getElementById('espresso-water-ml');
-    const yieldInput = document.getElementById('espresso-yield-ml');
-
-    if (!fidProduk || !coffeeSelect || !waterSelect || !doseInput || !waterInput || !yieldInput) return;
-
-    fidProduk.value = produkId;
-
-    const coffeeOptions = bahanBaku.filter(b => b.satuan === 'gram');
-    populateEspressoSelect(coffeeSelect, coffeeOptions, profile.coffeeBahanId, 'Pilih bahan kopi (gram)');
-
-    const waterOptions = bahanBaku.filter(b => b.satuan === 'ml' || b.satuan === 'gram');
-    const selectedWaterId = profile.waterBahanId || findDefaultWaterBahanId();
-    populateEspressoSelect(waterSelect, waterOptions, selectedWaterId, 'Pilih bahan air');
-
-    doseInput.value = profile.doseGram != null ? profile.doseGram : defaultEspressoDose();
-    waterInput.value = profile.waterMl != null ? profile.waterMl : defaultEspressoWater();
-    yieldInput.value = profile.yieldMl != null ? profile.yieldMl : (profile.waterMl != null ? profile.waterMl : defaultEspressoWater());
-
-    openModal('modal-espresso');
-    updateEspressoRatioDisplay();
-    updateEspressoModalSummary();
-}
-
-function submitEspressoForm(event) {
-    event.preventDefault();
-
-    const produkId = Number(document.getElementById('espresso-produk-id')?.value);
-    const coffeeId = Number(document.getElementById('espresso-coffee')?.value);
-    const waterId = Number(document.getElementById('espresso-water')?.value);
-    const dose = parseFloat(document.getElementById('espresso-dose')?.value || '0');
-    const waterMl = parseFloat(document.getElementById('espresso-water-ml')?.value || '0');
-    const yieldMlRaw = parseFloat(document.getElementById('espresso-yield-ml')?.value || '0');
-
-    const produk = produkList.find(p => p.id === produkId);
-    if (!produk) {
-        showToast('Produk tidak ditemukan', 'error');
-        return;
-    }
-    if (!coffeeId) {
-        showToast('Pilih bahan kopi', 'error');
-        return;
-    }
-    if (!waterId) {
-        showToast('Pilih bahan air', 'error');
-        return;
-    }
-    if (!(dose > 0)) {
-        showToast('Isi dosis kopi (gram) yang valid', 'error');
-        return;
-    }
-    if (!(waterMl > 0)) {
-        showToast('Isi penggunaan air (ml) yang valid', 'error');
-        return;
-    }
-
-    const yieldMl = yieldMlRaw > 0 ? yieldMlRaw : waterMl;
-    const brewRatio = dose > 0 ? (waterMl / dose) : null;
-
-    produk.espressoProfile = {
-        coffeeBahanId: coffeeId,
-        waterBahanId: waterId,
-        doseGram: dose,
-        waterMl,
-        yieldMl,
-        brewRatio
-    };
-
-    upsertResepBahan(produk, coffeeId, dose, { source: 'espresso' });
-    upsertResepBahan(produk, waterId, waterMl, { source: 'espresso' });
-
-    saveData();
-    renderAllProduk();
-    closeModal('modal-espresso');
-    showToast('Profil espresso tersimpan', 'success');
-}
-
-function clearEspressoProfile(produkId) {
-    const produk = produkList.find(p => p.id === produkId);
-    if (!produk || !produk.espressoProfile) {
-        return;
-    }
-    if (!confirm('Hapus pengaturan espresso untuk produk ini?')) return;
-    // Remove espresso profile and any recipe items created by the espresso builder
-    const profile = produk.espressoProfile;
-    const coffeeId = profile.coffeeBahanId;
-    const waterId = profile.waterBahanId;
-
-    produk.resep = produk.resep.filter(item => {
-        // remove items explicitly marked as espresso source
-        if (item.meta && item.meta.source === 'espresso') return false;
-        // if meta not present, remove items whose bahanId matches and jumlah equals the profile's values
-        if (!item.meta && ((item.bahanId === coffeeId && Number(item.jumlah) === Number(profile.doseGram)) || (item.bahanId === waterId && Number(item.jumlah) === Number(profile.waterMl)))) return false;
-        return true;
-    });
-
-    delete produk.espressoProfile;
-    saveData();
-    renderAllProduk();
-    showToast('Profil espresso dan resep terkait dihapus', 'success');
-}
+// espresso functions removed
 
 function hapusResepItem(produkId, idx) {
     const produk = produkList.find(p => p.id === produkId);
@@ -1119,26 +835,7 @@ function setupModals() {
         if (!list.contains(e.target) && e.target !== input) list.classList.add('hidden');
     });
 
-    const espressoForm = document.getElementById('espresso-form');
-    if (espressoForm) espressoForm.addEventListener('submit', submitEspressoForm);
-    ['espresso-dose', 'espresso-water-ml', 'espresso-yield-ml'].forEach(id => {
-        const input = document.getElementById(id);
-        if (input) input.addEventListener('input', () => {
-            updateEspressoRatioDisplay();
-            updateEspressoModalSummary();
-        });
-    });
-    ['espresso-coffee', 'espresso-water'].forEach(id => {
-        const select = document.getElementById(id);
-        if (select) select.addEventListener('change', updateEspressoModalSummary);
-    });
-    const espressoClear = document.getElementById('espresso-clear');
-    if (espressoClear) {
-        espressoClear.addEventListener('click', () => {
-            const produkId = Number(document.getElementById('espresso-produk-id')?.value);
-            if (produkId) clearEspressoProfile(produkId);
-        });
-    }
+    // espresso-related modal/events removed
 
     const komposisiForm = document.getElementById('form-komposisi');
     if (komposisiForm) komposisiForm.addEventListener('submit', submitKomposisiForm);
@@ -1163,21 +860,82 @@ function closeModal(id) {
     modal.classList.remove('flex');
 }
 function closeAllModals() {
-    ['modal-bahan', 'modal-produk', 'modal-resep', 'modal-espresso', 'modal-bahan-komposisi'].forEach(closeModal);
+    ['modal-bahan', 'modal-produk', 'modal-resep', 'modal-bahan-komposisi'].forEach(closeModal);
 }
 
 function attachCurrencyMask(input) {
+    // Less-aggressive mask: do NOT reformat on every keystroke (prevents blocking comma input).
+    // Instead:
+    // - allow the user to type freely (only lightly sanitize input)
+    // - map '.' to ',' while typing (many users hit dot)
+    // - format and add "Rp " prefix only on blur
+    // - remove "Rp " on focus so the value is editable/pastable
+    const sanitizeWhileTyping = (raw) => {
+        if (!raw) return '';
+        // keep digits, commas, dots and whitespace (user may type thousands separators)
+        // also keep any leading 'Rp' while typing (we strip it on focus)
+        return raw.replace(/[^0-9,\.Rp\s]/gi, '');
+    };
+
+    // Map '.' to ',' on keydown so users can type dot and it becomes comma
+    input.addEventListener('keydown', (e) => {
+        if (e.key === '.') {
+            // insert a comma at the caret position
+            e.preventDefault();
+            try {
+                const start = input.selectionStart || 0;
+                const end = input.selectionEnd || 0;
+                const val = input.value || '';
+                input.value = val.slice(0, start) + ',' + val.slice(end);
+                // place caret after inserted comma
+                const pos = start + 1;
+                // use setTimeout to ensure browser updates selection after value change
+                setTimeout(() => { input.selectionStart = input.selectionEnd = pos; }, 0);
+            } catch (err) {
+                // fallback: append comma
+                input.value = (input.value || '') + ',';
+            }
+        }
+    });
+
+    // Light sanitization on input (do not reformat)
     input.addEventListener('input', () => {
-        const val = parseCurrency(input.value);
-        if (typeof val === 'number' && !Number.isNaN(val)) {
-            // show up to 2 decimals when needed
+        const cleaned = sanitizeWhileTyping(input.value);
+        if (cleaned !== input.value) {
+            const pos = input.selectionStart || input.value.length;
+            input.value = cleaned;
+            // try to restore caret near previous position
+            setTimeout(() => {
+                const p = Math.min(pos, input.value.length);
+                input.selectionStart = input.selectionEnd = p;
+            }, 0);
+        }
+    });
+
+    input.addEventListener('focus', () => {
+        // remove Rp prefix when focusing so user can edit easily
+        if (input.value && input.value.trim().toLowerCase().startsWith('rp')) {
+            input.value = input.value.replace(/^rp\s*/i, '');
+        }
+        // ensure decimal-friendly input mode
+        try { input.setAttribute('inputmode', 'decimal'); } catch (e) {}
+    });
+
+    input.addEventListener('blur', () => {
+        // on blur, parse and format value and add Rp prefix if non-empty
+        const raw = input.value || '';
+        const val = parseCurrency(raw);
+        if (typeof val === 'number' && !Number.isNaN(val) && val !== 0) {
             const hasDecimal = Math.abs(val - Math.round(val)) >= 0.005;
-            input.value = val.toLocaleString('id-ID', { minimumFractionDigits: hasDecimal ? 2 : 0, maximumFractionDigits: 2 });
+            const formatted = val.toLocaleString('id-ID', { minimumFractionDigits: hasDecimal ? 2 : 0, maximumFractionDigits: 2 });
+            input.value = `Rp ${formatted}`;
         } else {
-            input.value = '';
+            // empty or zero -> clear to keep UX simple
+            input.value = raw.trim() === '' ? '' : input.value;
         }
     });
 }
+
 function parseCurrency(text) {
     const raw = (text || '').toString().trim();
     if (!raw) return 0;
@@ -1259,7 +1017,7 @@ function openBahanModal(id) {
         fid.value = '';
         nama.value = '';
         netto.value = '';
-        satuan.value = 'ml';
+        satuan.value = 'unit';
         harga.value = '';
         if (density) density.value = '';
         if (waste) waste.value = '';
@@ -1311,7 +1069,12 @@ function openProdukModal(id) {
         title.textContent = 'Edit Produk';
         fid.value = p.id;
         nama.value = p.nama;
-        harga.value = (p.hargaJual || 0).toLocaleString('id-ID');
+        // Format harga with localized separator and show two decimals when fractional
+        const hargaVal = p.hargaJual != null ? Number(p.hargaJual) : 0;
+        const hargaFormatted = Math.abs(hargaVal - Math.round(hargaVal)) < 0.005
+            ? hargaVal.toLocaleString('id-ID')
+            : hargaVal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        harga.value = hargaFormatted;
     } else {
         title.textContent = 'Tambah Produk';
         fid.value = '';
@@ -1459,13 +1222,53 @@ function handleImportBahanCsv(e) {
             const text = reader.result.toString();
             const rows = text.split(/\r?\n/).map(r => r.trim()).filter(Boolean);
             if (rows.length === 0) return;
+            // small CSV parser: split on commas but respect quoted fields
+            function splitCsvLine(line) {
+                // If semicolon appears more than commas, prefer semicolon as separator
+                const commaCount = (line.match(/,/g) || []).length;
+                const semiCount = (line.match(/;/g) || []).length;
+                const sep = semiCount > commaCount ? ';' : ',';
+                const res = [];
+                let cur = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const ch = line[i];
+                    if (ch === '"') {
+                        inQuotes = !inQuotes;
+                        continue;
+                    }
+                    if (ch === sep && !inQuotes) {
+                        res.push(cur);
+                        cur = '';
+                        continue;
+                    }
+                    cur += ch;
+                }
+                res.push(cur);
+                return res.map(s => s.trim());
+            }
+
             // Detect header
             const header = rows[0].toLowerCase();
             let startIdx = 0;
             if (header.includes('bahan') || header.includes('nama')) startIdx = 1;
             let imported = 0;
             for (let i = startIdx; i < rows.length; i++) {
-                const cols = rows[i].split(',').map(c => c.trim());
+                let cols = splitCsvLine(rows[i]);
+                // Fallback: if line was unquoted and a decimal like '82,28' produced an extra column
+                // detect simple pattern where last two columns look like numeric parts and merge them
+                if (cols.length >= 4) {
+                    const last = cols[cols.length - 1];
+                    const prev = cols[cols.length - 2];
+                    const lastIsNumeric = /^\d{1,3}$/.test(last.replace(/[^0-9]/g, ''));
+                    const prevLooksLikeCurrency = /\d/.test(prev);
+                    // If prev contains digits and last looks like the fractional part (1-3 digits), merge
+                    if (prevLooksLikeCurrency && lastIsNumeric) {
+                        cols[cols.length - 2] = `${prev},${last}`;
+                        cols.pop();
+                    }
+                }
+                // normalize any remaining semicolon separators if used
                 if (cols.length < 3) continue;
                 let nama, netto, harga, satuan;
                 if (cols.length >= 4) {
@@ -1474,19 +1277,19 @@ function handleImportBahanCsv(e) {
                     netto = parseFloat(cols[1]);
                     if (isNaN(parseFloat(cols[2])) && cols[2]) {
                         // nama, netto, satuan, harga
-                        satuan = cols[2] || 'ml';
+                        satuan = cols[2] || 'unit';
                         harga = parseCurrency(cols[3] || '0');
                     } else {
                         // nama, netto, harga, satuan
                         harga = parseCurrency(cols[2] || '0');
-                        satuan = cols[3] || 'ml';
+                        satuan = cols[3] || 'unit';
                     }
                 } else {
                     // Assume: nama, netto, harga
                     nama = cols[0];
                     netto = parseFloat(cols[1]);
                     harga = parseCurrency(cols[2] || '0');
-                    satuan = 'ml';
+                    satuan = 'unit';
                 }
                 if (!nama || isNaN(netto) || netto <= 0 || isNaN(harga)) continue;
                 // try to read optional density and waste columns if present

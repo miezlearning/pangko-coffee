@@ -309,7 +309,24 @@ class OrderManager {
         order.updatedAt = new Date();
         this.orders.set(orderId, order);
         this._persistAll();
-        return order;
+            // Also update payment gateway pending list if exists so dashboard can show the proof image
+            try {
+                // dataStore is in src/paymentGateway/dataStore.js relative to services
+                const dataStore = require('../paymentGateway/dataStore');
+                const pending = dataStore.getPendingPayments() || [];
+                const idx = pending.findIndex(p => p.orderId === orderId || p.id === orderId);
+                if (idx > -1) {
+                    // attach the proof object (including imageData if provided)
+                    pending[idx].paymentProof = order.paymentProof;
+                    // replace entire pending array (dataStore will persist to disk)
+                    dataStore.updatePendingPayments(pending);
+                }
+            } catch (e) {
+                // best-effort: if update fails, just log and continue
+                console.warn('[OrderManager] Failed to update pending payment proof:', e && e.message);
+            }
+
+            return order;
     }
 
     /**

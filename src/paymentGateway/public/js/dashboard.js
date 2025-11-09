@@ -462,6 +462,19 @@ function renderPaymentsList() {
           <span class="mt-1 block text-3xl font-extrabold text-matcha">Rp ${formatNumber(payment.amount || 0)}</span>
         </div>
       </div>
+      </div>
+
+      <!-- Photo proof (if available) -->
+      ${payment.paymentProof && payment.paymentProof.imageData ? `
+      <div class="mt-4">
+        <div class="mb-2 text-sm font-semibold text-charcoal">📸 Bukti Pembayaran</div>
+        <div class="w-full max-w-xs">
+          <a href="${payment.paymentProof.imageData}" class="glightbox" data-gallery="proofs" data-title="Bukti ${escapeHtml(payment.orderId)}">
+            <img src="${payment.paymentProof.imageData}" alt="Bukti ${escapeHtml(payment.orderId)}" class="rounded-lg border border-charcoal/10 object-cover w-full h-40 cursor-pointer" onerror="this.style.display='none'" />
+          </a>
+        </div>
+      </div>
+      ` : ''}
 
       <!-- Detail Pesanan Section -->
       <div class="mt-6">
@@ -1058,7 +1071,21 @@ window.addEventListener('DOMContentLoaded', () => {
 
   loadPrinterTemplates();
   updateTemplateIndicators();
+
+  // Initialize GLightbox for payment proof thumbnails if available
+  // GLightbox is loaded via CDN in the HTML and provides zoom & touch support.
+  if (typeof GLightbox !== 'undefined') {
+    try {
+      GLightbox({ selector: '.glightbox', touchNavigation: true, loop: false, zoomable: true });
+    } catch (e) {
+      console.warn('[Dashboard] GLightbox failed to initialize', e);
+    }
+  }
 });
+
+// Open proof modal from thumbnail element
+// Note: proof thumbnails render as anchors with class "glightbox" (see renderPaymentsList)
+// GLightbox will handle opening/zooming/close. No custom modal code required.
 
 // Auto-refresh every 3 seconds
 autoRefresh = setInterval(() => {

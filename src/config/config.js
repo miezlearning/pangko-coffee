@@ -221,4 +221,11 @@ Pesanan Anda sudah siap.
 Silakan ambil di counter dengan menyebutkan *Order ID* dan *nama pemesan*.
 Terima kasih telah memesan di *{shopName}*! ☕`
     }
+,
+    // AI Insights (Gemini or user-provided endpoint)
+    // Configure with environment variables in production
+    gemini: {
+        apiUrl: process.env.GEMINI_API_URL || '', // e.g. your proxy or direct Gemini endpoint
+        apiKey: process.env.GEMINI_API_KEY || ''  // set in environment, do NOT commit keys
+    }
 }

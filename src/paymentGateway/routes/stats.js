@@ -582,3 +582,138 @@ router.post('/export-monthly', async (req, res) => {
 });
 
 module.exports = router;
+
+/**
+ * POST /api/stats/insights
+ * Body: { scope: 'today'|'week'|'month'|'year'|'all', method: 'all'|'CASH'|'QRIS', limit: number }
+ * Calls configured Gemini API (or user-provided AI endpoint) to produce short insights.
+ */
+router.post('/insights', async (req, res) => {
+    const config = require('../../config/config');
+    const tz = (config && config.bot && config.bot.timezone) || 'Asia/Makassar';
+    const scope = (req.body && req.body.scope) ? req.body.scope.toLowerCase() : 'month';
+    const methodFilter = (req.body && req.body.method) ? (req.body.method || 'all').toUpperCase() : 'ALL';
+    const limit = Math.max(1, Math.min(parseInt((req.body && req.body.limit) || 5, 10), 50));
+
+    // Assemble local stats (overview + top items)
+    try {
+        const orderStore = require(path.resolve(__dirname, '..', '..', 'services', 'orderStore'));
+        let orders = orderStore.loadOrders() || [];
+        if (methodFilter !== 'ALL') orders = orders.filter(o => (o.paymentMethod || '').toUpperCase() === methodFilter);
+
+        // Build a compact summary for the selected scope
+        const revenueStatuses = new Set(['paid','processing','ready','completed']);
+        let filtered = orders;
+        if (scope === 'today') {
+            const start = moment().tz(tz).startOf('day');
+            filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSame(start, 'day'));
+        } else if (scope === 'week') {
+            const start = moment().tz(tz).startOf('isoWeek');
+            const end = start.clone().endOf('isoWeek');
+            filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isBetween(start, end, 'day', '[]'));
+        } else if (scope === 'month') {
+            const start = moment().tz(tz).startOf('month');
+            filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSameOrAfter(start));
+        } else if (scope === 'year') {
+            const start = moment().tz(tz).startOf('year');
+            filtered = orders.filter(o => o.createdAt && moment(o.createdAt).tz(tz).isSameOrAfter(start));
+        }
+
+        const totalOrders = filtered.length;
+        const totalRevenue = filtered.filter(o => revenueStatuses.has((o.status||'').toLowerCase()))
+            .reduce((s,o)=> s + (o?.pricing?.total||0), 0);
+
+        // Top items aggregation
+        const map = new Map();
+        filtered.forEach(o => {
+            if (!Array.isArray(o.items)) return;
+            o.items.forEach(it => {
+                const key = it.id || it.name;
+                if (!map.has(key)) map.set(key, { id: it.id || null, name: it.name || (it.title || 'Item'), qty: 0, revenue: 0 });
+                const acc = map.get(key);
+                acc.qty += Number(it.quantity || 0);
+                if (revenueStatuses.has((o.status||'').toLowerCase())) acc.revenue += Number(it.price || 0) * Number(it.quantity || 0);
+            });
+        });
+        const topItems = Array.from(map.values()).sort((a,b) => b.qty - a.qty).slice(0, limit);
+
+        // Determine AI endpoint and key. We allow calling a public proxy without an API key.
+        const defaultAiUrl = 'https://api.siputzx.my.id/api/ai/gemini-lite';
+        const aiUrl = (config && config.gemini && config.gemini.apiUrl) || process.env.GEMINI_API_URL || defaultAiUrl;
+        const aiKey = (config && config.gemini && config.gemini.apiKey) || process.env.GEMINI_API_KEY || '';
+
+        const payload = {
+            generatedAt: new Date().toISOString(),
+            scope,
+            method: methodFilter,
+            summary: { totalOrders, totalRevenue },
+            topItems
+        };
+
+        // Local fallback insights (human-readable) to return when no AI is configured
+        const localInsights = [];
+        localInsights.push(`Ringkasan ${scope}: ${totalOrders} pesanan, total Rp ${Math.round(totalRevenue).toLocaleString('id-ID')}.`);
+        if (topItems.length) {
+            const top = topItems[0];
+            const runner = topItems[1];
+            localInsights.push(`Top produk: ${top.name} (terjual ${top.qty} unit, kontribusi Rp ${Math.round(top.revenue).toLocaleString('id-ID')}).`);
+            if (runner) localInsights.push(`Runner-up: ${runner.name} (terjual ${runner.qty}). Pertimbangkan bundling dengan top product.`);
+        } else {
+            localInsights.push('Tidak ada data produk untuk rentang ini.');
+        }
+
+        // If there's no endpoint at all (shouldn't happen because we fall back to a public proxy), return local insights
+        if (!aiUrl) {
+            return res.json({ success: true, ai: false, insights: localInsights, raw: payload, message: 'No AI endpoint configured. Set GEMINI_API_URL to enable AI insights.' });
+        }
+
+        // Build prompt for AI (concise). Keep size small to avoid large costs.
+        const promptParts = [];
+        promptParts.push(`You are an analytics assistant for a small coffee shop answer in Indonesian Language. Produce 3-4 concise, actionable insights (1-2 sentences each) and up to 3 short recommendations for promotions or ops improvements.`);
+        promptParts.push(`Context (JSON): ${JSON.stringify({ scope, method: methodFilter, totalOrders, totalRevenue, topItems })}`);
+        const prompt = promptParts.join('\n\n');
+
+    // Use a simple REST API (gemini-lite) that accepts prompt & model as query parameters.
+    // `aiUrl` already contains either configured URL or the default public proxy.
+    const endpoint = aiUrl;
+        const modelName = (config && config.gemini && config.gemini.model) || process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
+
+        // Build URL with encoded prompt and model
+        const encodedPrompt = encodeURIComponent(prompt);
+        const encodedModel = encodeURIComponent(modelName);
+        const url = `${endpoint}?prompt=${encodedPrompt}&model=${encodedModel}`;
+
+        // Use fetch (node 18+) or undici if needed
+        let fetchFn = global.fetch;
+        if (!fetchFn) {
+            try { fetchFn = require('undici').fetch; } catch (e) { fetchFn = null; }
+        }
+        if (!fetchFn) return res.status(500).json({ success: false, message: 'Fetch not available in runtime. Install node >=18 or add undici.' });
+
+        // Call the external gemini-lite endpoint (GET)
+        const headers = {};
+        if (aiKey) headers['Authorization'] = `Bearer ${aiKey}`;
+        const aiResp = await fetchFn(url, { method: 'GET', headers });
+        if (!aiResp.ok) {
+            const txt = await aiResp.text().catch(() => '<no-body>');
+            return res.status(502).json({ success: false, message: 'AI endpoint error', status: aiResp.status, body: txt });
+        }
+
+        const aiJson = await aiResp.json().catch(() => null);
+        let aiText = '';
+        // Expected shape per example: { status: true, data: { parts: [ { text: '...' } ] }, timestamp }
+        if (aiJson && aiJson.data && Array.isArray(aiJson.data.parts)) {
+            aiText = aiJson.data.parts.map(p => p.text || '').join('\n');
+        } else if (aiJson && aiJson.text) {
+            aiText = aiJson.text;
+        } else {
+            aiText = JSON.stringify(aiJson);
+        }
+
+        // Return both raw AI response and parsed text
+        res.json({ success: true, ai: true, insights: aiText ? aiText.split(/\n+/).filter(Boolean) : [], raw: payload, aiResponse: aiJson });
+    } catch (e) {
+        console.error('[insights] error', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});

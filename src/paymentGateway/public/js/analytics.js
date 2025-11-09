@@ -150,6 +150,18 @@ function renderLeaderboardHighlights(){
 function updateLeaderboardInsights(items, meta){
   const insightEl = document.getElementById('leaderboard-insights');
   if (!insightEl) return;
+  // If user-saved AI insight exists for this scope/method, render and keep it (prevent overwrite by auto-refresh)
+    try {
+      const saved = loadSavedAi(currentLeaderboardScope, currentLeaderboardMethod);
+      if (saved && saved.html) {
+        insightEl.innerHTML = saved.html + renderSavedAiControls(currentLeaderboardScope, currentLeaderboardMethod);
+        // attach delete handler so user can remove persisted insight
+        attachSavedAiDeleteHandler(currentLeaderboardScope, currentLeaderboardMethod);
+        return;
+      }
+    } catch (e) {
+      // ignore parse errors and continue to compute local insights
+    }
   if (!items.length){
     insightEl.innerHTML = '<li>Menunggu data untuk menghitung rekomendasi.</li>';
     return;
@@ -180,6 +192,43 @@ function updateLeaderboardInsights(items, meta){
   }
 
   insightEl.innerHTML = insights.map(text => `<li>${text}</li>`).join('');
+}
+
+// --- AI insights persistence helpers (client-side) ---
+function aiStorageKey(scope, method){ return `aiInsight:${scope || 'all'}:${method || 'all'}`; }
+function loadSavedAi(scope, method){
+  const key = aiStorageKey(scope, method);
+  const raw = localStorage.getItem(key);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+function saveAi(scope, method, html, meta){
+  const key = aiStorageKey(scope, method);
+  const payload = { html, meta: meta || {}, savedAt: new Date().toISOString() };
+  try { localStorage.setItem(key, JSON.stringify(payload)); return true; } catch (e) { return false; }
+}
+function deleteSavedAi(scope, method){
+  const key = aiStorageKey(scope, method);
+  localStorage.removeItem(key);
+}
+
+function renderSavedAiControls(scope, method){
+  // small delete button HTML injected after saved insights
+  return `
+    <div class="mt-3 flex items-center gap-2">
+      <button id="ai-insight-delete" class="rounded-lg bg-white px-3 py-1 text-xs font-semibold text-rose-600 border border-rose-200">Hapus Insight</button>
+    </div>
+  `;
+}
+
+function attachSavedAiDeleteHandler(scope, method){
+  const del = document.getElementById('ai-insight-delete');
+  if (!del) return;
+  del.addEventListener('click', () => {
+    deleteSavedAi(scope, method);
+    // Re-render current leaderboard detail to restore computed insights
+    renderLeaderboardDetail();
+  });
 }
 
 function renderLeaderboardDetail(){
@@ -399,4 +448,67 @@ window.addEventListener('DOMContentLoaded', ()=>{
   loadOverview();
   applyFilters();
   leaderboardTimer = setInterval(() => loadLeaderboards(currentLeaderboardMethod), 15000);
+
+  // AI Insights button
+  const aiBtn = document.getElementById('ai-insights-btn');
+  if (aiBtn) aiBtn.addEventListener('click', async () => {
+    try {
+      aiBtn.disabled = true;
+      const orig = aiBtn.innerHTML;
+      aiBtn.innerHTML = 'Meminta...';
+      const scope = currentLeaderboardScope || 'month';
+      const method = currentLeaderboardMethod || 'all';
+      const res = await fetch('/api/stats/insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope, method, limit: 5 })
+      });
+      const data = await res.json();
+      const el = document.getElementById('leaderboard-insights');
+      if (!el) return;
+      if (!data.success) {
+        el.innerHTML = `<li class="text-sm text-rose-700">Gagal mendapatkan insight: ${data.message || 'Unknown'}</li>`;
+        return;
+      }
+      if (data.ai === false) {
+        // show fallback insights (do not persist local heuristics)
+        el.innerHTML = (data.insights || []).map(s => `<li>${escapeHtml(String(s))}</li>`).join('');
+      } else {
+        // AI produced insights array (may contain Markdown). Convert Markdown -> HTML and sanitize.
+        let aiHtml = '';
+        try {
+          const rawText = (data.aiResponse && data.aiResponse.data && Array.isArray(data.aiResponse.data.parts))
+            ? data.aiResponse.data.parts.map(p => p.text || '').join('\n')
+            : (Array.isArray(data.insights) ? data.insights.join('\n') : (typeof data.insights === 'string' ? data.insights : ''));
+
+          if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+            const converted = marked.parse(rawText || '');
+            aiHtml = DOMPurify.sanitize(converted);
+          } else {
+            // fallback: convert newlines to paragraphs and escape
+            aiHtml = (rawText || '').split(/\n+/).filter(Boolean).map(p => `<p>${escapeHtml(p)}</p>`).join('');
+          }
+        } catch (e) {
+          aiHtml = escapeHtml(String(data.insights || ''));
+        }
+        // Save persisted AI insight so it survives refreshes; user can delete it explicitly
+        saveAi(scope, method, aiHtml, { generatedAt: data.raw && data.raw.generatedAt ? data.raw.generatedAt : new Date().toISOString() });
+        el.innerHTML = aiHtml + renderSavedAiControls(scope, method);
+        attachSavedAiDeleteHandler(scope, method);
+      }
+      aiBtn.disabled = false;
+      aiBtn.innerHTML = orig;
+    } catch (err) {
+      console.error('AI insights failed', err);
+      const el = document.getElementById('leaderboard-insights');
+      if (el) el.innerHTML = `<li class="text-sm text-rose-700">Gagal mengambil insight AI</li>`;
+      aiBtn.disabled = false;
+      aiBtn.innerHTML = 'Minta Insight AI';
+    }
+  });
 });
+
+// small helper to avoid XSS when rendering non-AI text
+function escapeHtml(unsafe){
+  return unsafe.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
