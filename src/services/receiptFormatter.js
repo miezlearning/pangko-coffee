@@ -449,7 +449,10 @@ function formatReceipt(order, receiptTemplate, options = {}) {
       footer.unshift(repeatChar('=', width));
   }
 
-  if (options.footerQr && options.footerQr.enabled) {
+  // Only add footer QR label when the QR feature is both enabled and canRender
+  // (i.e. there is a payload to render). This prevents templates from
+  // injecting QR labels when the user has disabled QR printing in tools.
+  if (options.footerQr && options.footerQr.enabled && options.footerQr.canRender) {
     const label = options.footerQr.label || 'Scan QR di bawah ini';
     wrapText(label, width).forEach(w => footer.push(centerLine(w, width)));
   }
@@ -577,7 +580,8 @@ function renderCustomTemplate(order, template, templateText, options = {}) {
     ...footerLines.map(l => centerLine(l, width))
   ];
 
-  if (options.footerQr && options.footerQr.enabled) {
+  // Only inject the QR label when QR is enabled and canRender is true.
+  if (options.footerQr && options.footerQr.enabled && options.footerQr.canRender) {
     const label = options.footerQr.label || 'Scan QR di bawah ini';
     const qrLabelLines = wrapText(label, width).map(w => centerLine(w, width));
     footerLines.push(...qrLabelLines);
@@ -723,7 +727,10 @@ function oldFormatReceipt(order, templateId, options = {}) {
       });
   }
 
-  if (options.footerQr && options.footerQr.enabled) {
+  // Only add footer QR label when the QR feature is both enabled and canRender
+  // (i.e. there is a payload to render). This prevents templates from
+  // injecting QR labels when the user has disabled QR printing in tools.
+  if (options.footerQr && options.footerQr.enabled && options.footerQr.canRender) {
     const label = options.footerQr.label || 'Scan QR di bawah ini';
     wrapText(label, width).forEach(w => footer.push(centerLine(w, width)));
   }

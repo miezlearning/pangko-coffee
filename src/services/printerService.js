@@ -407,8 +407,8 @@ class PrinterService {
           }
         }
 
-        // If footer QR is enabled, prefer printing a graphical QR via raster
-        if (footerQr && footerQr.enabled && (footerQr.type === 'qr' || footerQr.type === 'link' || footerQr.type === 'image')) {
+  // If footer QR is enabled and canRender, prefer printing a graphical QR via raster
+  if (footerQr && footerQr.enabled && footerQr.canRender && (footerQr.type === 'qr' || footerQr.type === 'link' || footerQr.type === 'image')) {
           // If the receipt footer already contains the same label text, avoid
           // printing it again here to prevent duplication.
           const labelText = footerQr.label ? String(footerQr.label).trim() : '';
@@ -482,8 +482,8 @@ class PrinterService {
         }
       }
 
-      // Render QR code at footer when enabled
-      if (footerQr.enabled) {
+  // Render QR code at footer only when enabled AND canRender (i.e. payload exists)
+  if (footerQr && footerQr.enabled && footerQr.canRender) {
         const type = footerQr.type || 'qr';
         if ((type === 'qr' || type === 'link') && footerQr.value) {
           const qrValue = String(footerQr.value || '').trim();
@@ -530,7 +530,8 @@ class PrinterService {
       // PERBAIKAN UTAMA: Hapus semua feed lines tambahan jika QR tidak ada
       // TM-58V sudah memiliki margin internal yang cukup
       // Set feed to 0 before cut to minimize gap
-      if (!footerQr.enabled || !footerQr.value) {
+      // If QR is not available to render, ensure minimal feed/cut to avoid extra gap
+      if (!(footerQr && footerQr.enabled && footerQr.canRender)) {
         this.printer.add(Buffer.from([0x1B, 0x4A, 0x00])); // ESC J 0: feed 0/180 inch before cut
         this.printer.cut();
       }
@@ -778,7 +779,13 @@ class PrinterService {
   setFooterQrSetting({ enabled, value, label, type, imageData, cellSize, position } = {}) {
     this.settings = this.settings || {};
     if (typeof enabled !== 'undefined') {
-      this.settings.footerQrEnabled = !!enabled;
+      // Coerce string values like 'true'/'false' from client UI into booleans.
+      if (typeof enabled === 'string') {
+        const lowered = enabled.toLowerCase().trim();
+        this.settings.footerQrEnabled = (lowered === 'true' || lowered === '1');
+      } else {
+        this.settings.footerQrEnabled = !!enabled;
+      }
     }
     if (typeof value !== 'undefined') {
       this.settings.footerQrValue = String(value || '').trim();
@@ -927,6 +934,11 @@ class PrinterService {
       resolvedValue: qrContent || fallbackContent || '',
       enabled: qrSettingsSource.enabled && hasQrPayload,
     };
+    // Expose a canonical "canRender" flag which explicitly means there is
+    // both an enabled setting and a payload available to render. Other
+    // consumers (formatter / print paths) should guard on this to avoid
+    // inserting labels or images when QR printing is disabled.
+    footerQr.canRender = !!(footerQr.enabled);
 
     const receipt = formatReceipt(order, activeTemplate, {
       ...settings,
@@ -935,8 +947,8 @@ class PrinterService {
     });
     receipt.footerQr = footerQr;
     
-    // Generate base64 QR for preview if enabled
-    if (footerQr.enabled && footerQr.value && (footerQr.type === 'qr' || footerQr.type === 'link')) {
+  // Generate base64 QR for preview if enabled and renderable
+  if (footerQr.canRender && footerQr.value && (footerQr.type === 'qr' || footerQr.type === 'link')) {
       try {
         receipt.footerQrBase64 = await QRCode.toDataURL(footerQr.value, {
           errorCorrectionLevel: 'M',
@@ -947,7 +959,7 @@ class PrinterService {
         console.error('[Printer] Failed to generate QR data URL for preview:', e.message);
         receipt.footerQrBase64 = '';
       }
-    } else if (footerQr.enabled && footerQr.type === 'image' && footerQr.imageData) {
+  } else if (footerQr.canRender && footerQr.type === 'image' && footerQr.imageData) {
       receipt.footerQrBase64 = footerQr.imageData;
     }
     
@@ -1055,8 +1067,9 @@ class PrinterService {
         </div>
       </div>`;
 
-    let qrHtml = '';
-    if (footerQr.enabled && qrImageSrc) {
+  let qrHtml = '';
+  // Only show QR preview when enabled and there is a renderable image payload
+  if (footerQr && footerQr.enabled && footerQr.canRender && qrImageSrc) {
       const label = footerQr.label ? escapeHtml(footerQr.label) : 'Scan QR di bawah ini';
       let linkHtml = '';
       if (footerQr.type === 'link' && footerQr.value) {
