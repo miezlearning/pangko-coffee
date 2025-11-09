@@ -9,7 +9,8 @@
         <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Twemoji to ensure emojis render consistently across platforms -->
-    <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js" crossorigin="anonymous"></script>
+    <!-- Removed crossorigin attribute because the CDN resource does not set CORS headers and modern browsers block the fetch when crossorigin is present. If needed, host twemoji locally or use an alternative CDN. -->
+    <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js"></script>
         <script>
             tailwind.config = {
                 theme: {

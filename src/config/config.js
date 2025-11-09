@@ -155,6 +155,7 @@ module.exports = {
     // Jumlah feed line tambahan sebelum cut (untuk beberapa printer yang memotong terlalu dekat).
     // Set ke 0 untuk tidak menambah baris kosong.
     cutFeedLines: 0,
+    skipCutFeed: true,
 
         autoPrint: true,             // Auto-print receipt ketika pembayaran terkonfirmasi
         autoOpenDrawer: false,       // Auto-open cash drawer (port RJ11)

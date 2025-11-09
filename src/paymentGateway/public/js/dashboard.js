@@ -469,7 +469,7 @@ function renderPaymentsList() {
       <div class="mt-4">
         <div class="mb-2 text-sm font-semibold text-charcoal">📸 Bukti Pembayaran</div>
         <div class="w-full max-w-xs">
-          <a href="${payment.paymentProof.imageData}" class="glightbox" data-gallery="proofs" data-title="Bukti ${escapeHtml(payment.orderId)}">
+          <a href="${payment.paymentProof.imageData}" class="glightbox" data-type="image" data-gallery="proofs" data-title="Bukti ${escapeHtml(payment.orderId)}">
             <img src="${payment.paymentProof.imageData}" alt="Bukti ${escapeHtml(payment.orderId)}" class="rounded-lg border border-charcoal/10 object-cover w-full h-40 cursor-pointer" onerror="this.style.display='none'" />
           </a>
         </div>
