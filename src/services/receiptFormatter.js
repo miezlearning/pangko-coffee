@@ -322,77 +322,173 @@ function formatReceipt(order, receiptTemplate, options = {}) {
   const shopPhone = config.printer?.shopPhone || config.shop?.contact || '';
   const shopSocials = config.printer?.shopSocials || config.shop?.socials || '';
 
-  const header = [];
+  const allowedFonts = new Set(['normal', 'double-height', 'double-width', 'double']);
+  const allowedAlignments = new Set(['left', 'center', 'right']);
+
+  const sectionStrings = {
+    header: [],
+    info: [],
+    items: [],
+    totals: [],
+    footer: [],
+  };
+  const sectionMeta = {
+    header: [],
+    info: [],
+    items: [],
+    totals: [],
+    footer: [],
+  };
+  const structuredLines = [];
+
+  const normalizeFont = (value) => (allowedFonts.has(value) ? value : 'normal');
+  const normalizeAlign = (value, fallback = 'left') => (allowedAlignments.has(value) ? value : fallback);
+
+  const pushLine = (section, rawText, { align, font, displayText } = {}) => {
+    const sectionKey = sectionStrings[section] ? section : 'header';
+    const safeRaw = rawText == null ? '' : String(rawText);
+    const resolvedAlign = normalizeAlign(align || 'left');
+    const resolvedFont = normalizeFont(font);
+    let finalDisplay = displayText;
+    if (finalDisplay === undefined) {
+      if (resolvedAlign === 'center') finalDisplay = centerLine(safeRaw, width);
+      else if (resolvedAlign === 'right') finalDisplay = rightAlignText(safeRaw, width);
+      else finalDisplay = leftAlign(safeRaw, width);
+    }
+    sectionStrings[sectionKey].push(finalDisplay);
+    const entry = {
+      section: sectionKey,
+      rawText: safeRaw,
+      displayText: finalDisplay,
+      align: resolvedAlign,
+      font: resolvedFont,
+    };
+    sectionMeta[sectionKey].push(entry);
+    structuredLines.push(entry);
+  };
+
+  const pushLines = (section, lines, options = {}) => {
+    if (!Array.isArray(lines)) return;
+    lines.forEach((line) => pushLine(section, line, options));
+  };
+
+  const normalizedCustomHeaderLines = Array.isArray(options.customHeaderLines)
+    ? options.customHeaderLines
+        .map((line) => {
+          if (!line) return null;
+          const text = String(line.text ?? '').trim();
+          if (!text) return null;
+          return {
+            text,
+            font: normalizeFont(line.font),
+            align: normalizeAlign(line.align, 'center'),
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  const fallbackCustomHeaderLines = String(customHeaderText || '')
+    .split(/\r?\n/)
+    .map((line) => {
+      const text = String(line || '').trim();
+      if (!text) return null;
+      return { text, font: 'normal', align: 'center' };
+    })
+    .filter(Boolean);
+
   // Build header based on preset
   switch (headerPreset) {
     case 'shop-name':
-      header.push(centerLine(shopName, width));
+      pushLine('header', shopName, { align: 'center' });
       break;
     case 'shop-details':
-      header.push(centerLine(shopName, width));
-      if (shopAddress) header.push(...wrapText(shopAddress, width).map(line => centerLine(line, width)));
-      break;
-    case 'shop-contact':
-      header.push(centerLine(shopName, width));
-      if (shopPhone) header.push(...wrapText(shopPhone, width).map(line => centerLine(line, width)));
-      break;
-    case 'custom':
-      if (customHeaderText) {
-        String(customHeaderText).split(/\r?\n/).forEach(line => {
-            header.push(centerLine(line, width));
-        });
+      pushLine('header', shopName, { align: 'center' });
+      if (shopAddress) {
+        pushLines('header', wrapText(shopAddress, width), { align: 'center' });
       }
       break;
+    case 'shop-contact':
+      pushLine('header', shopName, { align: 'center' });
+      if (shopPhone) {
+        pushLines('header', wrapText(shopPhone, width), { align: 'center' });
+      }
+      break;
+    case 'custom': {
+      const headerLines = normalizedCustomHeaderLines.length
+        ? normalizedCustomHeaderLines
+        : fallbackCustomHeaderLines;
+      headerLines.forEach((line) => {
+        pushLine('header', line.text, { align: line.align ?? 'center', font: line.font ?? 'normal' });
+      });
+      break;
+    }
     case 'none':
-      // Do nothing
       break;
     default:
-      header.push(centerLine(shopName, width));
+      pushLine('header', shopName, { align: 'center' });
   }
 
-  if (header.length > 0 && showHeaderSeparator) {
-    header.push(repeatChar('=', width));
+  if (sectionStrings.header.length > 0 && showHeaderSeparator) {
+    const separator = repeatChar('=', width);
+    pushLine('header', separator, { align: 'left', displayText: separator });
   }
 
-  const info = [];
-  if (showOrderId && order?.orderId) info.push(rightAlign('Order ID', order.orderId, width));
-  if (showTime) info.push(rightAlign('Waktu', createdAt.format('DD/MM/YYYY HH:mm'), width));
-  if (showCustomer && order?.customerName) info.push(rightAlign('Pelanggan', order.customerName, width));
-  if (showPaymentMethod && order?.paymentMethod) info.push(rightAlign('Metode', order.paymentMethod === 'CASH' ? 'Tunai' : 'QRIS', width));
-  
-  if (info.length > 0) {
-      info.push(repeatChar('-', width));
+  if (showOrderId && order?.orderId) {
+    const formatted = rightAlign('Order ID', order.orderId, width);
+    pushLine('info', formatted, { align: 'left', displayText: formatted });
+  }
+  if (showTime) {
+    const formatted = rightAlign('Waktu', createdAt.format('DD/MM/YYYY HH:mm'), width);
+    pushLine('info', formatted, { align: 'left', displayText: formatted });
+  }
+  if (showCustomer && order?.customerName) {
+    const formatted = rightAlign('Pelanggan', order.customerName, width);
+    pushLine('info', formatted, { align: 'left', displayText: formatted });
+  }
+  if (showPaymentMethod && order?.paymentMethod) {
+    const methodLabel = order.paymentMethod === 'CASH' ? 'Tunai' : 'QRIS';
+    const formatted = rightAlign('Metode', methodLabel, width);
+    pushLine('info', formatted, { align: 'left', displayText: formatted });
   }
 
-  const items = [];
+  if (sectionStrings.info.length > 0) {
+    const separator = repeatChar('-', width);
+    pushLine('info', separator, { align: 'left', displayText: separator });
+  }
+
   const orderItems = Array.isArray(order?.items) ? order.items : [];
-  orderItems.forEach(item => {
+  orderItems.forEach((item) => {
     const name = item?.name || 'Item';
-    wrapText(name, width).forEach(line => items.push(line));
+    pushLines('items', wrapText(name, width));
 
     const qty = Number(item?.quantity || 1);
     const baseUnit = getBaseUnitPrice(item);
     const addonSum = sumAddons(item?.addons);
-    const subtotal = (qty * baseUnit) + addonSum;
+    const subtotalLineTotal = (qty * baseUnit) + addonSum;
     const priceLabel = formatCurrency(baseUnit);
-    const subtotalLabel = formatCurrency(subtotal);
+    const subtotalLabel = formatCurrency(subtotalLineTotal);
 
     const kv = (label, value) => rightAlign(`  ${label}`, value, width);
 
     if (detailedItemBreakdown) {
-      items.push(kv('Harga 1x', priceLabel));
-      if (addonSum > 0) items.push(kv('Add-on', formatCurrency(addonSum)));
-      items.push(kv(`${qty}x Total`, subtotalLabel));
+      pushLine('items', kv('Harga 1x', priceLabel), { align: 'left', displayText: kv('Harga 1x', priceLabel) });
+      if (addonSum > 0) {
+        const formattedAddon = kv('Add-on', formatCurrency(addonSum));
+        pushLine('items', formattedAddon, { align: 'left', displayText: formattedAddon });
+      }
+      pushLine('items', kv(`${qty}x Total`, subtotalLabel), { align: 'left', displayText: kv(`${qty}x Total`, subtotalLabel) });
     } else {
       const left = `  ${qty}x @${priceLabel}`;
-      items.push(rightAlign(left, subtotalLabel, width));
+      const formatted = rightAlign(left, subtotalLabel, width);
+      pushLine('items', formatted, { align: 'left', displayText: formatted });
     }
 
     if (showItemNotes && item?.notes) {
-      wrapText(`  Note: ${item.notes}`, width).forEach(line => items.push(line));
+      pushLines('items', wrapText(`  Note: ${item.notes}`, width));
     }
     if (showItemAddons) {
-      items.push(...buildAddonLines(item?.addons, width));
+      const addonLines = buildAddonLines(item?.addons, width);
+      pushLines('items', addonLines);
     }
   });
 
@@ -405,64 +501,95 @@ function formatReceipt(order, receiptTemplate, options = {}) {
   const discount = Number(order?.pricing?.discount || 0);
   const total = subtotal + fee - discount;
 
-  const totals = [
-    repeatChar('-', width),
-    rightAlign('Subtotal', formatCurrency(subtotal), width)
-  ];
-  if (fee > 0) totals.push(rightAlign('Biaya', formatCurrency(fee), width));
-  if (discount > 0) totals.push(rightAlign('Diskon', `- ${formatCurrency(discount)}`, width));
-  totals.push(repeatChar('=', width));
-  totals.push(rightAlign('TOTAL', formatCurrency(total), width));
-  totals.push(repeatChar('=', width));
+  const subtotalLine = rightAlign('Subtotal', formatCurrency(subtotal), width);
+  pushLine('totals', repeatChar('-', width), { align: 'left', displayText: repeatChar('-', width) });
+  pushLine('totals', subtotalLine, { align: 'left', displayText: subtotalLine });
+  if (fee > 0) {
+    const feeLine = rightAlign('Biaya', formatCurrency(fee), width);
+    pushLine('totals', feeLine, { align: 'left', displayText: feeLine });
+  }
+  if (discount > 0) {
+    const discountLine = rightAlign('Diskon', `- ${formatCurrency(discount)}`, width);
+    pushLine('totals', discountLine, { align: 'left', displayText: discountLine });
+  }
+  const totalsSeparator = repeatChar('=', width);
+  pushLine('totals', totalsSeparator, { align: 'left', displayText: totalsSeparator });
+  const totalLine = rightAlign('TOTAL', formatCurrency(total), width);
+  pushLine('totals', totalLine, { align: 'left', displayText: totalLine, font: 'double-height' });
+  pushLine('totals', totalsSeparator, { align: 'left', displayText: totalsSeparator });
 
-  const footer = [];
-  // Build footer based on preset
+  const footerTextLines = [];
   switch (footerPreset) {
     case 'thank-you':
-      footer.push(centerLine('Terima kasih!', width));
-      footer.push(centerLine('Selamat menikmati ☕', width));
+      footerTextLines.push('Terima kasih!');
+      footerTextLines.push('Selamat menikmati ☕');
       break;
     case 'social-media':
       if (shopSocials) {
-        String(shopSocials).split(/\r?\n/).forEach(line => {
-          footer.push(centerLine(line, width));
-        });
+        footerTextLines.push(
+          ...String(shopSocials)
+            .split(/\r?\n/)
+            .map((line) => String(line || '').trim())
+            .filter(Boolean)
+        );
       } else {
-        footer.push(centerLine('Follow us on social media!', width));
+        footerTextLines.push('Follow us on social media!');
       }
       break;
     case 'custom':
       if (customFooterText) {
-        String(customFooterText).split(/\r?\n/).forEach(line => {
-            footer.push(centerLine(line, width));
-        });
+        footerTextLines.push(
+          ...String(customFooterText)
+            .split(/\r?\n/)
+            .map((line) => String(line || '').trim())
+            .filter(Boolean)
+        );
       }
       break;
     case 'none':
-      // Do nothing
       break;
     default:
-      footer.push(centerLine('Terima kasih!', width));
+      footerTextLines.push('Terima kasih!');
   }
 
-  if (footer.length > 0 && showFooterSeparator) {
-      footer.unshift(repeatChar('=', width));
+  if (footerTextLines.length > 0) {
+    if (showFooterSeparator) {
+      const separator = repeatChar('=', width);
+      pushLine('footer', separator, { align: 'left', displayText: separator });
+    }
+    footerTextLines.forEach((line) => pushLine('footer', line, { align: 'center' }));
   }
 
-  // Only add footer QR label when the QR feature is both enabled and canRender
-  // (i.e. there is a payload to render). This prevents templates from
-  // injecting QR labels when the user has disabled QR printing in tools.
   if (options.footerQr && options.footerQr.enabled && options.footerQr.canRender) {
     const label = options.footerQr.label || 'Scan QR di bawah ini';
-    wrapText(label, width).forEach(w => footer.push(centerLine(w, width)));
+    const qrLines = wrapText(label, width);
+    qrLines.forEach((line) => pushLine('footer', line, { align: 'center' }));
   }
 
-  const lines = [...header, ...info, ...items, ...totals, ...footer];
+  const lines = structuredLines.map((entry) => entry.displayText);
+  const header = sectionStrings.header;
+  const info = sectionStrings.info;
+  const items = sectionStrings.items;
+  const totals = sectionStrings.totals;
+  const footer = sectionStrings.footer;
+
+  const structuredSections = Object.fromEntries(
+    Object.entries(sectionMeta).map(([key, value]) => [key, value.slice()])
+  );
 
   return {
     template: template.id,
     width,
     sections: { header, info, items, totals, footer },
+    structuredLines,
+    structuredSections,
+    headerStyles: structuredSections.header
+      .filter((entry) => entry.rawText && !/^[-=\s]+$/.test(entry.rawText.trim()))
+      .map((entry) => ({
+        text: entry.rawText,
+        font: entry.font,
+        align: entry.align,
+      })),
     lines,
     text: lines.join('\n'),
     meta: buildReceiptMeta({

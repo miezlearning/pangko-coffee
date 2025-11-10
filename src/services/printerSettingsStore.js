@@ -7,6 +7,7 @@ const DEFAULT_SETTINGS = {
   // Deprecated but kept for backward compatibility and potential future use
   customHeaderText: '',
   customFooterText: '',
+  customHeaderLines: [],
   useCustomTemplate: false,
   customTemplates: {},
   // End Deprecated

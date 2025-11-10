@@ -345,28 +345,65 @@ class PrinterService {
       trimTrailingEmpty(totals);
       trimTrailingEmpty(footer);
 
-      // Build final lines array and ensure no trailing blank lines remain
-      const finalLines = [].concat(header, info, items, totals, footer).map(l => String(l || ''));
-      while (finalLines.length && finalLines[finalLines.length - 1].trim() === '') finalLines.pop();
+      const cloneEntry = (entry) => ({
+        section: entry?.section || 'body',
+        rawText: entry?.rawText != null ? String(entry.rawText) : String(entry?.displayText || ''),
+        displayText: entry?.displayText != null ? String(entry.displayText) : String(entry?.rawText || ''),
+        align: entry?.align || 'left',
+        font: entry?.font || 'normal',
+      });
 
-      // Collapse runs of empty lines to a single empty line to avoid large vertical gaps
-      const collapsed = [];
-      for (const ln of finalLines) {
-        if (String(ln).trim() === '') {
-          if (collapsed.length === 0 || String(collapsed[collapsed.length - 1]).trim() !== '') {
-            collapsed.push('');
-          }
-        } else {
-          collapsed.push(ln);
+      const fallbackEntries = () => {
+        const merged = [].concat(header, info, items, totals, footer).map(line => String(line || ''));
+        return merged.map(text => ({
+          section: 'body',
+          rawText: text,
+          displayText: text,
+          align: 'left',
+          font: 'normal',
+        }));
+      };
+
+      const structuredSource = Array.isArray(receipt.structuredLines) && receipt.structuredLines.length
+        ? receipt.structuredLines.map(cloneEntry)
+        : fallbackEntries();
+
+      const collapseEntries = (entries) => {
+        const trimmed = [...entries];
+        while (trimmed.length && !String(trimmed[trimmed.length - 1]?.displayText || '').trim()) {
+          trimmed.pop();
         }
-      }
-      
-      const safeFinalLines = collapsed;
-      // PERBAIKAN: Pastikan tidak ada empty line di akhir yang menyebabkan gap
-      while (safeFinalLines.length > 0 && String(safeFinalLines[safeFinalLines.length - 1]).trim() === '') {
-        safeFinalLines.pop();
-      }
+        const collapsed = [];
+        trimmed.forEach((entry) => {
+          const value = String(entry.displayText || '');
+          const isEmpty = value.trim() === '';
+          if (isEmpty) {
+            if (!collapsed.length || String(collapsed[collapsed.length - 1].displayText || '').trim() !== '') {
+              collapsed.push(entry);
+            }
+          } else {
+            collapsed.push(entry);
+          }
+        });
+        return collapsed;
+      };
+
+      const safeEntries = collapseEntries(structuredSource);
+      const safeFinalLines = safeEntries.map(entry => entry.displayText);
       const lastPrintedLine = safeFinalLines.length ? safeFinalLines[safeFinalLines.length - 1] : '';
+
+      const mapFontMultipliers = (font) => {
+        switch (font) {
+          case 'double-height':
+            return { width: 1, height: 2 };
+          case 'double-width':
+            return { width: 2, height: 1 };
+          case 'double':
+            return { width: 2, height: 2 };
+          default:
+            return { width: 1, height: 1 };
+        }
+      };
 
       // If using serial mode, send a minimal raw ESC/POS payload (same concept as scripts/printTest-tight.js)
       if (this.mode === 'serial') {
@@ -375,37 +412,36 @@ class PrinterService {
         parts.push(Buffer.from([0x1B, 0x40]));
         parts.push(Buffer.from([0x1B, 0x33, 0x00]));
 
-        // appendLine supports optional size multiplier (1..8). It emits GS ! n to set
-        // character width/height multipliers before printing, and resets after.
-        const appendLine = (text, alignCenter = false, size = 1) => {
-          if (alignCenter) parts.push(Buffer.from([0x1B, 0x61, 0x01])); // ESC a 1
-          else parts.push(Buffer.from([0x1B, 0x61, 0x00])); // ESC a 0
-          const sz = Math.max(1, Math.min(8, parseInt(size, 10) || 1));
-          if (sz !== 1) {
-            // GS ! n where n = (width-1)<<4 | (height-1)
-            const n = ((sz - 1) << 4) | (sz - 1);
+        const defaultSerialTextSize = (this.config && Number(this.config.serialTextSize))
+          ? Math.max(1, Math.min(8, Number(this.config.serialTextSize)))
+          : 1;
+
+        const appendEntry = (entry) => {
+          const alignCode = entry.align === 'center' ? 0x01 : entry.align === 'right' ? 0x02 : 0x00;
+          parts.push(Buffer.from([0x1B, 0x61, alignCode]));
+
+          let { width, height } = mapFontMultipliers(entry.font);
+          if (entry.font === 'normal' && defaultSerialTextSize > 1) {
+            width = defaultSerialTextSize;
+            height = defaultSerialTextSize;
+          }
+          const clampedWidth = Math.max(1, Math.min(8, Math.round(width)));
+          const clampedHeight = Math.max(1, Math.min(8, Math.round(height)));
+          const n = ((clampedWidth - 1) << 4) | (clampedHeight - 1);
+          if (n !== 0) {
             parts.push(Buffer.from([0x1D, 0x21, n]));
           }
-          parts.push(Buffer.from(String(text || ''), 'ascii'));
-          parts.push(Buffer.from([0x0A])); // LF
-          if (sz !== 1) {
-            // reset to normal size
+
+          const raw = entry.rawText ?? '';
+          parts.push(Buffer.from(String(raw), 'ascii'));
+          parts.push(Buffer.from([0x0A]));
+
+          if (n !== 0) {
             parts.push(Buffer.from([0x1D, 0x21, 0x00]));
           }
         };
 
-        // allow optional per-config default text size for serial prints
-        const defaultSerialTextSize = (this.config && Number(this.config.serialTextSize)) ? Math.max(1, Math.min(8, Number(this.config.serialTextSize))) : 1;
-        if (safeFinalLines.length) {
-          if (header.length && safeFinalLines[0]) {
-            // Print header using the same default serial text size so it matches other lines
-            const headerText = String(safeFinalLines[0] || '').trim();
-            appendLine(headerText, true, defaultSerialTextSize);
-            safeFinalLines.slice(1).forEach(line => appendLine(line, false, defaultSerialTextSize));
-          } else {
-            safeFinalLines.forEach(line => appendLine(line, false, defaultSerialTextSize));
-          }
-        }
+        safeEntries.forEach(appendEntry);
 
   // If footer QR is enabled and canRender, prefer printing a graphical QR via raster
   if (footerQr && footerQr.enabled && footerQr.canRender && (footerQr.type === 'qr' || footerQr.type === 'link' || footerQr.type === 'image')) {
@@ -467,20 +503,31 @@ class PrinterService {
         return { success: true, message: 'Receipt printed (serial raw)', template: receipt.template };
       }
 
-      // fallback: non-serial flows use composer as before
+      // fallback: non-serial flows use composer with structured metadata
       this.printer.alignLeft();
-      
-      // Print using the composed safeFinalLines to avoid accidental extra lines
-      if (safeFinalLines.length) {
-        if (header.length) {
-          this.printer.bold(true);
-          this.printer.println(safeFinalLines[0]);
-          this.printer.bold(false);
-          safeFinalLines.slice(1).forEach(line => this.printer.println(line));
-        } else {
-          safeFinalLines.forEach(line => this.printer.println(line));
+
+      const printEntry = (entry) => {
+        if (entry.align === 'center') this.printer.alignCenter();
+        else if (entry.align === 'right') this.printer.alignRight();
+        else this.printer.alignLeft();
+
+        const { width, height } = mapFontMultipliers(entry.font);
+        const clampedWidth = Math.max(1, Math.min(8, Math.round(width)));
+        const clampedHeight = Math.max(1, Math.min(8, Math.round(height)));
+        const n = ((clampedWidth - 1) << 4) | (clampedHeight - 1);
+        if (n !== 0) {
+          this.printer.add(Buffer.from([0x1D, 0x21, n]));
         }
-      }
+
+        this.printer.println(entry.rawText ?? '');
+
+        if (n !== 0) {
+          this.printer.add(Buffer.from([0x1D, 0x21, 0x00]));
+        }
+      };
+
+      safeEntries.forEach(printEntry);
+      this.printer.alignLeft();
 
   // Render QR code at footer only when enabled AND canRender (i.e. payload exists)
   if (footerQr && footerQr.enabled && footerQr.canRender) {
@@ -824,11 +871,43 @@ class PrinterService {
 
   getCustomText() {
     this.settings = this.settings || {};
+    const allowedFonts = new Set(['normal', 'double-height', 'double-width', 'double']);
+    const allowedAlignments = new Set(['left', 'center', 'right']);
+
+    const rawHeaderLines = Array.isArray(this.settings.customHeaderLines)
+      ? this.settings.customHeaderLines
+      : [];
+
+    const normalizedHeaderLines = rawHeaderLines
+      .map((line) => {
+        if (!line) return null;
+        const text = String(line.text ?? '').trim();
+        if (!text) return null;
+        const font = allowedFonts.has(line.font) ? line.font : 'normal';
+        const align = allowedAlignments.has(line.align) ? line.align : 'center';
+        return { text, font, align };
+      })
+      .filter(Boolean);
+
+    const fallbackHeaderLines = (String(this.settings.customHeaderText || '')
+      .split(/\r?\n/)
+      .map((line) => {
+        const text = String(line || '').trim();
+        if (!text) return null;
+        return { text, font: 'normal', align: 'center' };
+      })
+      .filter(Boolean));
+
+    const customHeaderLines = normalizedHeaderLines.length
+      ? normalizedHeaderLines
+      : fallbackHeaderLines;
+
     return {
       headerPreset: this.settings.headerPreset || 'shop-name',
       footerPreset: this.settings.footerPreset || 'thank-you',
       customHeaderText: this.settings.customHeaderText || '',
       customFooterText: this.settings.customFooterText || '',
+      customHeaderLines,
       lineSpacing: this.settings.lineSpacing || 'normal',
       showHeaderSeparator: this.settings.showHeaderSeparator !== false,
       showFooterSeparator: this.settings.showFooterSeparator !== false,
@@ -847,6 +926,29 @@ class PrinterService {
     // Still save custom text for the 'custom' preset option
     if (params.customHeaderText !== undefined) this.settings.customHeaderText = String(params.customHeaderText || '');
     if (params.customFooterText !== undefined) this.settings.customFooterText = String(params.customFooterText || '');
+
+    if (params.customHeaderLines !== undefined) {
+      if (Array.isArray(params.customHeaderLines)) {
+        const allowedFonts = new Set(['normal', 'double-height', 'double-width', 'double']);
+        const allowedAlignments = new Set(['left', 'center', 'right']);
+        const sanitized = params.customHeaderLines
+          .map((line) => {
+            if (!line) return null;
+            const text = String(line.text ?? '').trim();
+            if (!text) return null;
+            const font = allowedFonts.has(line.font) ? line.font : 'normal';
+            const align = allowedAlignments.has(line.align) ? line.align : 'center';
+            return { text, font, align };
+          })
+          .filter(Boolean);
+        this.settings.customHeaderLines = sanitized;
+        if (sanitized.length && params.customHeaderText === undefined) {
+          this.settings.customHeaderText = sanitized.map(line => line.text).join('\n');
+        }
+      } else if (params.customHeaderLines === null) {
+        this.settings.customHeaderLines = [];
+      }
+    }
     
     if (params.headerPreset) this.settings.headerPreset = params.headerPreset;
     if (params.footerPreset) this.settings.footerPreset = params.footerPreset;
@@ -872,7 +974,10 @@ class PrinterService {
       ? optionsOrTemplateId.receiptTemplate 
       : (optionsOrTemplateId && RECEIPT_TEMPLATES[optionsOrTemplateId] ? optionsOrTemplateId : this.receiptTemplateId);
 
-    const settings = isOptions ? optionsOrTemplateId : this.getCustomText();
+    const baseSettings = this.getCustomText();
+    const settings = isOptions
+      ? { ...baseSettings, ...optionsOrTemplateId }
+      : baseSettings;
 
     const maybeCustom = this.getUseCustomTemplate() ? this.getCustomTemplate(activeTemplate) : '';
 
@@ -931,14 +1036,12 @@ class PrinterService {
       ...qrSettingsSource,
       imageData: qrSettingsSource.type === 'image' ? (effectiveImageData || '') : qrSettingsSource.imageData,
       value: qrContent,
-      resolvedValue: qrContent || fallbackContent || '',
-      enabled: qrSettingsSource.enabled && hasQrPayload,
+      resolvedValue: qrContent || fallbackContent || ''
     };
-    // Expose a canonical "canRender" flag which explicitly means there is
-    // both an enabled setting and a payload available to render. Other
-    // consumers (formatter / print paths) should guard on this to avoid
-    // inserting labels or images when QR printing is disabled.
-    footerQr.canRender = !!(footerQr.enabled);
+    // Preserve the user's toggle (enabled) and provide a derived flag (canRender)
+    // so callers can distinguish between "user wants QR" and "QR has payload".
+    footerQr.enabled = !!qrSettingsSource.enabled;
+    footerQr.canRender = footerQr.enabled && hasQrPayload;
 
     const receipt = formatReceipt(order, activeTemplate, {
       ...settings,
@@ -1000,6 +1103,35 @@ class PrinterService {
     const footerQr = receipt.footerQr || {};
     const qrImageSrc = typeof receipt.footerQrBase64 === 'string' && receipt.footerQrBase64.startsWith('data:image')
       ? receipt.footerQrBase64
+      : '';
+
+    const headerEntries = Array.isArray(receipt?.structuredSections?.header)
+      ? receipt.structuredSections.header
+      : [];
+
+    const previewFontStyle = (font) => {
+      switch (font) {
+        case 'double-height':
+          return 'font-size:18px;font-weight:700;letter-spacing:0.04em;';
+        case 'double-width':
+          return 'font-size:18px;font-weight:700;letter-spacing:0.12em;';
+        case 'double':
+          return 'font-size:20px;font-weight:700;letter-spacing:0.08em;';
+        default:
+          return 'font-size:15px;font-weight:600;letter-spacing:0.02em;';
+      }
+    };
+
+    const headerPreviewLines = headerEntries
+      .filter((entry) => entry.rawText && !/^[-=\s]+$/.test(entry.rawText.trim()))
+      .map((entry) => {
+        const align = entry.align === 'right' ? 'right' : entry.align === 'left' ? 'left' : 'center';
+        const style = previewFontStyle(entry.font);
+        return `<div style="text-align:${align};${style}margin-bottom:4px;">${escapeHtml(entry.rawText)}</div>`;
+      });
+
+    const headerPreviewHtml = headerPreviewLines.length
+      ? `<div style="margin-bottom:16px;">${headerPreviewLines.join('')}</div>`
       : '';
 
     const infoRows = [];
@@ -1111,6 +1243,7 @@ class PrinterService {
             ${headerSubtitle ? `<div style="margin-top:6px;font-size:11px;opacity:0.9;line-height:1.5;">${headerSubtitle}</div>` : ''}
           </div>
           <div style="padding:20px 22px;font-family:'Manrope','Segoe UI',sans-serif;color:#111827;">
+            ${headerPreviewHtml}
             ${infoRowsHtml ? `<div style="margin-bottom:16px;">${infoRowsHtml}</div>` : ''}
             <div>${itemsHtml}</div>
             ${totalsHtml}

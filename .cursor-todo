@@ -1,0 +1,4 @@
+# TODO
+- [ ] Normalize /api/printer/footer-qr request handling (boolean coercion, include canRender)
+- [ ] Auto-persist footer QR toggle & inputs from tools UI (debounced save)
+- [ ] Verify UI refresh uses persisted state after navigation

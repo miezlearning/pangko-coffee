@@ -10,6 +10,7 @@ const printerToolsState = {
   footerPreset: 'thank-you',
   customHeaderText: '',
   customFooterText: '',
+  customHeaderLines: [],
   // QR Code
   footerQrEnabled: false,
   footerQrContent: '',
@@ -21,6 +22,7 @@ const printerToolsState = {
   qrPosition: 'after-footer',
   footerQrDefaultValue: '',
   footerQrDefaultLabel: '',
+  footerQrCanRender: false,
   // Formatting
   lineSpacing: 'normal',
   showHeaderSeparator: true,
@@ -37,6 +39,21 @@ const printerToolsState = {
   previewColumns: 32,
   livePreviewTimer: null,
 };
+
+let footerQrAutoSaveTimer = null;
+
+function scheduleFooterQrAutoSave({ immediate = false } = {}) {
+  if (footerQrAutoSaveTimer) {
+    clearTimeout(footerQrAutoSaveTimer);
+  }
+  const delay = immediate ? 0 : 700;
+  footerQrAutoSaveTimer = setTimeout(() => {
+    footerQrAutoSaveTimer = null;
+    persistFooterQrSettings({ silent: true }).catch((error) => {
+      console.error('Auto-save footer QR failed:', error);
+    });
+  }, delay);
+}
 
 // Debounced live preview update
 function schedulePreviewUpdate() {
@@ -55,10 +72,155 @@ function toggleCustomContainer(presetValue, containerId) {
   if (container) {
     if (presetValue === 'custom') {
       container.classList.remove('hidden');
+      if (containerId === 'custom-header-container') {
+        ensureHeaderLinesRendered();
+      }
     } else {
       container.classList.add('hidden');
     }
   }
+}
+
+const HEADER_FONT_OPTIONS = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'double-height', label: 'Tinggi x2' },
+  { value: 'double-width', label: 'Lebar x2' },
+  { value: 'double', label: 'Lebar & Tinggi x2' },
+];
+
+const HEADER_ALIGN_OPTIONS = [
+  { value: 'left', label: 'Rata Kiri' },
+  { value: 'center', label: 'Rata Tengah' },
+  { value: 'right', label: 'Rata Kanan' },
+];
+
+let headerLineIdCounter = 0;
+
+function escapeAttribute(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function createHeaderLine({ text = '', font = 'normal', align = 'center' } = {}) {
+  headerLineIdCounter += 1;
+  const fontOption = HEADER_FONT_OPTIONS.some(option => option.value === font) ? font : 'normal';
+  const alignOption = HEADER_ALIGN_OPTIONS.some(option => option.value === align) ? align : 'center';
+  return {
+    id: `header-line-${Date.now()}-${headerLineIdCounter}`,
+    text: String(text ?? ''),
+    font: fontOption,
+    align: alignOption,
+  };
+}
+
+function ensureHeaderLines() {
+  if (!Array.isArray(printerToolsState.customHeaderLines)) {
+    printerToolsState.customHeaderLines = [];
+  }
+  if (!printerToolsState.customHeaderLines.length) {
+    printerToolsState.customHeaderLines.push(createHeaderLine());
+  }
+}
+
+function syncHeaderTextState() {
+  const text = printerToolsState.customHeaderLines.map(line => line.text).join('\n');
+  printerToolsState.customHeaderText = text;
+  const textarea = document.getElementById('custom-header');
+  if (textarea) {
+    textarea.value = text;
+  }
+}
+
+function ensureHeaderLinesRendered() {
+  ensureHeaderLines();
+  renderHeaderLinesEditor();
+}
+
+function renderHeaderLinesEditor() {
+  const container = document.getElementById('header-lines-list');
+  if (!container) return;
+  ensureHeaderLines();
+
+  const canDelete = printerToolsState.customHeaderLines.length > 1;
+  container.innerHTML = printerToolsState.customHeaderLines.map((line, index) => {
+    const fontOptions = HEADER_FONT_OPTIONS.map(opt => `<option value="${opt.value}" ${opt.value === line.font ? 'selected' : ''}>${opt.label}</option>`).join('');
+    const alignOptions = HEADER_ALIGN_OPTIONS.map(opt => `<option value="${opt.value}" ${opt.value === line.align ? 'selected' : ''}>${opt.label}</option>`).join('');
+    return `
+      <div class="rounded-2xl border border-charcoal/10 bg-white/90 p-3 shadow-sm" data-header-line="${line.id}">
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal/40">Baris ${index + 1}</span>
+          ${canDelete ? `<button data-header-line-remove="${line.id}" type="button" class="text-xs font-semibold text-rose-500 transition hover:text-rose-600">Hapus</button>` : ''}
+        </div>
+  <input data-header-line-text="${line.id}" type="text" class="mt-3 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-matcha focus:ring-2 focus:ring-matcha/20" placeholder="Teks header" value="${escapeAttribute(line.text)}" />
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <label class="text-xs font-semibold text-charcoal/60">Font
+            <select data-header-line-font="${line.id}" class="mt-1 w-full rounded-lg border border-charcoal/15 bg-white px-2 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-charcoal/70 outline-none transition focus:border-matcha focus:ring-2 focus:ring-matcha/20">${fontOptions}</select>
+          </label>
+          <label class="text-xs font-semibold text-charcoal/60">Posisi
+            <select data-header-line-align="${line.id}" class="mt-1 w-full rounded-lg border border-charcoal/15 bg-white px-2 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-charcoal/70 outline-none transition focus:border-matcha focus:ring-2 focus:ring-matcha/20">${alignOptions}</select>
+          </label>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('input[data-header-line-text]').forEach((input) => {
+    input.addEventListener('input', (event) => {
+      const id = event.currentTarget.getAttribute('data-header-line-text');
+      const targetLine = printerToolsState.customHeaderLines.find(line => line.id === id);
+      if (!targetLine) return;
+      targetLine.text = event.currentTarget.value;
+      syncHeaderTextState();
+      schedulePreviewUpdate();
+    });
+  });
+
+  container.querySelectorAll('select[data-header-line-font]').forEach((select) => {
+    select.addEventListener('change', (event) => {
+      const id = event.currentTarget.getAttribute('data-header-line-font');
+      const targetLine = printerToolsState.customHeaderLines.find(line => line.id === id);
+      if (!targetLine) return;
+      targetLine.font = event.currentTarget.value;
+      schedulePreviewUpdate();
+    });
+  });
+
+  container.querySelectorAll('select[data-header-line-align]').forEach((select) => {
+    select.addEventListener('change', (event) => {
+      const id = event.currentTarget.getAttribute('data-header-line-align');
+      const targetLine = printerToolsState.customHeaderLines.find(line => line.id === id);
+      if (!targetLine) return;
+      targetLine.align = event.currentTarget.value;
+      schedulePreviewUpdate();
+    });
+  });
+
+  container.querySelectorAll('button[data-header-line-remove]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      const id = event.currentTarget.getAttribute('data-header-line-remove');
+      printerToolsState.customHeaderLines = printerToolsState.customHeaderLines.filter(line => line.id !== id);
+      ensureHeaderLines();
+      renderHeaderLinesEditor();
+      syncHeaderTextState();
+      schedulePreviewUpdate();
+    });
+  });
+
+  syncHeaderTextState();
+}
+
+function getHeaderLinesPayload() {
+  return printerToolsState.customHeaderLines
+    .map((line) => ({
+      text: String(line.text || '').trim(),
+      font: line.font,
+      align: line.align,
+    }))
+    .filter((line) => line.text.length > 0);
 }
 
 function setQrPanelInteractivity(enabled) {
@@ -276,14 +438,20 @@ function updateQrStatusBadge() {
   const badge = document.getElementById('footer-qr-status-badge');
   if (!badge) return;
   
-  if (printerToolsState.footerQrEnabled) {
+  const enabled = !!printerToolsState.footerQrEnabled;
+  const canRender = !!printerToolsState.footerQrCanRender;
+
+  badge.classList.remove('bg-charcoal/10', 'text-charcoal/60', 'bg-matcha/15', 'text-matcha', 'bg-amber-100', 'text-amber-700');
+
+  if (enabled && canRender) {
     badge.textContent = 'Aktif';
-    badge.classList.remove('bg-charcoal/10', 'text-charcoal/60');
     badge.classList.add('bg-matcha/15', 'text-matcha');
+  } else if (enabled && !canRender) {
+    badge.textContent = 'Perlu konten';
+    badge.classList.add('bg-amber-100', 'text-amber-700');
   } else {
     badge.textContent = 'Nonaktif';
     badge.classList.add('bg-charcoal/10', 'text-charcoal/60');
-    badge.classList.remove('bg-matcha/15', 'text-matcha');
   }
 }
 
@@ -362,7 +530,7 @@ async function loadSamplePreview(templateId) {
       template: id,
       headerPreset: printerToolsState.headerPreset,
       footerPreset: printerToolsState.footerPreset,
-      customHeaderText: document.getElementById('custom-header')?.value || '',
+  customHeaderText: printerToolsState.customHeaderText || '',
       customFooterText: document.getElementById('custom-footer')?.value || '',
       lineSpacing: printerToolsState.lineSpacing,
       qrPosition: printerToolsState.qrPosition,
@@ -383,6 +551,9 @@ async function loadSamplePreview(templateId) {
       footerQrLabel: qrLabel,
       footerQrSize: printerToolsState.footerQrSize,
     });
+
+    const headerLinesPayload = getHeaderLinesPayload();
+    params.set('customHeaderLines', JSON.stringify(headerLinesPayload));
 
     const res = await fetch(`/api/printer/sample-preview?${params.toString()}`);
     const data = await res.json();
@@ -415,10 +586,13 @@ async function loadSamplePreview(templateId) {
     }
 
     const qrEnabled = data.footerQrEnabled ?? printerToolsState.footerQrEnabled;
+    const qrCanRender = data.footerQrCanRender ?? printerToolsState.footerQrCanRender ?? qrEnabled;
+    printerToolsState.footerQrEnabled = qrEnabled;
+    printerToolsState.footerQrCanRender = qrCanRender;
     const qrLabelText = data.footerQrLabel || printerToolsState.footerQrLabel || printerToolsState.footerQrDefaultLabel || 'Scan QR';
 
     if (qrContainer) {
-      if (!data.html && qrEnabled && data.footerQrBase64) {
+      if (!data.html && qrEnabled && qrCanRender && data.footerQrBase64) {
         if (qrImage) qrImage.src = data.footerQrBase64;
         if (qrLabelEl) qrLabelEl.textContent = qrLabelText;
         qrContainer.classList.remove('hidden');
@@ -464,6 +638,9 @@ async function loadFooterQrSettings() {
     printerToolsState.qrPosition = data.position || 'after-footer';
     printerToolsState.footerQrDefaultValue = data.defaultValue || '';
     printerToolsState.footerQrDefaultLabel = data.defaultLabel || 'Scan QR';
+    printerToolsState.footerQrCanRender = data.canRender !== undefined
+      ? !!data.canRender
+      : (printerToolsState.footerQrEnabled && (!!printerToolsState.footerQrContent || !!printerToolsState.footerQrImageData));
 
     const toggle = document.getElementById('footer-qr-enabled');
     if (toggle) toggle.checked = printerToolsState.footerQrEnabled;
@@ -492,6 +669,7 @@ async function loadFooterQrSettings() {
     });
     updateQrInputVisibility();
     updateQrDefaultBadges();
+    updateQrStatusBadge();
 
     await loadSamplePreview(printerToolsState.selected || printerToolsState.active);
   } catch (error) {
@@ -615,6 +793,9 @@ function bindPrinterToolEvents() {
     headerPreset.addEventListener('change', (e) => {
       printerToolsState.headerPreset = e.target.value;
       toggleCustomContainer(e.target.value, 'custom-header-container');
+      if (e.target.value === 'custom') {
+        ensureHeaderLinesRendered();
+      }
       schedulePreviewUpdate();
     });
   }
@@ -632,6 +813,18 @@ function bindPrinterToolEvents() {
   if (customHeader) {
     customHeader.addEventListener('input', (e) => {
       printerToolsState.customHeaderText = e.target.value;
+      const lines = String(e.target.value || '')
+        .split(/\r?\n/)
+        .map((text, idx) => {
+          const existing = printerToolsState.customHeaderLines[idx];
+          return createHeaderLine({
+            text,
+            font: existing?.font || 'normal',
+            align: existing?.align || 'center',
+          });
+        });
+      printerToolsState.customHeaderLines = lines.length ? lines : [createHeaderLine()];
+      renderHeaderLinesEditor();
       schedulePreviewUpdate();
     });
   }
@@ -688,8 +881,13 @@ function bindPrinterToolEvents() {
   if (footerQrToggle) {
     footerQrToggle.addEventListener('change', (event) => {
       printerToolsState.footerQrEnabled = !!event.target.checked;
+      printerToolsState.footerQrCanRender = printerToolsState.footerQrEnabled
+        ? printerToolsState.footerQrCanRender
+        : false;
       setQrPanelInteractivity(printerToolsState.footerQrEnabled);
+      updateQrStatusBadge();
       schedulePreviewUpdate(); // Live preview
+      scheduleFooterQrAutoSave({ immediate: true });
     });
   }
 
@@ -701,6 +899,7 @@ function bindPrinterToolEvents() {
         printerToolsState.footerQrType = event.target.value;
         updateQrInputVisibility();
         schedulePreviewUpdate();
+        scheduleFooterQrAutoSave();
       });
     });
   }
@@ -711,6 +910,7 @@ function bindPrinterToolEvents() {
     qrContentInput.addEventListener('input', (e) => {
       printerToolsState.footerQrContent = e.target.value;
       schedulePreviewUpdate();
+      scheduleFooterQrAutoSave();
     });
   }
   const qrLabelInput = document.getElementById('footer-qr-label');
@@ -718,6 +918,7 @@ function bindPrinterToolEvents() {
     qrLabelInput.addEventListener('input', (e) => {
       printerToolsState.footerQrLabel = e.target.value;
       schedulePreviewUpdate();
+      scheduleFooterQrAutoSave();
     });
   }
 
@@ -726,6 +927,7 @@ function bindPrinterToolEvents() {
     qrLinkInput.addEventListener('input', (e) => {
       printerToolsState.footerQrLink = e.target.value;
       schedulePreviewUpdate();
+      scheduleFooterQrAutoSave();
     });
   }
 
@@ -736,6 +938,7 @@ function bindPrinterToolEvents() {
       printerToolsState.footerQrSize = Number.isFinite(rawValue) ? rawValue : 2;
       updateQrSizeDisplay();
       schedulePreviewUpdate();
+      scheduleFooterQrAutoSave();
     });
   }
 
@@ -744,6 +947,7 @@ function bindPrinterToolEvents() {
     qrPositionSelect.addEventListener('change', (e) => {
       printerToolsState.qrPosition = e.target.value;
       schedulePreviewUpdate();
+      scheduleFooterQrAutoSave();
     });
   }
 
@@ -756,6 +960,7 @@ function bindPrinterToolEvents() {
         contentArea.value = value;
         printerToolsState.footerQrContent = value;
         schedulePreviewUpdate();
+        scheduleFooterQrAutoSave({ immediate: true });
         showPrinterToast('Menggunakan QR default dari pengaturan toko', 'info');
       } else {
         showPrinterToast('Tidak ada QR default tersedia', 'error');
@@ -776,6 +981,7 @@ function bindPrinterToolEvents() {
       const labelInputEl = document.getElementById('footer-qr-label');
       if (labelInputEl) labelInputEl.value = '';
       schedulePreviewUpdate();
+      scheduleFooterQrAutoSave({ immediate: true });
       showPrinterToast('QR footer dibersihkan', 'info');
     });
   }
@@ -784,6 +990,15 @@ function bindPrinterToolEvents() {
   const saveQrBtn = document.getElementById('save-footer-qr');
   if (saveQrBtn) {
     saveQrBtn.addEventListener('click', saveFooterQrSettings);
+  }
+
+  const addHeaderLineBtn = document.getElementById('add-header-line');
+  if (addHeaderLineBtn) {
+    addHeaderLineBtn.addEventListener('click', () => {
+      printerToolsState.customHeaderLines.push(createHeaderLine());
+      renderHeaderLinesEditor();
+      schedulePreviewUpdate();
+    });
   }
 
   updateQrInputVisibility();
@@ -811,6 +1026,23 @@ async function loadCustomText() {
     printerToolsState.footerPreset = data.footerPreset || 'thank-you';
     printerToolsState.customHeaderText = data.customHeaderText || '';
     printerToolsState.customFooterText = data.customFooterText || '';
+    const incomingHeaderLines = Array.isArray(data.customHeaderLines) ? data.customHeaderLines : [];
+    if (incomingHeaderLines.length) {
+      printerToolsState.customHeaderLines = incomingHeaderLines.map((line) => createHeaderLine({
+        text: line?.text || '',
+        font: line?.font || 'normal',
+        align: line?.align || 'center',
+      }));
+    } else if (printerToolsState.customHeaderText) {
+      printerToolsState.customHeaderLines = String(printerToolsState.customHeaderText)
+        .split(/\r?\n/)
+        .map(str => createHeaderLine({ text: str }))
+        .filter(Boolean);
+    } else {
+      printerToolsState.customHeaderLines = [createHeaderLine()];
+    }
+    syncHeaderTextState();
+    renderHeaderLinesEditor();
     printerToolsState.lineSpacing = data.lineSpacing || 'normal';
     printerToolsState.showHeaderSeparator = data.showHeaderSeparator !== false;
     printerToolsState.showFooterSeparator = data.showFooterSeparator !== false;
@@ -864,8 +1096,9 @@ async function saveCustomText() {
     const payload = {
       headerPreset: document.getElementById('header-preset')?.value || 'shop-name',
       footerPreset: document.getElementById('footer-preset')?.value || 'thank-you',
-      customHeaderText: document.getElementById('custom-header')?.value || '',
+      customHeaderText: printerToolsState.customHeaderText || '',
       customFooterText: document.getElementById('custom-footer')?.value || '',
+      customHeaderLines: getHeaderLinesPayload(),
       lineSpacing: printerToolsState.lineSpacing,
       showHeaderSeparator: printerToolsState.showHeaderSeparator,
       showFooterSeparator: printerToolsState.showFooterSeparator,
@@ -890,6 +1123,14 @@ async function saveCustomText() {
     printerToolsState.footerPreset = data.footerPreset || 'thank-you';
     printerToolsState.customHeaderText = data.customHeaderText || '';
     printerToolsState.customFooterText = data.customFooterText || '';
+    if (Array.isArray(data.customHeaderLines)) {
+      printerToolsState.customHeaderLines = data.customHeaderLines.map((line) => createHeaderLine({
+        text: line?.text || '',
+        font: line?.font || 'normal',
+        align: line?.align || 'center',
+      }));
+      renderHeaderLinesEditor();
+    }
 
     showPrinterToast('✅ Pengaturan kustomisasi disimpan', 'success');
     // Refresh preview to reflect changes
@@ -908,6 +1149,7 @@ async function resetCustomTextToDefault() {
       footerPreset: 'thank-you',
       customHeaderText: '',
       customFooterText: '',
+  customHeaderLines: [createHeaderLine()],
       lineSpacing: 'normal',
       showHeaderSeparator: true,
       showFooterSeparator: true,
@@ -919,36 +1161,44 @@ async function resetCustomTextToDefault() {
       showItemAddons: true,
       detailedItemBreakdown: true
     });
+    syncHeaderTextState();
+    renderHeaderLinesEditor();
     await saveCustomText();
     await loadCustomText();
   } catch (_) {}
 }
 
-async function saveFooterQrSettings() {
+function collectFooterQrPayload() {
+  const toggle = document.getElementById('footer-qr-enabled');
+  const contentInput = document.getElementById('footer-qr-content');
+  const linkInput = document.getElementById('footer-qr-link');
+  const labelInput = document.getElementById('footer-qr-label');
+  const sizeInput = document.getElementById('footer-qr-size');
+  const type = printerToolsState.footerQrType;
+
+  let value = '';
+  if (type === 'link') {
+    value = linkInput ? linkInput.value.trim() : printerToolsState.footerQrLink || '';
+  } else if (type === 'image') {
+    value = printerToolsState.footerQrImageData || '';
+  } else {
+    value = contentInput ? contentInput.value.trim() : printerToolsState.footerQrContent || '';
+  }
+
+  return {
+    enabled: toggle ? !!toggle.checked : printerToolsState.footerQrEnabled,
+    type,
+    value,
+    imageData: type === 'image' ? (printerToolsState.footerQrImageData || value || '') : undefined,
+    label: labelInput ? labelInput.value.trim() : '',
+    cellSize: sizeInput ? Number(sizeInput.value) : printerToolsState.footerQrSize,
+    position: printerToolsState.qrPosition,
+  };
+}
+
+async function persistFooterQrSettings({ silent = false } = {}) {
+  const payload = collectFooterQrPayload();
   try {
-    const toggle = document.getElementById('footer-qr-enabled');
-    const contentInput = document.getElementById('footer-qr-content');
-    const linkInput = document.getElementById('footer-qr-link');
-    const labelInput = document.getElementById('footer-qr-label');
-    const sizeInput = document.getElementById('footer-qr-size');
-    const type = printerToolsState.footerQrType;
-    let value = '';
-    if (type === 'link') {
-      value = linkInput ? linkInput.value.trim() : printerToolsState.footerQrLink || '';
-    } else if (type === 'image') {
-      value = printerToolsState.footerQrImageData || '';
-    } else {
-      value = contentInput ? contentInput.value.trim() : printerToolsState.footerQrContent || '';
-    }
-    const payload = {
-      enabled: toggle ? toggle.checked : false,
-      type,
-      value,
-      label: labelInput ? labelInput.value.trim() : '',
-      cellSize: sizeInput ? Number(sizeInput.value) : printerToolsState.footerQrSize,
-      position: printerToolsState.qrPosition,
-    };
-    
     const res = await fetch('/api/printer/footer-qr', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -958,19 +1208,70 @@ async function saveFooterQrSettings() {
     if (!data?.success) {
       throw new Error(data?.message || 'Gagal menyimpan QR footer');
     }
-  printerToolsState.footerQrEnabled = !!data.enabled;
-  printerToolsState.footerQrContent = data.value || '';
-  printerToolsState.footerQrLabel = data.label || '';
-  printerToolsState.footerQrType = data.type || printerToolsState.footerQrType;
-  printerToolsState.footerQrSize = data.cellSize || printerToolsState.footerQrSize;
-  printerToolsState.qrPosition = data.position || printerToolsState.qrPosition;
-    showPrinterToast('✅ Pengaturan QR footer disimpan', 'success');
-    // Refresh preview to reflect changes
-    await loadSamplePreview(printerToolsState.selected || printerToolsState.active);
+
+    printerToolsState.footerQrEnabled = !!data.enabled;
+    printerToolsState.footerQrContent = data.value || '';
+    printerToolsState.footerQrLabel = data.label || '';
+    printerToolsState.footerQrType = data.type || payload.type;
+    printerToolsState.footerQrSize = Number.isFinite(Number(data.cellSize)) ? Number(data.cellSize) : printerToolsState.footerQrSize;
+    printerToolsState.qrPosition = data.position || printerToolsState.qrPosition;
+    printerToolsState.footerQrImageData = printerToolsState.footerQrType === 'image'
+      ? (data.imageData || payload.imageData || '')
+      : '';
+    if (printerToolsState.footerQrType === 'link') {
+      printerToolsState.footerQrLink = printerToolsState.footerQrContent;
+    } else if (printerToolsState.footerQrType === 'qr') {
+      printerToolsState.footerQrLink = '';
+    }
+    printerToolsState.footerQrCanRender = data.canRender !== undefined
+      ? !!data.canRender
+      : (printerToolsState.footerQrEnabled && (!!printerToolsState.footerQrContent || !!printerToolsState.footerQrImageData));
+    printerToolsState.footerQrDefaultValue = data.defaultValue || printerToolsState.footerQrDefaultValue;
+    printerToolsState.footerQrDefaultLabel = data.defaultLabel || printerToolsState.footerQrDefaultLabel;
+
+    const toggle = document.getElementById('footer-qr-enabled');
+    if (toggle) toggle.checked = printerToolsState.footerQrEnabled;
+    const contentInput = document.getElementById('footer-qr-content');
+    if (contentInput && printerToolsState.footerQrType === 'qr') {
+      contentInput.value = printerToolsState.footerQrContent;
+    }
+    const linkInput = document.getElementById('footer-qr-link');
+    if (linkInput && printerToolsState.footerQrType === 'link') {
+      linkInput.value = printerToolsState.footerQrLink;
+    }
+    const labelInput = document.getElementById('footer-qr-label');
+    if (labelInput) {
+      labelInput.value = printerToolsState.footerQrLabel;
+    }
+    const sizeInput = document.getElementById('footer-qr-size');
+    if (sizeInput) {
+      sizeInput.value = printerToolsState.footerQrSize;
+    }
+    setQrPanelInteractivity(printerToolsState.footerQrEnabled);
+    updateQrStatusBadge();
+    updateQrDefaultBadges();
+    if (!silent) {
+      showPrinterToast('✅ Pengaturan QR footer disimpan', 'success');
+      await loadSamplePreview(printerToolsState.selected || printerToolsState.active);
+    }
+    return data;
   } catch (error) {
-    console.error('Failed to save footer QR settings:', error);
-    showPrinterToast(error.message || 'Gagal menyimpan QR footer', 'error');
+    if (!silent) {
+      console.error('Failed to save footer QR settings:', error);
+      showPrinterToast(error.message || 'Gagal menyimpan QR footer', 'error');
+    } else {
+      console.error('Auto-save footer QR failed:', error);
+    }
+    throw error;
   }
+}
+
+async function saveFooterQrSettings() {
+  if (footerQrAutoSaveTimer) {
+    clearTimeout(footerQrAutoSaveTimer);
+    footerQrAutoSaveTimer = null;
+  }
+  return persistFooterQrSettings({ silent: false });
 }
 
 async function loadFullCustomTemplate() {

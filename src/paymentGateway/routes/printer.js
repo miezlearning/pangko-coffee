@@ -7,6 +7,39 @@ const router = express.Router();
 const printerService = require('../../services/printerService');
 const orderManager = require('../../services/orderManager');
 
+function parseBoolean(value, fallback = undefined) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return false;
+    if (['true', '1', 'yes', 'on', 'enable', 'enabled'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'off', 'disable', 'disabled'].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
+function coerceNumber(value, fallback = undefined) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function coerceString(value) {
+  if (value === undefined || value === null) return undefined;
+  const str = String(value).trim();
+  return str.length ? str : undefined;
+}
+
+function parseJsonArray(value) {
+  if (!value) return undefined;
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    return Array.isArray(parsed) ? parsed : undefined;
+  } catch (_) {
+    return undefined;
+  }
+}
+
 /**
  * GET /api/printer/status
  * Get printer status
@@ -57,6 +90,7 @@ router.get('/sample-preview', async (req, res) => {
       headerPreset: req.query.headerPreset,
       footerPreset: req.query.footerPreset,
       customHeaderText: req.query.customHeaderText,
+    customHeaderLines: parseJsonArray(req.query.customHeaderLines),
       customFooterText: req.query.customFooterText,
       // Formatting
       lineSpacing: req.query.lineSpacing,
@@ -92,6 +126,8 @@ router.get('/sample-preview', async (req, res) => {
       footerQrBase64: receipt.footerQrBase64 || '', // Send base64 image
       footerQrLabel: receipt.footerQr && receipt.footerQr.label ? receipt.footerQr.label : '',
       footerQrEnabled: !!(receipt.footerQr && receipt.footerQr.enabled),
+      footerQrCanRender: !!(receipt.footerQr && receipt.footerQr.canRender),
+      headerStyles: receipt.headerStyles || [],
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -154,6 +190,7 @@ router.post('/custom-text', (req, res) => {
       headerPreset,
       footerPreset,
       customHeaderText,
+  customHeaderLines,
       customFooterText,
       lineSpacing,
       // Section visibility
@@ -171,7 +208,8 @@ router.post('/custom-text', (req, res) => {
     const saved = printerService.setCustomText({ 
       headerPreset,
       footerPreset,
-      customHeaderText,
+  customHeaderText,
+  customHeaderLines,
       customFooterText,
       lineSpacing,
       // Section visibility
@@ -203,15 +241,20 @@ router.get('/footer-qr', (req, res) => {
 router.post('/footer-qr', (req, res) => {
   try {
     const { enabled, type, value, link, imageData, cellSize, label, position } = req.body || {};
-    const saved = printerService.setFooterQrSetting({ 
-      enabled, 
-      type, 
-      value, 
-      link, 
-      imageData, 
-      cellSize, 
-      label,
-      position
+    const normalizedEnabled = parseBoolean(enabled);
+    const normalizedType = coerceString(type) || 'qr';
+    const payloadValue = coerceString(value) ?? coerceString(link);
+    const payloadImage = normalizedType === 'image' ? (coerceString(imageData) ?? payloadValue ?? '') : coerceString(imageData);
+    const normalizedCellSize = coerceNumber(cellSize);
+
+    const saved = printerService.setFooterQrSetting({
+      enabled: normalizedEnabled,
+      type: normalizedType,
+      value: payloadValue,
+      imageData: payloadImage,
+      cellSize: normalizedCellSize,
+      label: coerceString(label),
+      position: coerceString(position)
     });
     res.json({ success: true, ...saved });
   } catch (error) {
@@ -280,7 +323,9 @@ router.get('/preview/:orderId', async (req, res) => {
       footerQrAscii: receipt.previewAscii || [],
       footerQrBase64: receipt.footerQrBase64 || '',
       footerQrLabel: footerQr.label || '',
-      footerQrEnabled: !!footerQr.enabled
+      footerQrEnabled: !!footerQr.enabled,
+  footerQrCanRender: !!footerQr.canRender,
+  headerStyles: receipt.headerStyles || [],
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
