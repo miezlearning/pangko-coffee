@@ -414,7 +414,11 @@ router.post('/cash/accept/:orderId', async (req, res) => {
                 `Order ID: *${order.orderId}*\n` +
                 `Atas Nama: *${order.customerName}*\n\n` +
                 `Pesanan Anda sedang diproses oleh barista. Anda akan mendapat notifikasi saat siap. 👨‍🍳`;
-            try { await botInstance.sock.sendMessage(order.userId, { text }); } catch (_) {}
+            try { 
+                await botInstance.sock.sendMessage(order.userId, { text }); 
+            } catch (e) {
+                console.error(`Failed to send cash accept notification to ${order.userId} for order ${order.orderId}:`, e);
+            }
         }
 
         // Optionally notify baristas of new order to process
@@ -429,7 +433,11 @@ router.post('/cash/accept/:orderId', async (req, res) => {
                 `━━━━━━━━━━━━━━━━━━━━\n\n` +
                 `Silakan proses pesanan ini! 👨‍🍳`;
             for (const baristaNumber of config.shop.baristaNumbers || config.baristaNumbers || []) {
-                try { await botInstance.sock.sendMessage(baristaNumber, { text: baristaText }); } catch (_) {}
+                try { 
+                    await botInstance.sock.sendMessage(baristaNumber, { text: baristaText }); 
+                } catch (e) {
+                    console.error(`Failed to send cash accept notification to barista ${baristaNumber} for order ${order.orderId}:`, e);
+                }
             }
         } catch (_) {}
 

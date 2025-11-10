@@ -20,7 +20,7 @@
   "license": "ISC",
   "dependencies": {
     "@hapi/boom": "^10.0.1",
-    "@whiskeysockets/baileys": "^6.7.8",
+    "@whiskeysockets/baileys": "^6.7.0",
     "axios": "^1.7.7",
     "better-sqlite3": "^11.7.0",
     "cors": "^2.8.5",
