@@ -1,0 +1,30 @@
+/* inventory.css — small modern tweaks (2025-friendly) */
+:root{
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --muted: #64748b;
+  --accent: #0ea5a4;
+  --glass: rgba(255,255,255,0.6);
+}
+body[data-page="inventory"] main{ /* subtle backdrop */
+  -webkit-font-smoothing:antialiased;
+}
+/* Card lift */
+section{ border-radius: 14px; }
+section.shadow-sm{ box-shadow: 0 6px 20px rgba(16,24,40,0.06); }
+/* Inputs */
+input[type="text"], input[type="number"], textarea{ transition: box-shadow .12s ease, transform .06s ease; }
+input:focus, textarea:focus{ box-shadow: 0 6px 20px rgba(14,165,164,0.06); transform: translateY(-1px); }
+/* Buttons: slightly larger, rounded */
+button{ transition: transform .06s ease, box-shadow .06s ease; }
+button:active{ transform: translateY(1px); }
+/* Ingredient unit label */
+.ingredient-unit{ min-width:72px; color:var(--muted); font-feature-settings: "tnum"; }
+/* Compact table rows and clearer separators */
+table.min-w-full td, table.min-w-full th{ padding-top:10px; padding-bottom:10px; }
+/* Master table actions spacing */
+.master-actions { display:flex; gap:8px; align-items:center; }
+/* Small screens: make ingredient rows more compact */
+@media (max-width:640px){
+  .ingredient-unit{ text-align:left; margin-left:0; }
+}

@@ -85,6 +85,26 @@ function addIngredientRow(containerId, name = '', qty = '') {
   qtyInput.className = 'ingredient-qty w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none sm:w-32';
   qtyInput.value = qty !== undefined && qty !== null ? qty : '';
 
+  // small unit label (populated from masterIngredients when available)
+  const unitSpan = document.createElement('div');
+  unitSpan.className = 'ingredient-unit mt-1 text-xs text-slate-500 sm:mt-0 sm:ml-2 sm:w-20 sm:text-right';
+  unitSpan.textContent = '';
+
+  function updateUnitLabel() {
+    const entered = (nameInput.value || '').trim();
+    if (!entered) {
+      unitSpan.textContent = '';
+      return;
+    }
+    const found = state.masterIngredients.find(it => (it.name || '').toLowerCase() === entered.toLowerCase());
+    if (found && (found.unit || found.nettoUnit)) {
+      unitSpan.textContent = found.unit || found.nettoUnit || '';
+    } else {
+      unitSpan.textContent = '';
+    }
+  }
+  nameInput.addEventListener('input', updateUnitLabel);
+
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className = 'rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100';
@@ -93,8 +113,12 @@ function addIngredientRow(containerId, name = '', qty = '') {
 
   row.appendChild(nameInput);
   row.appendChild(qtyInput);
+  row.appendChild(unitSpan);
   row.appendChild(removeBtn);
   container.appendChild(row);
+
+  // set unit initially if name was provided
+  if (name) updateUnitLabel();
 }
 
 function setIngredientRows(containerId, map = {}, options = {}) {
@@ -277,13 +301,21 @@ async function loadSessionStatus() {
   if (response.success && response.session) {
     state.activeSession = response.session;
     if (notice) {
+      const formatEl = $('recapFormat');
+      const fmt = formatEl ? (formatEl.value || 'detail') : 'detail';
+      if (fmt === 'block') await renderRecapChecklist();
       notice.textContent = `Sesi aktif sejak ${formatDateTime(response.session.openedAt)}. Silakan lengkapi closing.`;
       notice.classList.remove('hidden');
     }
     populateOpeningForm(response.session);
-    populateClosingForm(response.session);
+    const openNamesExisting = getContainerNames('openIngredients');
+    if (shouldReplaceWithMaster(openNamesExisting)) {
+      resetOpeningForm(openNames);
+    }
+    // lock/open forms appropriately for an active session
     setFormEnabled('openForm', false);
     setFormEnabled('closeForm', true);
+    populateClosingForm(response.session);
   } else {
     state.activeSession = null;
     if (notice) {
@@ -293,11 +325,81 @@ async function loadSessionStatus() {
     setFormEnabled('openForm', true);
     setFormEnabled('closeForm', false);
     resetClosingForm(openNames);
-    const openNamesExisting = getContainerNames('openIngredients');
-    if (shouldReplaceWithMaster(openNamesExisting)) {
-      resetOpeningForm(openNames);
-    }
   }
+}
+
+async function renderRecapChecklist() {
+  const wrap = $('recapChecklist');
+  const aiStatus = $('recapAiStatus');
+  const aiResult = $('recapAiResult');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  if (aiStatus) aiStatus.textContent = '';
+  if (aiResult) aiResult.textContent = '';
+
+  const reportRes = await api('/report');
+  if (!reportRes.success || !reportRes.report) {
+    wrap.textContent = 'Belum ada data untuk menandai.';
+    return;
+  }
+
+  const report = reportRes.report || {};
+  const ingredients = Object.keys(report.ingredients || {});
+  if (!ingredients.length) {
+    wrap.innerHTML = '<div class="text-xs text-slate-500">Belum ada item untuk ditandai.</div>';
+    return;
+  }
+
+  ingredients.forEach((name) => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-3 py-1';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'recap-mark';
+    cb.dataset.name = name;
+
+    const label = document.createElement('label');
+    label.className = 'text-sm text-slate-700 flex-1';
+    label.textContent = name;
+
+    // show opening/closing numbers if available
+    const entry = report.ingredients && report.ingredients[name] ? report.ingredients[name] : null;
+    const meta = document.createElement('div');
+    meta.className = 'text-xs text-slate-500';
+    if (entry) meta.textContent = `O:${entry.opening ?? '-'} • C:${entry.closing ?? '-'} • Digunakan:${entry.used ?? '-'}`;
+
+    row.appendChild(cb);
+    row.appendChild(label);
+    row.appendChild(meta);
+    wrap.appendChild(row);
+  });
+}
+
+async function generateAiRecommendations() {
+  const status = $('recapAiStatus');
+  const result = $('recapAiResult');
+  if (status) status.textContent = 'Meminta rekomendasi...';
+  const res = await api('/recap/ai', { method: 'POST', body: {} });
+  if (res.success) {
+    if (result) result.textContent = res.text || '';
+    if (status) status.textContent = 'Rekomendasi siap';
+    return res.recommended || [];
+  } else {
+    if (result) result.textContent = res.message || 'Gagal membuat rekomendasi.';
+    if (status) status.textContent = '';
+    return [];
+  }
+}
+
+async function applyAiRecommendations() {
+  const recs = await generateAiRecommendations();
+  if (!recs || !recs.length) return;
+  const checkboxes = Array.from(document.querySelectorAll('.recap-mark'));
+  checkboxes.forEach(cb => {
+    const name = cb.dataset.name || '';
+    if (recs.find(r => (r || '').toLowerCase() === name.toLowerCase())) cb.checked = true;
+  });
 }
 
 async function loadReport() {
@@ -323,15 +425,18 @@ async function loadReport() {
   const entries = Object.entries(report.ingredients || {});
   if (entries.length === 0) {
     const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="5" class="px-3 py-2 text-center text-slate-400">Belum ada data bahan</td>';
+    row.innerHTML = '<td colspan="6" class="px-3 py-2 text-center text-slate-400">Belum ada data bahan</td>';
     bodyEl.appendChild(row);
   } else {
     entries.forEach(([name, item]) => {
       const percent = item.percentRemaining === null || item.percentRemaining === undefined ? '-' : `${item.percentRemaining}%`;
+      const master = state.masterIngredients.find(it => (it.name || '').toLowerCase() === (name || '').toLowerCase());
+      const unitLabel = master ? (master.unit || master.nettoUnit || '-') : '-';
       const tr = document.createElement('tr');
       tr.className = 'border-t border-slate-100';
       tr.innerHTML = `
         <td class="px-3 py-2 font-medium text-slate-700">${name}</td>
+        <td class="px-3 py-2 text-slate-600">${unitLabel}</td>
         <td class="px-3 py-2 text-slate-600">${item.opening}</td>
         <td class="px-3 py-2 text-slate-600">${item.closing}</td>
         <td class="px-3 py-2 text-slate-600">${item.used}</td>
@@ -348,9 +453,10 @@ async function previewRecap() {
   const status = $('recapStatus');
   const textarea = $('recapText');
   if (!status || !textarea) return;
-
   status.textContent = 'Membuat preview...';
-  const response = await api('/recap');
+  const formatEl = $('recapFormat');
+  const fmt = formatEl ? (formatEl.value || 'detail') : 'detail';
+  const response = await api(`/recap?format=${encodeURIComponent(fmt)}`);
   if (response.success && response.text) {
     textarea.value = response.text;
     status.textContent = '✅ Preview siap dikirim';
@@ -363,9 +469,15 @@ async function sendRecap() {
   const status = $('recapStatus');
   const textarea = $('recapText');
   if (!status || !textarea) return;
-
   status.textContent = 'Mengirim ke WhatsApp...';
-  const response = await api('/recap/send', { method: 'POST', body: {} });
+  const formatEl = $('recapFormat');
+  const fmt = formatEl ? (formatEl.value || 'detail') : 'detail';
+  let body = {};
+  if (fmt === 'block') {
+    const checked = Array.from(document.querySelectorAll('.recap-mark:checked')).map(cb => cb.dataset.name).filter(Boolean);
+    body.marked = checked;
+  }
+  const response = await api(`/recap/send?format=${encodeURIComponent(fmt)}`, { method: 'POST', body });
   if (response.success) {
     if (response.text && !textarea.value) textarea.value = response.text;
     status.textContent = `✅ Rekap dikirim ke ${response.sent} penerima`;
