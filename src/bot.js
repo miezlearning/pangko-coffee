@@ -36,6 +36,7 @@ class WhatsAppBot {
         this.reconnectAttempts = 0;
         this.lockAcquired = false;
         this.cleanupStarted = false;
+        this.interactivePromptShown = false;
         
         // Default value (nanti akan di-override oleh input user jika belum login)
         this.usePairingCode = false;
@@ -70,27 +71,34 @@ class WhatsAppBot {
             console.log(`📦 Baileys v${version.join('.')}`);
 
             // --- 3. CEK SESSION ---
-            const { state, saveCreds } = await useMultiFileAuthState('./sessions');
+            const sessionDir = path.resolve(__dirname, '..', 'sessions');
+            const credsPath = path.join(sessionDir, 'creds.json');
+            const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
-            // --- 4. INTERACTIVE LOGIN PROMPT (Jika Belum Terdaftar) ---
-            // Logika: Jika belum ada creds.registered, tanya user mau pake apa
-            if (!state.creds.registered) {
+            // --- 4. INTERACTIVE LOGIN PROMPT (Jika benar-benar belum ada sesi) ---
+            // Gunakan keberadaan file creds.json sebagai kebenaran utama agar tidak salah deteksi.
+            const sessionExists = fs.existsSync(credsPath);
+            if (!sessionExists && !this.interactivePromptShown) {
                 console.log('\n⚠️  BELUM ADA SESI LOGIN TERDETEKSI');
                 console.log('Pilih metode login:');
                 console.log('1. QR Code (Scan biasa)');
                 console.log('2. Pairing Code (Kode 8 digit - Lebih stabil)');
-                
                 const choice = await question('Masukkan pilihan (1/2): ');
+                this.interactivePromptShown = true;
 
                 if (choice.trim() === '2') {
                     this.usePairingCode = true;
                     const inputNumber = await question('Masukkan Nomor WhatsApp (contoh: 62812xxx): ');
-                    this.pairingPhone = inputNumber.replace(/\D/g, ''); // Hapus karakter non-angka
+                    this.pairingPhone = inputNumber.replace(/\D/g, '');
                     console.log(`✅ Mode Pairing Code dipilih untuk: ${this.pairingPhone}\n`);
                 } else {
                     this.usePairingCode = false;
                     console.log('✅ Mode QR Code dipilih.\n');
                 }
+            } else if (sessionExists) {
+                // Hindari prompt ketika sesi sudah ada
+                this.usePairingCode = false;
+                this.hasShownPairingCode = true;
             }
 
             // --- 5. BUAT SOCKET ---
@@ -103,6 +111,9 @@ class WhatsAppBot {
                 generateHighQualityLinkPreview: true,
                 // 👇 TAMBAHAN AGAR LEBIH STABIL
                 syncFullHistory: false, // Eksplisit nonaktifkan
+                shouldSyncHistoryMessage: () => false,
+                markOnlineOnConnect: false,
+                emitOwnEvents: false,
                 connectTimeoutMs: 60000, 
                 defaultQueryTimeoutMs: 0, // Tidak ada timeout query default
                 keepAliveIntervalMs: 20000, // Interval keep-alive lebih lama
@@ -190,9 +201,15 @@ class WhatsAppBot {
             }
 
             console.log(`❌ Terputus (Status: ${statusCode}). Reconnect: ${shouldReconnect}`);
+            // Selalu bersihkan socket lama agar tidak terjadi duplikasi listener/WS
+            if (this.sock) {
+                try { this.sock.ev.removeAllListeners(); } catch(_){}
+                try { this.sock.ws && this.sock.ws.close(); } catch(_){}
+                this.sock = null;
+            }
             if (shouldReconnect) {
                 this.reconnectAttempts++;
-                setTimeout(() => this.start(), 5000); // Reconnect tanpa tanya input (karena session masih ada)
+                setTimeout(() => this.start(), 5000);
             }
         } else if (connection === 'open') {
             console.log('✅ TERHUBUNG KE WHATSAPP!');

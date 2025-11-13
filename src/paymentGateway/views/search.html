@@ -48,9 +48,9 @@
         </div>
 
         <div class="relative mt-8 rounded-2xl border border-white/60 bg-white/85 p-5 shadow-[0_25px_60px_-55px_rgba(51,51,51,0.45)]">
-          <div class="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
-            <input id="search-input" type="text" placeholder="Contoh: CF123456 atau NAMA" class="w-full rounded-2xl border border-charcoal/10 bg-white/95 px-4 py-3 text-sm outline-none ring-matcha/30 focus:ring-2" />
-            <select id="search-status" class="rounded-2xl border border-charcoal/10 bg-white/95 px-3 py-3 text-sm">
+          <div class="grid gap-4 sm:grid-cols-[1fr_auto]">
+            <input id="search-input" type="text" placeholder="Cari berdasarkan ID Pesanan atau Nama Customer..." class="w-full rounded-xl border border-charcoal/10 bg-white/95 px-4 py-3 text-sm outline-none ring-matcha/30 transition focus:ring-2" />
+            <select id="search-status" class="w-full rounded-xl border border-charcoal/10 bg-white/95 px-3 py-3 text-sm outline-none ring-matcha/30 transition focus:ring-2 sm:w-auto">
               <option value="all">Semua Status</option>
               <option value="pending_cash">Menunggu Tunai</option>
               <option value="pending_payment">Pembayaran Pending (QRIS)</option>
@@ -59,23 +59,32 @@
               <option value="completed">Selesai</option>
               <option value="cancelled">Dibatalkan</option>
             </select>
-            <button id="btn-search-secondary" type="button" onclick="runSearch()" class="rounded-2xl border border-matcha/30 bg-matcha/10 px-4 py-3 text-sm font-semibold text-matcha transition hover:bg-matcha/15">Filter Status</button>
           </div>
         </div>
 
-        <div id="search-results" class="relative mt-8 space-y-3"></div>
+        <div id="search-results" class="relative mt-6">
+          <!-- Results will be injected here -->
+          <div id="placeholder" class="py-10 text-center text-charcoal/50">
+            <p>Masukkan kata kunci untuk memulai pencarian...</p>
+          </div>
+        </div>
       </section>
     </main>
 
     <!-- Detail Modal -->
-    <div id="detail-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-charcoal/40 p-4 opacity-0 transition-opacity duration-200">
-      <div class="w-full max-w-2xl rounded-3xl border border-white/50 bg-white/95 p-6 shadow-2xl">
+    <div id="detail-modal" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-charcoal/60 p-4 opacity-0 backdrop-blur-sm transition-opacity duration-300">
+      <div class="w-full max-w-2xl scale-95 rounded-3xl border border-white/50 bg-cream/80 p-6 shadow-2xl backdrop-blur-lg transition-all duration-300">
         <div class="flex items-start justify-between">
-          <h3 id="detail-title" class="text-lg font-semibold">Detail</h3>
-          <button id="detail-close" class="rounded-xl border border-charcoal/15 bg-white px-3 py-1 text-sm">Tutup</button>
+          <div class="space-y-1">
+            <h3 id="detail-title" class="text-xl font-bold text-charcoal">Detail Pesanan</h3>
+            <p id="detail-subtitle" class="text-sm text-charcoal/60">Informasi lengkap mengenai pesanan.</p>
+          </div>
+          <button id="detail-close" class="rounded-full border border-charcoal/15 bg-white/80 p-2 text-sm transition hover:bg-white">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+          </button>
         </div>
-        <div id="detail-body" class="mt-4 text-sm"></div>
-        <div id="detail-actions" class="mt-5 grid gap-3 sm:grid-cols-2"></div>
+        <div id="detail-body" class="mt-6 max-h-[60vh] overflow-y-auto pr-2 text-sm"></div>
+        <div id="detail-actions" class="mt-6 grid gap-3 sm:grid-cols-2"></div>
       </div>
     </div>
 

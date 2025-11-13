@@ -40,6 +40,7 @@ const importRouter = require('./routes/import');
 const menuRouter = require('./routes/menu');
 const printerRouter = require('./routes/printer');
 const toolsRouter = require('./routes/tools');
+const inventoryRouter = require('./routes/inventory');
 
 // Mount routes
 app.use('/api/payments', paymentsRouter);
@@ -51,6 +52,7 @@ app.use('/api/export', exportRouter);
 app.use('/api/import', importRouter);
 app.use('/api/printer', printerRouter);
 app.use('/api/tools', toolsRouter);
+app.use('/api/inventory', inventoryRouter);
 
 // Serve dashboard
 app.get('/', (req, res) => {
@@ -85,6 +87,11 @@ app.get('/import', (req, res) => {
 // Serve tools page
 app.get('/tools', (req, res) => {
     res.sendFile(path.join(__dirname, 'views/tools.html'));
+});
+
+// Serve inventory audit page
+app.get('/tools/inventory', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views/inventory.html'));
 });
 
 // Serve salary calculator

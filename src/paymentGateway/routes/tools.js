@@ -50,6 +50,29 @@ router.post('/reset-table', (req, res) => {
     const tx = db.transaction(() => del.run());
     tx();
 
+    // Also clear in-memory caches relevant to this table so UI reflects changes immediately
+    try {
+      if (table.toLowerCase() === 'orders') {
+        // Clear in-memory orders and pending payments used by search
+        try {
+          const orderManager = require('../../services/orderManager');
+          if (orderManager && orderManager.orders && typeof orderManager.orders.flushAll === 'function') {
+            orderManager.orders.flushAll();
+          }
+        } catch (e) {
+          console.warn('[tools] Failed to flush in-memory orders:', e && e.message);
+        }
+        try {
+          const ds = require('../dataStore');
+          if (ds && typeof ds.clearPendingPayments === 'function') {
+            ds.clearPendingPayments();
+          }
+        } catch (e) {
+          console.warn('[tools] Failed to clear pending payments:', e && e.message);
+        }
+      }
+    } catch (_) { /* best-effort */ }
+
     res.json({ success: true, message: `Table ${table} reset (all rows deleted)`, columns: info.map(c => c.name) });
   } catch (e) {
     console.error('Failed to reset table:', e.message);
