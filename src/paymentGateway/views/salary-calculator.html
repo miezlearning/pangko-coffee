@@ -5,11 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Pangko Coffee · Kalkulator Gaji</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Twemoji keeps emoji rendering consistent across platforms -->
+    <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: { sans: ['Manrope', 'system-ui', 'sans-serif'] },
+                    fontFamily: {
+                        sans: ['Manrope', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', 'system-ui', 'sans-serif']
+                    },
                     colors: { matcha: '#74A662', cream: '#FFFDD0', charcoal: '#333333', peach: '#FFE5B4' },
                     boxShadow: { glow: '0 35px 80px -45px rgba(116, 166, 98, 0.65)' }
                 }
@@ -19,20 +23,47 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+        body { font-family: Manrope, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui, sans-serif; }
+        img.emoji { height: 1em; width: 1em; margin: 0 .05em; vertical-align: -0.15em; }
+    </style>
 </head>
 <body class="min-h-screen bg-cream text-charcoal antialiased" data-page="tools">
     <!-- Navbar Container -->
     <div id="navbar-container"></div>
 
     <main class="mx-auto w-full max-w-[1180px] px-5 pt-32 pb-16">
-        <!-- Header -->
-        <header class="mb-8">
-            <div class="flex items-center gap-3">
-                <a href="/tools" class="text-charcoal/50 hover:text-matcha transition">← Kembali ke Tools</a>
+        <section class="relative mb-10 overflow-hidden rounded-3xl bg-white/90 px-6 py-8 shadow-glow md:px-12 md:py-12">
+            <div class="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-matcha/25 blur-3xl"></div>
+            <div class="pointer-events-none absolute -right-20 bottom-0 h-72 w-72 rounded-full bg-peach/35 blur-3xl"></div>
+            <div class="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div class="max-w-xl space-y-4">
+                    <a href="/tools" class="inline-flex items-center gap-2 text-sm font-semibold text-charcoal/55 transition hover:text-matcha">
+                        ← Kembali ke Tools
+                    </a>
+                    <span class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-5 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-matcha">People Ops</span>
+                    <h1 class="text-4xl font-extrabold leading-tight md:text-5xl">💰 Kalkulator Gaji Karyawan</h1>
+                    <p class="text-base text-charcoal/65 md:text-lg">Hitung pembagian gaji berdasarkan persentase revenue, role khusus, atau pembagian rata hanya dalam beberapa langkah.</p>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button type="button" onclick="document.getElementById('revenue-input')?.focus()" class="inline-flex items-center gap-2 rounded-2xl bg-matcha px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-matcha/25 transition hover:-translate-y-0.5 hover:bg-matcha/90">🧮 Masukkan Pendapatan</button>
+                        <button type="button" onclick="document.getElementById('mode-select')?.focus()" class="inline-flex items-center gap-2 rounded-2xl border border-matcha/35 bg-white px-5 py-3 text-sm font-semibold text-matcha transition hover:-translate-y-0.5 hover:bg-matcha/10">⚙️ Atur Mode</button>
+                    </div>
+                </div>
+                <div class="relative w-full max-w-sm space-y-4 rounded-2xl border border-white/50 bg-white/80 p-6 shadow-[0_45px_80px_-60px_rgba(51,51,51,0.55)]">
+                    <div class="flex items-center gap-3">
+                        <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-matcha/15 text-2xl">👥</span>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/55">Atur per Shift</p>
+                            <p class="text-sm text-charcoal/65">Tambahkan role, tetapkan persentase, dan pantau sisa alokasi otomatis.</p>
+                        </div>
+                    </div>
+                    <div class="rounded-2xl border border-charcoal/10 bg-charcoal/5 p-4 text-xs text-charcoal/60">
+                        <p class="font-semibold text-charcoal">Tips</p>
+                        <p class="mt-2">Gunakan tombol <strong>Tambah Karyawan</strong> setelah mengisi data untuk memastikan perhitungan langsung ter-update.</p>
+                    </div>
+                </div>
             </div>
-            <h1 class="mt-4 text-4xl font-extrabold tracking-tight">💰 Kalkulator Gaji Karyawan</h1>
-            <p class="mt-2 text-lg text-charcoal/70">Hitung pembagian gaji berdasarkan persentase revenue untuk setiap karyawan.</p>
-        </header>
+        </section>
 
         <div class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <!-- Left Column: Input & Employee List -->
@@ -229,5 +260,17 @@
 
     <script src="/js/navbar.js"></script>
     <script src="/js/salary-calculator.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.twemoji) {
+                const parseAll = () => {
+                    try { twemoji.parse(document.body, { folder: 'svg', ext: '.svg' }); } catch (_) {}
+                };
+                parseAll();
+                const obs = new MutationObserver(() => parseAll());
+                obs.observe(document.body, { childList: true, subtree: true });
+            }
+        });
+    </script>
 </body>
 </html>

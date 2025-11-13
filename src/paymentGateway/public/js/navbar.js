@@ -100,10 +100,12 @@ function initStoreControls(){
         pill.textContent = '🟢 OPEN';
         pill.className = 'px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800';
         actions.innerHTML = `<button id="btn-close-store" class="rounded-full px-3 py-1 text-sm font-semibold border border-red-200 bg-white text-red-600">Tutup Toko</button>`;
+        syncHeroStoreState(true);
       } else {
         pill.textContent = '🔴 CLOSED';
         pill.className = 'px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-700';
         actions.innerHTML = `<button id="btn-open-store" class="rounded-full px-3 py-1 text-sm font-semibold border border-green-200 bg-white text-green-600">Buka Toko</button>`;
+        syncHeroStoreState(false);
       }
 
       // Wire buttons
@@ -139,6 +141,22 @@ function initStoreControls(){
   // Initial load + periodic refresh every 8s
   refresh();
   setInterval(refresh, 8000);
+}
+
+function syncHeroStoreState(isOpen){
+  const badge = document.getElementById('store-state-badge');
+  const chip = document.getElementById('store-state-chip');
+  const indicator = document.getElementById('store-state-indicator');
+  if(!badge || !chip || !indicator) return;
+  if(isOpen){
+    badge.className = 'inline-flex items-center gap-2 rounded-full bg-matcha/15 px-3 py-1 text-xs font-semibold text-matcha';
+    indicator.className = 'h-2 w-2 rounded-full bg-matcha';
+    chip.textContent = 'Buka';
+  } else {
+    badge.className = 'inline-flex items-center gap-2 rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-600';
+    indicator.className = 'h-2 w-2 rounded-full bg-red-500';
+    chip.textContent = 'Tutup';
+  }
 }
 
 /**

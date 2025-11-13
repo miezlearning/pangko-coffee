@@ -28,17 +28,17 @@ module.exports = {
     }
 
     if (['open','buka','openstore'].includes(sub)) {
-      const updated = storeState.setOpen(true, 'barista/admin');
-      const text = `✅ Toko dibuka. Sekarang menerima pesanan.\n\nJam Operasional: ${config.shop.openHours}`;
-      await sock.sendMessage(from, { text });
+      storeState.setOpen(true, from);
+      await sock.sendMessage(from, { text: '✅ Status toko berhasil diubah menjadi BUKA.' });
+      await storeState.updateProfileStatus();
       return;
     }
 
     if (['close','tutup','closestore'].includes(sub)) {
-      const reason = args.slice(1).join(' ').trim();
-      const message = reason || `Maaf, toko sedang tutup. Jam operasional: ${config.shop.openHours}`;
-      storeState.setOpen(false, 'barista/admin', message);
-      await sock.sendMessage(from, { text: `⏸️ Toko ditutup untuk sementara.\n\n${message}` });
+      const reason = args.slice(1).join(' ') || null;
+      storeState.setOpen(false, from, reason);
+      await sock.sendMessage(from, { text: `🔴 Status toko berhasil diubah menjadi TUTUP.\nAlasan: ${reason || 'Tidak ada'}` });
+      await storeState.updateProfileStatus();
       return;
     }
 

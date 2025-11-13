@@ -5,20 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Pangko Coffee · Kalkulator Modern</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Twemoji keeps emoji rendering consistent across platforms -->
+    <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js"></script>
     <script>
       // Konfigurasi tailwind custom Anda
       tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
-              sans: ["Manrope", "system-ui", "sans-serif"],
+              sans: ['Manrope', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', 'system-ui', 'sans-serif'],
             },
             colors: {
-              matcha: "#74A662",
-              cream: "#FFFDD0",
-              charcoal: "#333333",
-              peach: "#FFE5B4",
+              matcha: '#74A662',
+              cream: '#FFFDD0',
+              charcoal: '#333333',
+              peach: '#FFE5B4',
             },
+            boxShadow: { glow: '0 35px 80px -45px rgba(116, 166, 98, 0.65)' },
           },
         },
       };
@@ -29,22 +32,31 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
+    <style>
+      body { font-family: Manrope, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui, sans-serif; }
+      img.emoji { height: 1em; width: 1em; margin: 0 .05em; vertical-align: -0.15em; }
+    </style>
   </head>
   <body
-    class="min-h-screen bg-gradient-to-br from-peach to-cream text-charcoal antialiased"
+    class="min-h-screen bg-cream text-charcoal antialiased"
     data-page="tools-calculators"
   >
     <div id="navbar-container"></div>
 
     <main class="mx-auto w-full max-w-[520px] px-5 pt-40 pb-16">
-      <header class="mb-6 text-center">
-        <h1 class="text-4xl md:text-5xl font-extrabold text-charcoal/90">
-          Kalkulator
-        </h1>
-        <p class="mt-2 text-lg text-charcoal/70">
-          Kalkulator modern dengan UI yang lebih baik.
-        </p>
-      </header>
+      <section class="relative mb-8 overflow-hidden rounded-3xl bg-white/90 px-6 py-8 text-center shadow-glow">
+        <div class="pointer-events-none absolute -left-32 -top-24 h-72 w-72 rounded-full bg-matcha/25 blur-3xl"></div>
+        <div class="pointer-events-none absolute -right-20 bottom-0 h-72 w-72 rounded-full bg-peach/35 blur-3xl"></div>
+        <div class="relative space-y-4">
+          <span class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-5 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-matcha">Utility Suite</span>
+          <h1 class="text-4xl font-extrabold text-charcoal/90 md:text-5xl">Kalkulator Modern</h1>
+          <p class="mx-auto max-w-sm text-sm text-charcoal/65 md:text-base">Selesaikan perhitungan cepat dengan tampilan stylish dan dukungan keyboard penuh.</p>
+          <div class="flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <button type="button" onclick="document.getElementById('display')?.focus()" class="inline-flex items-center gap-2 rounded-2xl bg-matcha px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-matcha/25 transition hover:-translate-y-0.5 hover:bg-matcha/90">⌨️ Fokus ke Display</button>
+            <button type="button" onclick="document.querySelector('[data-action=clear]')?.click()" class="inline-flex items-center gap-2 rounded-2xl border border-matcha/35 bg-white px-5 py-3 text-sm font-semibold text-matcha transition hover:-translate-y-0.5 hover:bg-matcha/10">🧹 Bersihkan</button>
+          </div>
+        </div>
+      </section>
 
       <section
         class="rounded-2xl border border-white/40 bg-white/30 p-5 shadow-xl backdrop-blur-md"
@@ -287,6 +299,18 @@
 
       // init
       clearAll();
+    </script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        if (window.twemoji) {
+          const parseAll = () => {
+            try { twemoji.parse(document.body, { folder: 'svg', ext: '.svg' }); } catch (_) {}
+          };
+          parseAll();
+          const obs = new MutationObserver(() => parseAll());
+          obs.observe(document.body, { childList: true, subtree: true });
+        }
+      });
     </script>
   </body>
 </html>

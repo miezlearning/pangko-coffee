@@ -54,13 +54,20 @@ module.exports = {
         // ⚠️ PENTING: Hanya masukkan nomor barista/kasir ASLI disini
         // Customer TIDAK boleh ada di list ini!
         baristaNumbers: [
-            '6281345028895@s.whatsapp.net'
+            // '6281345028895@s.whatsapp.net',
+            '6281354902543@s.whatsapp.net', // dapin
+            '6285330306512@s.whatsapp.net', // dipa
+            '6282256877604@s.whatsapp.net', // fiko
+            '6285163631059@s.whatsapp.net', // huda 
+            '6281348411883@s.whatsapp.net' // tama
         ],
 
         // Admin Numbers (untuk akses penuh ke semua command)
         // Admin otomatis dapat akses barista commands juga
         adminNumbers: [
             '6281345028895@s.whatsapp.net', // Nomor admin
+            '6285163631059@s.whatsapp.net', // huda 
+            '6281348411883@s.whatsapp.net'
         ]
     },
 
@@ -189,7 +196,7 @@ Ketik *!help* untuk bantuan.
 
 Seluruh waktu ditampilkan dalam WITA (Asia/Makassar).`,
 
-    orderSuccess: `✅ *Pesanan Berhasil Dibuat*
+    orderSuccess: ` *[ ORDER SUCCESS ✅ ]!*
 
 Order ID: {orderId}
 Total: Rp {total}
@@ -197,8 +204,7 @@ Total: Rp {total}
 Silakan lakukan pembayaran dalam {timeout} menit.
 Ketik *!pay {orderId}* untuk melanjutkan pembayaran (QRIS) atau pilih *CASH* saat checkout untuk bayar di kasir.`,
 
-    paymentPending: `💳 *Menunggu Pembayaran*
-
+    paymentPending: `*[ PAYMENT PENDING 💳 ]!*
 Order ID: {orderId}
 Total Pembayaran: Rp {total}
 
@@ -207,14 +213,14 @@ Scan QRIS di bawah ini untuk membayar.
 
 Setelah transfer, tunggu konfirmasi dari kasir. Jika butuh bantuan, hubungi kami.`,
 
-    paymentConfirmed: `✅ *Pembayaran Dikonfirmasi*
+    paymentConfirmed: `*[ PAYMENT CONFIRMED ✅ ]!*
 
 Order ID: {orderId}
 Terima kasih! Pesanan Anda sedang diproses oleh barista *{shopName}* ☕
 
 Estimasi waktu 10–15 menit. Kami akan beri tahu saat sudah siap diambil.`,
 
-    orderReady: `🎉 *Pesanan Siap Diambil!*
+    orderReady: `*[ READY TO PICKUP! ☕ ]!*
 
 Order ID: {orderId}
 Pesanan Anda sudah siap.

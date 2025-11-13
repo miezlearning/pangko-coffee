@@ -8,19 +8,24 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Twemoji keeps emoji rendering consistent across platforms -->
+    <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
-            fontFamily: { sans: ['Manrope','system-ui','sans-serif'] },
-            colors: { matcha:'#74A662', cream:'#FFFDD0', charcoal:'#333333', peach:'#FFE5B4' },
+            fontFamily: {
+              sans: ['Manrope', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', 'system-ui', 'sans-serif']
+            },
+            colors: { matcha: '#74A662', cream: '#FFFDD0', charcoal: '#333333', peach: '#FFE5B4' },
             boxShadow: { glow: '0 35px 80px -45px rgba(116, 166, 98, 0.65)' }
           }
         }
       }
     </script>
     <style>
-      body { font-family: Manrope, system-ui, sans-serif; }
+      body { font-family: Manrope, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui, sans-serif; }
+      img.emoji { height: 1em; width: 1em; margin: 0 .05em; vertical-align: -0.15em; }
       
       /* Custom scrollbar for cart */
       #cart-list::-webkit-scrollbar { width: 6px; }
@@ -36,6 +41,7 @@
       /* Line clamp utility */
       .line-clamp-2 {
         display: -webkit-box;
+        line-clamp: 2;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
@@ -65,14 +71,41 @@
       button { transition-property: all; }
     </style>
   </head>
-  <body class="min-h-screen bg-gray-50 text-charcoal antialiased" data-page="cashier">
+  <body class="min-h-screen bg-cream text-charcoal antialiased" data-page="cashier">
     <div id="navbar-container"></div>
 
     <main class="mx-auto w-full max-w-7xl px-4 pt-40 pb-16">
-      <header class="mb-6">
-        <h1 class="text-4xl font-extrabold tracking-tight">🧾 Kasir (Point of Sale)</h1>
-        <p class="mt-2 text-lg text-charcoal/60">Pilih item dari menu untuk ditambahkan ke keranjang.</p>
-      </header>
+      <section class="relative mb-10 overflow-hidden rounded-3xl bg-white/92 px-6 py-8 shadow-glow md:px-12 md:py-12">
+        <div class="pointer-events-none absolute -left-28 -top-24 h-72 w-72 rounded-full bg-matcha/25 blur-3xl"></div>
+        <div class="pointer-events-none absolute -right-16 bottom-0 h-64 w-64 rounded-full bg-peach/35 blur-3xl"></div>
+        <div class="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div class="max-w-xl space-y-4">
+            <span class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-5 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-matcha">Kasir Live</span>
+            <h1 class="text-4xl font-extrabold leading-tight md:text-5xl">🧾 Kasir (Point of Sale)</h1>
+            <p class="text-base text-charcoal/65 md:text-lg">Tambah produk ke keranjang, atur diskon, dan proses pembayaran QRIS maupun tunai dari satu layar yang responsif.</p>
+            <div class="flex flex-wrap items-center gap-3">
+              <button id="hero-new-order" type="button" onclick="document.getElementById('search-input')?.focus()" class="inline-flex items-center gap-2 rounded-2xl bg-matcha px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-matcha/25 transition hover:-translate-y-0.5 hover:bg-matcha/90">➕ Tambah Item</button>
+              <button type="button" onclick="document.getElementById('refresh-menu')?.click()" class="inline-flex items-center gap-2 rounded-2xl border border-matcha/35 bg-white px-5 py-3 text-sm font-semibold text-matcha transition hover:-translate-y-0.5 hover:bg-matcha/10">🔄 Refresh Menu</button>
+            </div>
+          </div>
+          <div class="relative w-full max-w-sm space-y-4 rounded-2xl border border-white/50 bg-white/85 p-6 shadow-[0_45px_80px_-60px_rgba(51,51,51,0.55)]">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/55">Status Toko</p>
+                <p class="mt-1 text-sm text-charcoal/65">Sinkron dengan tombol di navbar.</p>
+              </div>
+              <span id="store-state-badge" class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-3 py-1 text-xs font-semibold text-matcha">
+                <span id="store-state-indicator" class="h-2 w-2 rounded-full bg-matcha"></span>
+                <span id="store-state-chip">Memuat…</span>
+              </span>
+            </div>
+            <div class="rounded-2xl border border-charcoal/10 bg-charcoal/5 p-4 text-xs text-charcoal/60">
+              <p class="font-semibold text-charcoal">Tip Cepat</p>
+              <p class="mt-2">Gunakan <kbd class="rounded bg-white px-1.5 py-0.5 shadow-inner">Enter</kbd> untuk menambahkan item terpilih dan <kbd class="rounded bg-white px-1.5 py-0.5 shadow-inner">Ctrl</kbd> + <kbd class="rounded bg-white px-1.5 py-0.5 shadow-inner">B</kbd> untuk proses pembayaran.</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 lg:gap-8">
         
@@ -272,5 +305,17 @@
 
     <script src="/js/navbar.js"></script>
     <script src="/js/cashier.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        if (window.twemoji) {
+          const parseAll = () => {
+            try { twemoji.parse(document.body, { folder: 'svg', ext: '.svg' }); } catch (_) {}
+          };
+          parseAll();
+          const obs = new MutationObserver(() => parseAll());
+          obs.observe(document.body, { childList: true, subtree: true });
+        }
+      });
+    </script>
   </body>
 </html>

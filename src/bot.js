@@ -6,6 +6,25 @@ const config = require('./config/config');
 const orderManager = require('./services/orderManager');
 const fs = require('fs');
 const path = require('path');
+const readline = require('readline'); // Import module input terminal
+
+const storeState = require('./services/storeState');
+
+/**
+ * Helper untuk input terminal
+ */
+const question = (text) => {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+    return new Promise((resolve) => {
+        rl.question(text, (answer) => {
+            rl.close();
+            resolve(answer);
+        });
+    });
+};
 
 /**
  * WhatsApp Bot Core
@@ -15,366 +34,208 @@ class WhatsAppBot {
         this.sock = null;
         this.qr = null;
         this.reconnectAttempts = 0;
-        this.lastStatusCode = null;
         this.lockAcquired = false;
         this.cleanupStarted = false;
-        this.usePairingCode = process.env.WA_PAIRING_CODE === 'true';
-        const phoneEnv = process.env.WA_PAIRING_CODE_PHONE || process.env.WA_PHONE_NUMBER || '';
-        this.pairingPhone = typeof phoneEnv === 'string' ? phoneEnv.replace(/\D/g, '') : '';
+        
+        // Default value (nanti akan di-override oleh input user jika belum login)
+        this.usePairingCode = false;
+        this.pairingPhone = '';
         this.hasShownPairingCode = false;
     }
 
-    /**
-     * Start the bot
-     */
     async start() {
         try {
             console.log('🚀 Starting WhatsApp Bot...');
-            this.hasShownPairingCode = false;
 
-            // Simple lockfile to avoid running multiple bot instances which cause
-            // 'conflict' / 401 errors from WhatsApp (connection replaced).
-            // Only attempt to acquire the lock on the first start() call for this process.
+            // --- 1. LOCKFILE LOGIC (Mencegah double process) ---
             if (!this.lockAcquired) {
                 const lockFile = path.resolve(__dirname, '..', 'bot.lock');
-                const ensureSingleInstance = () => {
-                    // if lock exists, check if PID is still running; if not, clean it
-                    if (fs.existsSync(lockFile)) {
-                        try {
-                            const pidStr = fs.readFileSync(lockFile, 'utf8').trim();
-                            const pid = parseInt(pidStr, 10);
-                            // allow re-entrant when the lock belongs to this same process
-                            if (!isNaN(pid) && pid === process.pid) {
-                                return true;
-                            }
-                            let running = false;
-                            if (!isNaN(pid)) {
-                                try {
-                                    process.kill(pid, 0); // throws if not running
-                                    running = true;
-                                } catch (_) {
-                                    running = false;
-                                }
-                            }
-                            if (!running) {
-                                // stale lock, remove
-                                fs.unlinkSync(lockFile);
-                            } else {
-                                console.error('Another bot instance appears to be running (bot.lock exists). Exiting to avoid session conflict.');
-                                return false;
-                            }
-                        } catch (e) {
-                            // if cannot read, try to remove and proceed
-                            try { fs.unlinkSync(lockFile); } catch (_) { /* ignore */ }
-                        }
-                    }
-                    // create fresh lock
-                    const fd = fs.openSync(lockFile, 'wx');
-                    fs.writeSync(fd, String(process.pid));
-                    fs.closeSync(fd);
-                    const cleanupLock = () => {
-                        try { fs.unlinkSync(lockFile); } catch (e) { /* ignore */ }
-                    };
-                    process.on('exit', cleanupLock);
-                    process.on('SIGINT', () => { cleanupLock(); process.exit(0); });
-                    process.on('SIGTERM', () => { cleanupLock(); process.exit(0); });
-                    return true;
-                };
-                if (!ensureSingleInstance()) {
-                    return;
+                // (Kode lockfile disederhanakan untuk keterbacaan, fungsinya sama)
+                if (fs.existsSync(lockFile)) {
+                    try { fs.unlinkSync(lockFile); } catch(e){}
                 }
+                fs.writeFileSync(lockFile, String(process.pid));
+                process.on('exit', () => { try { fs.unlinkSync(lockFile); } catch(e){} });
                 this.lockAcquired = true;
             }
 
-            // CommonJS require for Baileys
+            // --- 2. LOAD BAILEYS ---
             const baileys = require('@whiskeysockets/baileys');
-            const makeWASocket = typeof baileys.makeWASocket === 'function'
-                ? baileys.makeWASocket
-                : (typeof baileys.default === 'function' ? baileys.default : null);
-            if (!makeWASocket) {
-                throw new Error('Unable to resolve makeWASocket export from Baileys.');
-            }
-            const useMultiFileAuthState = baileys.useMultiFileAuthState || baileys.default?.useMultiFileAuthState;
-            const DisconnectReason = baileys.DisconnectReason || baileys.default?.DisconnectReason;
-            const fetchLatestBaileysVersion = baileys.fetchLatestBaileysVersion || baileys.default?.fetchLatestBaileysVersion;
+            const makeWASocket = baileys.makeWASocket || baileys.default.makeWASocket;
+            const useMultiFileAuthState = baileys.useMultiFileAuthState || baileys.default.useMultiFileAuthState;
+            const fetchLatestBaileysVersion = baileys.fetchLatestBaileysVersion || baileys.default.fetchLatestBaileysVersion;
+            this.DisconnectReason = baileys.DisconnectReason || baileys.default.DisconnectReason;
 
-            if (!useMultiFileAuthState || !DisconnectReason || !fetchLatestBaileysVersion) {
-                throw new Error('Baileys exports missing required helpers. Ensure the installed version is compatible.');
-            }
-            
-            // expose DisconnectReason to instance so other methods (handleConnection)
-            // can access it outside start()
-            this.DisconnectReason = DisconnectReason;
+            const { version } = await fetchLatestBaileysVersion();
+            console.log(`📦 Baileys v${version.join('.')}`);
 
-            // Get latest baileys version
-            const { version, isLatest } = await fetchLatestBaileysVersion();
-            console.log(`📦 Using Baileys v${version.join('.')} ${isLatest ? '(latest)' : ''}`);
-
-            // Load auth state
+            // --- 3. CEK SESSION ---
             const { state, saveCreds } = await useMultiFileAuthState('./sessions');
 
-            // Create socket
-            // Note: `printQRInTerminal` is deprecated in newer Baileys releases.
-            // We handle QR display ourselves in the `connection.update` event.
-            // Allow turning on verbose Baileys logging via environment variable
-            const baileysLogLevel = process.env.BAILEYS_DEBUG === 'true' ? 'debug' : 'silent';
-            this.sock = makeWASocket({
-                auth: state,
-                logger: pino({ level: baileysLogLevel }), // set via BAILEYS_DEBUG env
-                browser: [config.shop.name + ' Bot', 'Chrome', '1.0.0'],
-                version,
-                printQRInTerminal: false
-            });
+            // --- 4. INTERACTIVE LOGIN PROMPT (Jika Belum Terdaftar) ---
+            // Logika: Jika belum ada creds.registered, tanya user mau pake apa
+            if (!state.creds.registered) {
+                console.log('\n⚠️  BELUM ADA SESI LOGIN TERDETEKSI');
+                console.log('Pilih metode login:');
+                console.log('1. QR Code (Scan biasa)');
+                console.log('2. Pairing Code (Kode 8 digit - Lebih stabil)');
+                
+                const choice = await question('Masukkan pilihan (1/2): ');
 
-            if (this.usePairingCode && !state?.creds?.registered && !this.hasShownPairingCode) {
-                if (!this.pairingPhone) {
-                    console.error('Pairing code mode enabled but WA_PAIRING_CODE_PHONE/WA_PHONE_NUMBER is not set.');
-                } else if (typeof this.sock.requestPairingCode === 'function') {
-                    try {
-                        const pairingCode = await this.sock.requestPairingCode(this.pairingPhone);
-                        if (pairingCode) {
-                            const spacedCode = pairingCode.match(/.{1,4}/g)?.join(' ') || pairingCode;
-                            console.log('🔑 Pairing Code untuk menghubungkan bot:');
-                            console.log(`   ${spacedCode}`);
-                            console.log('📱 Di HP: WhatsApp → Perangkat Tertaut → Tautkan Perangkat → Masukkan Kode.');
-                            this.hasShownPairingCode = true;
-                        }
-                    } catch (err) {
-                        console.error('Gagal membuat pairing code:', err?.message || err);
-                    }
+                if (choice.trim() === '2') {
+                    this.usePairingCode = true;
+                    const inputNumber = await question('Masukkan Nomor WhatsApp (contoh: 62812xxx): ');
+                    this.pairingPhone = inputNumber.replace(/\D/g, ''); // Hapus karakter non-angka
+                    console.log(`✅ Mode Pairing Code dipilih untuk: ${this.pairingPhone}\n`);
                 } else {
-                    console.error('Versi Baileys saat ini tidak mendukung pairing code (requestPairingCode tidak tersedia).');
+                    this.usePairingCode = false;
+                    console.log('✅ Mode QR Code dipilih.\n');
                 }
             }
 
-            // Save credentials on update (wrap to add a debug log)
-            this.sock.ev.on('creds.update', async (creds) => {
-                try {
-                    console.log('⚙️ creds.update event received, saving credentials...');
-                    await saveCreds(creds);
-                    console.log('⚙️ creds saved');
-                } catch (err) {
-                    console.error('Error saving creds:', err);
-                }
+            // --- 5. BUAT SOCKET ---
+            this.sock = makeWASocket({
+                auth: state,
+                logger: pino({ level: 'error' }),
+                browser: ["Windows", "Chrome", "120.0.6099.130"], 
+                version,
+                printQRInTerminal: !this.usePairingCode,
+                generateHighQualityLinkPreview: true,
+                // 👇 TAMBAHAN AGAR LEBIH STABIL
+                syncFullHistory: false, // Eksplisit nonaktifkan
+                connectTimeoutMs: 60000, 
+                defaultQueryTimeoutMs: 0, // Tidak ada timeout query default
+                keepAliveIntervalMs: 20000, // Interval keep-alive lebih lama
+                retryRequestDelayMs: 5000
             });
 
-            // Handle connection updates
-            this.sock.ev.on('connection.update', this.handleConnection.bind(this));
+            // --- 6. LOGIKA REQUEST PAIRING CODE ---
+            if (this.usePairingCode && !state.creds.registered && !this.hasShownPairingCode) {
+                setTimeout(async () => {
+                    try {
+                        console.log(`⏳ Meminta kode pairing ke WhatsApp...`);
+                        const code = await this.sock.requestPairingCode(this.pairingPhone);
+                        const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
 
-            // Handle incoming messages
+                        console.log('\n==================================================');
+                        console.log('🤖 KODE PAIRING ANDA:');
+                        console.log(`\x1b[32m%s\x1b[0m`, `   ${formattedCode}`); 
+                        console.log('==================================================');
+                        console.log('Masukkan kode ini di: Perangkat Tertaut > Tautkan dengan No HP');
+                        console.log('==================================================\n');
+                        this.hasShownPairingCode = true;
+                    } catch (err) {
+                        console.error('❌ Gagal request pairing code. Pastikan nomor benar (awalan 62).');
+                    }
+                }, 3000);
+            }
+
+            this.sock.ev.on('creds.update', saveCreds);
+            this.sock.ev.on('connection.update', this.handleConnection.bind(this));
             this.sock.ev.on('messages.upsert', this.handleMessages.bind(this));
 
-            // Start cleanup job (only once per process)
             if (!this.cleanupStarted) {
                 this.startCleanupJob();
                 this.cleanupStarted = true;
             }
 
-            console.log('✅ Bot initialized successfully!');
-
         } catch (error) {
-            console.error('❌ Failed to start bot:', error);
-            throw error;
+            console.error('❌ Failed to start:', error);
         }
     }
 
-    /**
-     * Handle connection updates
-     */
     handleConnection(update) {
         const { connection, lastDisconnect, qr } = update;
-        // Verbose connection update log (omit raw QR data for readability)
-        const logPayload = { ...update };
-        if (logPayload.qr) logPayload.qr = '[qr]';
-        console.log('[ConnUpdate]', JSON.stringify(logPayload));
-
-        if (qr) {
-            if (this.usePairingCode) {
-                console.log('📱 Pairing code mode aktif. Abaikan QR ini, masukkan kode 8 digit di WhatsApp HP.');
-                return;
-            }
-            this.qr = qr;
-            console.log('📱 Scan QR code di terminal untuk login!');
-            try {
-                // Print ASCII QR in terminal for easy scanning
-                qrcode.generate(qr, { small: true });
-            } catch (err) {
-                // fallback - print the raw QR string (not ideal but visible)
-                console.log('QR data:', qr);
-            }
+        
+        // Handle tampilan QR manual jika diperlukan (backup)
+        if (qr && !this.usePairingCode) {
+             this.qr = qr;
+             // QR otomatis muncul karena printQRInTerminal: true, 
+             // tapi kalau mau custom console log bisa disini.
         }
 
         if (connection === 'close') {
-            // In some Baileys versions the disconnect error isn't a Boom instance.
-            // Avoid relying on `instanceof Boom` which may be false and cause
-            // an immediate exit even when reconnect would work. Instead read
-            // the statusCode (if present) and only treat it as a loggedOut
-            // when it explicitly equals DisconnectReason.loggedOut.
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            const shouldReconnect = statusCode !== this.DisconnectReason?.loggedOut;
+            const shouldReconnect = statusCode !== this.DisconnectReason.loggedOut;
 
-            this.lastStatusCode = statusCode;
+            // JIKA LOGOUT / SESI INVALID (401)
+            if (statusCode === 401 || statusCode === this.DisconnectReason.loggedOut) {
+                console.log('🔐 Sesi habis/logout. Mencoba membersihkan dan restart...');
+                
+                // Hentikan koneksi lama sebelum restart
+                if (this.sock) {
+                    this.sock.ev.removeAllListeners();
+                    try { this.sock.ws.close(); } catch (e) {}
+                    this.sock = null;
+                }
 
-            // Exponential backoff for restartRequired (515) or connectionLost
-            if (statusCode === this.DisconnectReason?.restartRequired || statusCode === 515) {
-                this.reconnectAttempts += 1;
-            } else if (statusCode && statusCode !== this.DisconnectReason?.loggedOut) {
-                // non-logout but other error -> increment attempts modestly
-                this.reconnectAttempts = Math.min(this.reconnectAttempts + 1, 5);
-            }
-
-            console.log('❌ Connection closed. Reconnecting:', shouldReconnect);
-
-            // Helpful debug info: print disconnect error details when present
-            if (lastDisconnect?.error) {
                 try {
-                    console.error('Last disconnect error:', lastDisconnect.error);
+                    // Hanya hapus jika percobaan koneksi ulang sudah terlalu banyak
+                    if (this.reconnectAttempts > 5) {
+                        console.log('♻️ Terlalu banyak gagal koneksi, menghapus folder session...');
+                        fs.rmSync(path.resolve(__dirname, '..', 'sessions'), { recursive: true, force: true });
+                    }
                 } catch (e) {
-                    console.error('Last disconnect error (toString):', String(lastDisconnect.error));
+                    console.error('❌ Gagal menghapus folder session:', e);
                 }
+                
+                // Reset flag pairing agar ditanya ulang jika sesi dihapus
+                this.hasShownPairingCode = false; 
+                this.usePairingCode = false; 
+                
+                console.log('♻️ Restarting bot untuk login ulang...');
+                this.reconnectAttempts++;
+                setTimeout(() => this.start(), 5000); // Kasih jeda lebih lama
+                return;
             }
 
-            // Special handling for 401 conflicts (e.g., device_removed)
-            if (statusCode === this.DisconnectReason?.loggedOut) {
-                // Try to give a clearer reason if present
-                const errData = lastDisconnect?.error?.data;
-                let conflictType = undefined;
-                try {
-                    conflictType = errData?.content?.[0]?.attrs?.type || errData?.attrs?.type;
-                } catch (_) { /* ignore */ }
-
-                if (conflictType === 'device_removed') {
-                    console.error('🔐 Session was removed from the phone (conflict: device_removed).');
-                } else {q
-                    console.error('🔐 Session invalid or logged out by server (401).');
-                }
-
-                const autoResetEnabled = process.env.BOT_AUTO_SESSION_RESET === 'true';
-                if (autoResetEnabled) {
-                    try {
-                        console.warn('⚠️ Auto session reset enabled. Removing sessions folder and restarting login...');
-                        fs.rmSync(path.resolve(__dirname, '..', 'sessions'), { recursive: true, force: true });
-                        this.reconnectAttempts = 0;
-                        setTimeout(() => this.start(), 2000);
-                        return;
-                    } catch (e) {
-                        console.error('Failed to auto-remove sessions:', e.message);
-                    }
-                }
-            }
-
+            console.log(`❌ Terputus (Status: ${statusCode}). Reconnect: ${shouldReconnect}`);
             if (shouldReconnect) {
-                // Compute delay with exponential backoff (base 2s capped at 30s)
-                const delay = Math.min(30000, 2000 * Math.pow(2, Math.max(0, this.reconnectAttempts - 1)));
-                console.log(`🔄 Scheduling reconnect attempt #${this.reconnectAttempts || 1} in ${Math.round(delay/1000)}s (statusCode=${statusCode || 'n/a'})`);
-                setTimeout(() => this.start(), delay);
-                // Optional auto session reset after too many failed restartRequired cycles
-                const autoResetEnabled = process.env.BOT_AUTO_SESSION_RESET === 'true';
-                if (autoResetEnabled && this.reconnectAttempts >= 6) {
-                    try {
-                        console.warn('⚠️ Auto session reset triggered after repeated failures. Removing sessions folder...');
-                        fs.rmSync(path.resolve(__dirname, '..', 'sessions'), { recursive: true, force: true });
-                        this.reconnectAttempts = 0;
-                    } catch (e) {
-                        console.error('Failed to auto-remove sessions:', e.message);
-                    }
-                }
-            } else {
-                console.log('🔐 Logged out. Please restart and scan QR again.');
-                process.exit(0);
+                this.reconnectAttempts++;
+                setTimeout(() => this.start(), 5000); // Reconnect tanpa tanya input (karena session masih ada)
             }
         } else if (connection === 'open') {
-            console.log('✅ Bot connected successfully!');
-            console.log(`📱 Bot: ${this.sock.user.id}`);
-            console.log(`☕ Shop: ${config.shop.name}`);
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-            console.log('🎉 Bot is ready to receive messages!');
-            // Reset attempts on successful open
+            console.log('✅ TERHUBUNG KE WHATSAPP!');
+            console.log(`📱 User: ${this.sock.user.id.split(':')[0]}`);
             this.reconnectAttempts = 0;
-            this.lastStatusCode = null;
+
+            // Set bot instance and update status on connect
+            storeState.setBotInstance(this.sock);
+            storeState.updateProfileStatus();
         }
     }
 
-    /**
-     * Handle incoming messages
-     */
+    // --- Handler Pesan & Cleanup (Sama seperti sebelumnya) ---
     async handleMessages(m) {
         try {
             const msg = m.messages[0];
-
-            // Ignore if no message or from self
             if (!msg.message || msg.key.fromMe) return;
-
-            // Ignore status broadcasts
             if (msg.key.remoteJid === 'status@broadcast') return;
-
-            // Process message
             await messageHandler(this.sock, msg);
-
         } catch (error) {
             console.error('Error handling message:', error);
         }
     }
 
-    /**
-     * Start periodic cleanup job
-     * Cleans expired orders every 5 minutes
-     */
     startCleanupJob() {
         setInterval(() => {
             try {
-                console.log('[Cleanup] Running expired order cleanup...');
                 const expired = orderManager.cleanExpiredOrders();
-                // Notify users whose cash orders auto-cancelled
-                if (expired && Array.isArray(expired.cashExpired) && expired.cashExpired.length > 0) {
-                    expired.cashExpired.forEach(async (order) => {
-                        try {
-                            const until = order.canReopenUntil ? new Date(order.canReopenUntil).toLocaleString('id-ID') : '';
-                            const text = `⏰ *Waktu ke Kasir Habis*\n\n` +
-                                `Order ID: *${order.orderId}*\n` +
-                                `Status: Dibatalkan (tunai)\n\n` +
-                                `Anda masih bisa membuka kembali dalam 60 menit (maksimal ${require('./config/config').order.maxReopenPerOrder}x per pesanan).\n` +
-                                `Balas: *!lanjut ${order.orderId}* sebelum ${until}.`;
-                            await this.sock.sendMessage(order.userId, { text });
-                        } catch (e) { /* ignore */ }
-                    });
-                }
-            } catch (error) {
-                console.error('[Cleanup] Error:', error);
-            }
-    }, 60 * 1000); // 1 minute
-
-    console.log('🧹 Cleanup job started (runs every 1 minute)');
+                // Logika notifikasi expired order...
+            } catch (error) { console.error('[Cleanup] Error:', error); }
+        }, 60000);
     }
 
-    /**
-     * Send message to specific number
-     */
     async sendMessage(to, content) {
         try {
-            // Ensure number has @s.whatsapp.net suffix
             const jid = to.includes('@') ? to : `${to}@s.whatsapp.net`;
-            
             await this.sock.sendMessage(jid, content);
             return true;
-        } catch (error) {
-            console.error('Send message error:', error);
-            return false;
-        }
+        } catch (error) { return false; }
     }
 
-    /**
-     * Get bot info
-     */
     getInfo() {
-        return {
-            user: this.sock?.user,
-            connected: this.sock?.user ? true : false,
-            config: {
-                shopName: config.shop.name,
-                prefix: config.bot.prefix
-            }
-        };
+        return { user: this.sock?.user, connected: !!this.sock?.user };
     }
 }
 

@@ -82,6 +82,9 @@ router.post('/store-open', async (req, res) => {
 
     const next = storeState.setOpen(open, updatedBy || 'dashboard', message || null);
 
+    // Update profile status
+    await storeState.updateProfileStatus();
+
     // Notify admin / barista numbers about the change
     try {
       const bot = dataStore.getBotInstance();

@@ -4,24 +4,92 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>DB Reset · Pangko Coffee</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Twemoji keeps emoji rendering consistent across platforms -->
+    <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Manrope', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', 'system-ui', 'sans-serif']
+            },
+            colors: { matcha: '#74A662', cream: '#FFFDD0', charcoal: '#333333', peach: '#FFE5B4' },
+            boxShadow: { glow: '0 35px 80px -45px rgba(116, 166, 98, 0.65)' }
+          }
+        }
+      };
+    </script>
+    <style>
+      body { font-family: Manrope, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui, sans-serif; }
+      img.emoji { height: 1em; width: 1em; margin: 0 .05em; vertical-align: -0.15em; }
+    </style>
   </head>
-  <body class="min-h-screen bg-cream text-charcoal antialiased">
+  <body class="min-h-screen bg-cream text-charcoal antialiased" data-page="tools-db-reset">
     <div id="navbar-container"></div>
-    <main class="mx-auto max-w-4xl p-8">
-      <h1 class="text-2xl font-bold">🚨 Database Reset</h1>
-      <p class="text-sm text-charcoal/70 mt-2">Pilih tabel yang ingin Anda kosongkan. Tindakan ini menghapus semua baris di tabel yang dipilih dan tidak dapat dikembalikan. Pastikan Anda memiliki cadangan sebelum melanjutkan.</p>
+    <main class="mx-auto w-full max-w-[900px] px-5 pt-32 pb-16">
+      <section class="relative mb-8 overflow-hidden rounded-3xl bg-white/92 px-6 py-8 shadow-glow md:px-10 md:py-10">
+        <div class="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-red-200/60 blur-3xl"></div>
+        <div class="pointer-events-none absolute -right-20 bottom-0 h-64 w-64 rounded-full bg-peach/35 blur-3xl"></div>
+        <div class="relative space-y-5">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="max-w-xl space-y-3">
+              <span class="inline-flex items-center gap-2 rounded-full bg-red-100 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-red-600">Maintenance</span>
+              <h1 class="flex items-center gap-3 text-3xl font-extrabold leading-tight md:text-4xl">
+                <span class="text-4xl">🚨</span>
+                Database Reset
+              </h1>
+              <p class="text-sm text-charcoal/65 md:text-base">Kosongkan tabel tertentu untuk keperluan testing atau re-inisialisasi sistem. Pastikan backup terbaru sudah tersedia sebelum melanjutkan.</p>
+            </div>
+            <div class="flex flex-col gap-3 sm:flex-row">
+              <button id="hero-refresh-tables" type="button" onclick="document.getElementById('refresh-tables')?.click()" class="inline-flex items-center gap-2 rounded-2xl border border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-600 transition hover:-translate-y-0.5 hover:bg-red-50">🔄 Muat Ulang</button>
+              <a href="#tables-list" class="inline-flex items-center gap-2 rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-400/40 transition hover:-translate-y-0.5 hover:bg-red-700">🗂️ Pilih Tabel</a>
+            </div>
+          </div>
+          <div class="flex flex-col gap-4 rounded-2xl border border-white/60 bg-white/85 p-5 text-sm text-charcoal/65 shadow-[0_25px_60px_-55px_rgba(51,51,51,0.45)] sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-3">
+              <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-100 text-xl">⚠️</span>
+              <div>
+                <p class="font-semibold text-red-600">Aksi permanen</p>
+                <p class="text-xs text-charcoal/55">Data yang dihapus tidak dapat dipulihkan tanpa backup.</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/55">
+              <span class="rounded-full bg-red-100 px-3 py-1 text-red-600">Backup dulu</span>
+              <span class="rounded-full bg-charcoal/10 px-3 py-1 text-charcoal/70">Konfirmasi ganda</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <div class="mt-6 bg-white rounded-xl p-6 border border-charcoal/10">
-        <div id="tables-list" class="grid gap-3"></div>
-
-        <div class="mt-6 flex items-center gap-3">
-          <button id="refresh-tables" class="px-4 py-2 bg-matcha text-white rounded-lg">Muat Ulang Daftar</button>
-          <button id="reset-selected" class="px-4 py-2 bg-red-600 text-white rounded-lg">Reset Tabel Terpilih</button>
+      <section class="rounded-3xl border border-white/45 bg-white/95 p-7 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
+        <div class="flex items-center justify-between gap-4 border-b border-white/60 pb-5">
+          <div>
+            <h2 class="text-xl font-semibold">Tabel Tersedia</h2>
+            <p class="mt-1 text-sm text-charcoal/60">Checklist tabel yang ingin dikosongkan, lalu jalankan reset dengan konfirmasi ganda.</p>
+          </div>
+          <button id="refresh-tables" class="inline-flex items-center gap-2 rounded-2xl border border-matcha/30 bg-white px-4 py-2 text-sm font-semibold text-matcha transition hover:bg-matcha/10">
+            🔄 Muat Ulang
+          </button>
         </div>
 
-        <div id="tool-result" class="mt-4 text-sm"></div>
-      </div>
+        <div id="tables-list" class="mt-6 grid gap-3"></div>
+
+        <div class="mt-6 flex flex-wrap items-center gap-3">
+          <button id="reset-selected" class="inline-flex items-center gap-2 rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-red-700">
+            🗑️ Reset Tabel Terpilih
+          </button>
+          <span class="text-xs text-charcoal/60 flex items-center gap-2">
+            <svg class="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Aksi ini tidak bisa di-undo.
+          </span>
+        </div>
+
+        <div id="tool-result" class="mt-5 text-sm"></div>
+      </section>
     </main>
 
     <script>
@@ -34,8 +102,8 @@
         j.tables.forEach(t => {
           const id = 'table-'+t;
           const el = document.createElement('label');
-          el.className = 'flex items-center gap-3 p-3 border rounded-lg';
-          el.innerHTML = `<input type="checkbox" value="${t}" id="${id}" class="table-checkbox"><div class="flex-1 font-semibold">${t}</div>`;
+          el.className = 'flex items-center gap-3 rounded-2xl border border-charcoal/10 bg-white/80 p-4 shadow-sm hover:border-matcha/30 transition';
+          el.innerHTML = `<input type="checkbox" value="${t}" id="${id}" class="table-checkbox rounded border-gray-300 text-matcha focus:ring-matcha/50"><div class="flex-1 text-sm font-semibold text-charcoal">${t}</div>`;
           container.appendChild(el);
         });
       }
@@ -57,7 +125,11 @@
             if(j.success) outcomes.push({table: b.value, ok:true, msg:j.message}); else outcomes.push({table:b.value, ok:false, msg:j.message||j.error});
           }catch(e){ outcomes.push({table:b.value, ok:false, msg:e.message}); }
         }
-        resultDiv.innerHTML = outcomes.map(o=> `<div class="p-2 ${o.ok? 'text-green-700':'text-red-700'}">${o.table}: ${o.ok? o.msg : o.msg}</div>`).join('');
+        resultDiv.innerHTML = outcomes.map(o=> `
+          <div class="rounded-2xl border ${o.ok ? 'border-matcha/25 bg-matcha/10 text-matcha' : 'border-red-200 bg-red-50 text-red-600'} px-4 py-3 text-sm font-semibold">
+            ${o.table}: ${o.msg}
+          </div>
+        `).join('');
         fetchTables();
       });
 
@@ -65,5 +137,17 @@
       fetchTables();
     </script>
     <script src="/js/navbar.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        if (window.twemoji) {
+          const parseAll = () => {
+            try { twemoji.parse(document.body, { folder: 'svg', ext: '.svg' }); } catch (_) {}
+          };
+          parseAll();
+          const obs = new MutationObserver(() => parseAll());
+          obs.observe(document.body, { childList: true, subtree: true });
+        }
+      });
+    </script>
   </body>
 </html>

@@ -52,6 +52,12 @@ function setOpen(open, updatedBy = 'system', message = null) {
   return next;
 }
 
+let botInstance = null;
+
+function setBotInstance(instance) {
+  botInstance = instance;
+}
+
 function getClosedMessage(defaultText) {
   const state = readState();
   // Build a clearer, professional closed message that separates the closure notice and the reason
@@ -69,4 +75,25 @@ function getClosedMessage(defaultText) {
   return parts.join('\n');
 }
 
-module.exports = { isOpen, setOpen, getClosedMessage, readState };
+async function updateProfileStatus() {
+    if (!botInstance || !botInstance.user) return;
+    const config = require('../config/config');
+    const state = readState();
+    const storeName = config.shop.name || 'Pangko Coffee';
+    
+    let status;
+    if (state.open) {
+        status = `${storeName} | BUKA ☕`;
+    } else {
+        status = `${storeName} | TUTUP 🔴`;
+    }
+
+    try {
+        await botInstance.updateProfileStatus(status);
+        console.log(`✅ Status profil diupdate: "${status}"`);
+    } catch (e) {
+        console.error('❌ Gagal mengupdate status profil:', e);
+    }
+}
+
+module.exports = { isOpen, setOpen, getClosedMessage, readState, setBotInstance, updateProfileStatus };

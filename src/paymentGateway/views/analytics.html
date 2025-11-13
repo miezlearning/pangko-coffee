@@ -8,16 +8,25 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Twemoji keeps emoji rendering consistent across platforms -->
+    <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
-            fontFamily: { sans: ['Manrope', 'system-ui', 'sans-serif'] },
+            fontFamily: {
+              sans: ['Manrope', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', 'system-ui', 'sans-serif']
+            },
             colors: { matcha: '#74A662', cream: '#FFFDD0', charcoal: '#333333', peach: '#FFE5B4' },
+            boxShadow: { glow: '0 35px 80px -45px rgba(116, 166, 98, 0.65)' }
           },
         },
       };
     </script>
+    <style>
+      body { font-family: Manrope, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui, sans-serif; }
+      img.emoji { height: 1em; width: 1em; margin: 0 .05em; vertical-align: -0.15em; }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Markdown renderer and sanitizer for AI insights -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -29,72 +38,73 @@
     <div id="navbar-container"></div>
 
     <main class="mx-auto w-full max-w-[1180px] px-5 pt-32 pb-16">
-      
-      <section class="mb-6">
-        
-        <header class="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h1 class="text-3xl font-extrabold tracking-tight">Statistik & Analisis</h1>
-            <p class="mt-1 text-sm text-charcoal/70">Ringkasan penjualan dan grafik performa.</p>
+      <section class="relative mb-8 overflow-hidden rounded-3xl bg-white/90 px-6 py-8 shadow-glow md:px-10 md:py-10">
+        <div class="pointer-events-none absolute -left-20 -top-20 h-60 w-60 rounded-full bg-matcha/25 blur-3xl"></div>
+        <div class="pointer-events-none absolute -right-16 bottom-0 h-64 w-64 rounded-full bg-peach/35 blur-3xl"></div>
+        <div class="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div class="max-w-xl space-y-3">
+            <span class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-matcha">Insights</span>
+            <h1 class="text-3xl font-extrabold leading-tight md:text-4xl">Statistik &amp; Analisis</h1>
+            <p class="text-sm text-charcoal/65 md:text-base">Pantau performa penjualan, revenue, dan tren produk secara mendalam untuk mengambil keputusan yang lebih cepat.</p>
           </div>
-          <div class="flex gap-2">
-            <button id="export-daily" class="inline-flex items-center gap-2 rounded-xl border border-matcha/30 bg-white px-4 py-2.5 text-sm font-semibold text-matcha transition hover:bg-matcha/10 shadow-sm">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <button id="export-daily" class="inline-flex items-center gap-2 rounded-2xl border border-matcha/35 bg-white px-5 py-3 text-sm font-semibold text-matcha transition hover:-translate-y-0.5 hover:bg-matcha/10">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               Export Harian
             </button>
-            <button id="export-monthly" class="inline-flex items-center gap-2 rounded-xl border border-matcha/30 bg-matcha px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-matcha/90 shadow-md">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <button id="export-monthly" class="inline-flex items-center gap-2 rounded-2xl bg-matcha px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-matcha/25 transition hover:-translate-y-0.5 hover:bg-matcha/90">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               Export Bulanan
             </button>
           </div>
-        </header>
+        </div>
 
-        <div class="flex flex-col gap-3 rounded-2xl border border-white/50 bg-white/90 p-4 shadow-sm md:flex-row md:items-end">
-          
-          <div class="flex-grow">
-            <label for="range" class="block text-xs font-semibold text-charcoal/70">Rentang</label>
-            <select id="range" class="mt-1 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-matcha">
-              <option value="7d">7 Hari</option>
-              <option value="30d" selected>30 Hari</option>
-              <option value="custom">Custom…</option>
-            </select>
-          </div>
-
-          <div class="flex flex-grow gap-2">
-            <div class="flex-1">
-              <label for="from" class="block text-xs font-semibold text-charcoal/70">Dari</label>
-              <input id="from" type="date" class="mt-1 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-matcha" />
+        <div class="relative mt-8 rounded-2xl border border-white/60 bg-white/80 p-4 shadow-[0_25px_60px_-50px_rgba(51,51,51,0.4)] md:p-5">
+          <div class="flex flex-col gap-3 md:flex-row md:items-end">
+            <div class="flex-grow">
+              <label for="range" class="block text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/55">Rentang</label>
+              <select id="range" class="mt-1 w-full rounded-xl border border-charcoal/15 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-matcha">
+                <option value="7d">7 Hari</option>
+                <option value="30d" selected>30 Hari</option>
+                <option value="custom">Custom…</option>
+              </select>
             </div>
-            <div class="flex-1">
-              <label for="to" class="block text-xs font-semibold text-charcoal/70">Sampai</label>
-              <input id="to" type="date" class="mt-1 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-matcha" />
+
+            <div class="flex flex-grow gap-2">
+              <div class="flex-1">
+                <label for="from" class="block text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/55">Dari</label>
+                <input id="from" type="date" class="mt-1 w-full rounded-xl border border-charcoal/15 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-matcha" />
+              </div>
+              <div class="flex-1">
+                <label for="to" class="block text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/55">Sampai</label>
+                <input id="to" type="date" class="mt-1 w-full rounded-xl border border-charcoal/15 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-matcha" />
+              </div>
+            </div>
+
+            <div class="flex-grow md:max-w-[180px]">
+              <label for="method" class="block text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/55">Metode</label>
+              <select id="method" class="mt-1 w-full rounded-xl border border-charcoal/15 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-matcha">
+                <option value="all">Semua</option>
+                <option value="CASH">Tunai</option>
+                <option value="QRIS">QRIS</option>
+              </select>
+            </div>
+
+            <div class="flex-shrink-0">
+              <button id="apply" class="flex w-full items-center justify-center gap-2 rounded-2xl bg-matcha px-6 py-3 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:bg-matcha/90">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6.66669 12.6667H9.33335" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M4 8H12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M2 3.33337H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>Terapkan</span>
+              </button>
             </div>
           </div>
-
-          <div class="flex-grow md:max-w-[180px]">
-            <label for="method" class="block text-xs font-semibold text-charcoal/70">Metode</label>
-            <select id="method" class="mt-1 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-matcha">
-              <option value="all">Semua</option>
-              <option value="CASH">Tunai</option>
-              <option value="QRIS">QRIS</option>
-            </select>
-          </div>
-
-          <div class="flex-shrink-0">
-            <button id="apply" class="flex w-full items-center justify-center gap-2 rounded-xl bg-matcha px-5 py-2 text-sm font-semibold text-white transition hover:bg-matcha/90">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M6.66669 12.6667H9.33335" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                <path d="M4 8H12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                <path d="M2 3.33337H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-              <span>Terapkan</span>
-            </button>
-          </div>
-
         </div>
       </section>
 
@@ -282,5 +292,17 @@
 
     <script src="/js/navbar.js"></script>
     <script src="/js/analytics.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        if (window.twemoji) {
+          const parseAll = () => {
+            try { twemoji.parse(document.body, { folder: 'svg', ext: '.svg' }); } catch (_) {}
+          };
+          parseAll();
+          const obs = new MutationObserver(() => parseAll());
+          obs.observe(document.body, { childList: true, subtree: true });
+        }
+      });
+    </script>
   </body>
 </html>

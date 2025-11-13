@@ -7,8 +7,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Twemoji keeps emoji rendering consistent across platforms -->
+  <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -402,5 +403,17 @@
 
     <script src="/js/navbar.js"></script>
     <script src="/js/menu.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        if (window.twemoji) {
+          const parseAll = () => {
+            try { twemoji.parse(document.body, { folder: 'svg', ext: '.svg' }); } catch (_) {}
+          };
+          parseAll();
+          const obs = new MutationObserver(() => parseAll());
+          obs.observe(document.body, { childList: true, subtree: true });
+        }
+      });
+    </script>
   </body>
 </html>
