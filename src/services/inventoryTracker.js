@@ -41,6 +41,16 @@ function sanitizeNumber(value) {
   return Number.isFinite(num) ? num : null;
 }
 
+function normalizeIngredientMap(map) {
+  const result = {};
+  Object.entries(map || {}).forEach(([name, value]) => {
+    if (!name) return;
+    const qty = Number(value);
+    result[name] = Number.isFinite(qty) ? qty : 0;
+  });
+  return result;
+}
+
 function upsertIngredient(payload) {
   const { name, unit, nettoValue, nettoUnit, buyPrice, originalName } = payload || {};
   if (!name) return false;
@@ -76,6 +86,7 @@ function upsertIngredient(payload) {
   if (sanitizedBuyPrice !== null) entry.buyPrice = sanitizedBuyPrice;
   else if (buyPrice !== undefined) delete entry.buyPrice;
 
+  entry.isMaster = true;
   entry.updatedAt = new Date().toISOString();
 
   // Remove null properties for cleaner JSON
@@ -131,7 +142,7 @@ function openSession({ cashier, openingCash, ingredients }) {
     cashier: cashier || 'kasir',
     openedAt: now.toISOString(),
     openingCash: Number(openingCash || 0),
-    openingIngredients: ingredients || {},
+    openingIngredients: normalizeIngredientMap(ingredients),
     closedAt: null,
     closingCash: null,
     closingIngredients: null
@@ -143,14 +154,18 @@ function openSession({ cashier, openingCash, ingredients }) {
 
 function closeSession({ cashier, closingCash, ingredients }) {
   const data = loadSessions();
-  const active = getActiveSession();
-  if (!active) throw new Error('Tidak ada sesi aktif untuk di-close.');
-  active.closedAt = new Date().toISOString();
-  active.closingCash = Number(closingCash || 0);
-  active.closingIngredients = ingredients || {};
-  active.closedBy = cashier || 'kasir';
+  const idx = data.sessions.findIndex(s => !s.closedAt);
+  if (idx === -1) throw new Error('Tidak ada sesi aktif untuk di-close.');
+
+  const session = data.sessions[idx];
+  session.closedAt = new Date().toISOString();
+  session.closingCash = Number(closingCash || 0);
+  session.closingIngredients = normalizeIngredientMap(ingredients);
+  session.closedBy = cashier || session.cashier || 'kasir';
+
+  data.sessions[idx] = session;
   saveSessions(data);
-  return active;
+  return session;
 }
 
 function discardActiveSession() {

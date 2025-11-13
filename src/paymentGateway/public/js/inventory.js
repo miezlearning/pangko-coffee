@@ -138,14 +138,16 @@ function setFormEnabled(formId, enabled) {
 function resetOpeningForm(prefillNames = []) {
   const form = $('openForm');
   if (form) form.reset();
-  setIngredientRows('openIngredients', {}, { prefill: prefillNames.length ? prefillNames : FALLBACK_INGREDIENTS });
+  const names = prefillNames.length ? prefillNames : getDefaultPrefillNames();
+  setIngredientRows('openIngredients', {}, { prefill: names });
   showInlineStatus('openResult', '');
 }
 
-function resetClosingForm(prefillNames = []) {
+function resetClosingForm(prefillNames) {
   const form = $('closeForm');
   if (form) form.reset();
-  setIngredientRows('closeIngredients', {}, { prefill: prefillNames });
+  const names = Array.isArray(prefillNames) && prefillNames.length ? prefillNames : getDefaultPrefillNames();
+  setIngredientRows('closeIngredients', {}, { prefill: names });
   showInlineStatus('closeResult', '');
 }
 
@@ -180,23 +182,31 @@ function updateIngredientSuggestions() {
 
 function getDefaultPrefillNames() {
   if (state.masterIngredients.length === 0) return FALLBACK_INGREDIENTS;
-  return state.masterIngredients.slice(0, 6).map((item) => item.name);
+  return state.masterIngredients.map((item) => item.name);
 }
 
-function containerHasData(containerId) {
+function getContainerNames(containerId) {
   const container = $(containerId);
-  if (!container) return false;
-  return Array.from(container.querySelectorAll('.ingredient-name')).some((input) => (input.value || '').trim() !== '');
+  if (!container) return [];
+  return Array.from(container.querySelectorAll('.ingredient-name'))
+    .map((input) => (input.value || '').trim())
+    .filter(Boolean);
+}
+
+function shouldReplaceWithMaster(names) {
+  if (!names.length) return true;
+  const fallbackSet = new Set(FALLBACK_INGREDIENTS.map((name) => name.toLowerCase()));
+  return names.every((name) => fallbackSet.has(name.toLowerCase()));
 }
 
 function maybePrefillFromMaster() {
-  if (state.activeSession) return;
-  const defaultNames = getDefaultPrefillNames();
-  if (!containerHasData('openIngredients')) {
-    setIngredientRows('openIngredients', {}, { prefill: defaultNames });
+  if (!state.masterIngredients.length || state.activeSession) return;
+  const masterNames = getDefaultPrefillNames();
+  if (shouldReplaceWithMaster(getContainerNames('openIngredients'))) {
+    setIngredientRows('openIngredients', {}, { prefill: masterNames });
   }
-  if (!containerHasData('closeIngredients')) {
-    setIngredientRows('closeIngredients', {}, { prefill: [] });
+  if (shouldReplaceWithMaster(getContainerNames('closeIngredients'))) {
+    setIngredientRows('closeIngredients', {}, { prefill: masterNames });
   }
 }
 
@@ -283,8 +293,8 @@ async function loadSessionStatus() {
     setFormEnabled('openForm', true);
     setFormEnabled('closeForm', false);
     resetClosingForm(openNames);
-    const openingContainer = $('openIngredients');
-    if (openingContainer && openingContainer.children.length === 0) {
+    const openNamesExisting = getContainerNames('openIngredients');
+    if (shouldReplaceWithMaster(openNamesExisting)) {
       resetOpeningForm(openNames);
     }
   }
@@ -543,14 +553,23 @@ function resetMasterForm() {
 async function loadMasterIngredients() {
   const response = await api('/ingredients');
   if (response.success && response.ingredients) {
-    state.masterIngredients = Object.entries(response.ingredients).map(([name, meta]) => ({
-      name,
-      unit: meta.unit || '',
-      nettoValue: meta.nettoValue ?? null,
-      nettoUnit: meta.nettoUnit || '',
-      buyPrice: meta.buyPrice ?? null,
-      updatedAt: meta.updatedAt || null
-    })).sort((a, b) => a.name.localeCompare(b.name, 'id'));
+    state.masterIngredients = Object.entries(response.ingredients)
+      .filter(([name, meta = {}]) => {
+        if (!name || typeof name !== 'string') return false;
+        if (name.includes('_')) return false;
+        if (meta.isMaster === true) return true;
+        const hasMeta = meta.buyPrice !== undefined || meta.nettoValue !== undefined;
+        const hasUppercase = /[A-Z]/.test(name);
+        return hasMeta || hasUppercase;
+      })
+      .map(([name, meta]) => ({
+        name,
+        unit: meta.unit || '',
+        nettoValue: meta.nettoValue ?? null,
+        nettoUnit: meta.nettoUnit || '',
+        buyPrice: meta.buyPrice ?? null,
+        updatedAt: meta.updatedAt || null
+      }));
     renderMasterTable();
     updateIngredientSuggestions();
     maybePrefillFromMaster();
