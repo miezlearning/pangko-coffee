@@ -35,6 +35,8 @@ const printerToolsState = {
   showItemNotes: true,
   showItemAddons: true,
   detailedItemBreakdown: true,
+  // Header logo
+  headerLogoDataUrl: '',
   // Internal
   previewColumns: 32,
   livePreviewTimer: null,
@@ -148,21 +150,38 @@ function renderHeaderLinesEditor() {
   const canDelete = printerToolsState.customHeaderLines.length > 1;
   container.innerHTML = printerToolsState.customHeaderLines.map((line, index) => {
     const fontOptions = HEADER_FONT_OPTIONS.map(opt => `<option value="${opt.value}" ${opt.value === line.font ? 'selected' : ''}>${opt.label}</option>`).join('');
-    const alignOptions = HEADER_ALIGN_OPTIONS.map(opt => `<option value="${opt.value}" ${opt.value === line.align ? 'selected' : ''}>${opt.label}</option>`).join('');
+    const btnH = 'h-9';
+    const alignBtnBase = `px-2 ${btnH} text-xs font-semibold transition border -ml-px first:ml-0 focus:outline-none`;
+    const alignBtn = (val, label) => `
+      <button type="button" data-header-align="${val}" data-line-id="${line.id}"
+        class="${alignBtnBase} ${line.align === val ? 'bg-matcha text-white border-matcha' : 'bg-white text-charcoal border-charcoal/15 hover:bg-charcoal/5'}">
+        ${label}
+      </button>`;
     return `
-      <div class="rounded-2xl border border-charcoal/10 bg-white/90 p-3 shadow-sm" data-header-line="${line.id}">
-        <div class="flex items-center justify-between gap-3">
-          <span class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal/40">Baris ${index + 1}</span>
-          ${canDelete ? `<button data-header-line-remove="${line.id}" type="button" class="text-xs font-semibold text-rose-500 transition hover:text-rose-600">Hapus</button>` : ''}
-        </div>
-  <input data-header-line-text="${line.id}" type="text" class="mt-3 w-full rounded-lg border border-charcoal/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-matcha focus:ring-2 focus:ring-matcha/20" placeholder="Teks header" value="${escapeAttribute(line.text)}" />
-        <div class="mt-3 grid grid-cols-2 gap-2">
-          <label class="text-xs font-semibold text-charcoal/60">Font
-            <select data-header-line-font="${line.id}" class="mt-1 w-full rounded-lg border border-charcoal/15 bg-white px-2 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-charcoal/70 outline-none transition focus:border-matcha focus:ring-2 focus:ring-matcha/20">${fontOptions}</select>
-          </label>
-          <label class="text-xs font-semibold text-charcoal/60">Posisi
-            <select data-header-line-align="${line.id}" class="mt-1 w-full rounded-lg border border-charcoal/15 bg-white px-2 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-charcoal/70 outline-none transition focus:border-matcha focus:ring-2 focus:ring-matcha/20">${alignOptions}</select>
-          </label>
+      <div class="rounded-xl border border-charcoal/10 bg-white/90 p-3" data-header-line="${line.id}">
+        <div class="flex flex-col gap-2">
+          <div class="flex items-center gap-2">
+            <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-charcoal/15 text-charcoal/50 bg-white hover:bg-charcoal/5" title="Pindahkan">⋮⋮</button>
+            <span class="shrink-0 rounded-md bg-charcoal/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-charcoal/50">${index + 1}</span>
+            <input data-header-line-text="${line.id}" type="text" class="w-full flex-1 rounded-md border border-charcoal/15 bg-white px-3 ${btnH} text-sm outline-none transition focus:border-matcha focus:ring-2 focus:ring-matcha/20" placeholder="Teks header" value="${escapeAttribute(line.text)}" />
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <select data-header-line-font="${line.id}" class="rounded-md border border-charcoal/15 bg-white px-2 ${btnH} text-xs font-semibold uppercase tracking-[0.16em] text-charcoal/70 outline-none transition focus:border-matcha focus:ring-2 focus:ring-matcha/20">
+                ${fontOptions}
+              </select>
+              <div class="inline-flex items-stretch rounded-md overflow-hidden border border-charcoal/15 bg-white ${btnH}">
+                ${alignBtn('left','L')}
+                ${alignBtn('center','C')}
+                ${alignBtn('right','R')}
+              </div>
+            </div>
+            <div class="flex items-center gap-1">
+              <button data-header-move="up" data-line-id="${line.id}" type="button" class="rounded-md border border-charcoal/15 bg-white px-2 ${btnH} text-xs text-charcoal/70 hover:bg-charcoal/5" title="Naik">▲</button>
+              <button data-header-move="down" data-line-id="${line.id}" type="button" class="rounded-md border border-charcoal/15 bg-white px-2 ${btnH} text-xs text-charcoal/70 hover:bg-charcoal/5" title="Turun">▼</button>
+              ${canDelete ? `<button data-header-line-remove="${line.id}" type="button" class="rounded-md border border-rose-200 bg-white px-3 ${btnH} text-xs font-semibold text-rose-600 transition hover:bg-rose-50" title="Hapus">Hapus</button>` : ''}
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -189,12 +208,17 @@ function renderHeaderLinesEditor() {
     });
   });
 
-  container.querySelectorAll('select[data-header-line-align]').forEach((select) => {
-    select.addEventListener('change', (event) => {
-      const id = event.currentTarget.getAttribute('data-header-line-align');
+  // Alignment segmented buttons
+  container.querySelectorAll('button[data-header-align]').forEach((btn) => {
+    btn.addEventListener('click', (event) => {
+      const id = event.currentTarget.getAttribute('data-line-id');
+      const val = event.currentTarget.getAttribute('data-header-align');
       const targetLine = printerToolsState.customHeaderLines.find(line => line.id === id);
       if (!targetLine) return;
-      targetLine.align = event.currentTarget.value;
+      targetLine.align = val || 'left';
+      // re-render to refresh active styles
+      renderHeaderLinesEditor();
+      syncHeaderTextState();
       schedulePreviewUpdate();
     });
   });
@@ -204,6 +228,30 @@ function renderHeaderLinesEditor() {
       const id = event.currentTarget.getAttribute('data-header-line-remove');
       printerToolsState.customHeaderLines = printerToolsState.customHeaderLines.filter(line => line.id !== id);
       ensureHeaderLines();
+      renderHeaderLinesEditor();
+      syncHeaderTextState();
+      schedulePreviewUpdate();
+    });
+  });
+
+  // Move up/down actions
+  container.querySelectorAll('button[data-header-move]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      const dir = event.currentTarget.getAttribute('data-header-move');
+      const id = event.currentTarget.getAttribute('data-line-id');
+      const idx = printerToolsState.customHeaderLines.findIndex(l => l.id === id);
+      if (idx === -1) return;
+      if (dir === 'up' && idx > 0) {
+        const tmp = printerToolsState.customHeaderLines[idx - 1];
+        printerToolsState.customHeaderLines[idx - 1] = printerToolsState.customHeaderLines[idx];
+        printerToolsState.customHeaderLines[idx] = tmp;
+      } else if (dir === 'down' && idx < printerToolsState.customHeaderLines.length - 1) {
+        const tmp = printerToolsState.customHeaderLines[idx + 1];
+        printerToolsState.customHeaderLines[idx + 1] = printerToolsState.customHeaderLines[idx];
+        printerToolsState.customHeaderLines[idx] = tmp;
+      } else {
+        return;
+      }
       renderHeaderLinesEditor();
       syncHeaderTextState();
       schedulePreviewUpdate();
@@ -262,6 +310,59 @@ function updateQrDefaultBadges() {
   const valueBadge = document.getElementById('footer-qr-default');
   if (valueBadge) {
     valueBadge.textContent = printerToolsState.footerQrDefaultValue || '—';
+  }
+}
+
+// Header logo helpers
+function setHeaderLogoPreview(dataUrl, filenameText) {
+  const img = document.getElementById('header-logo-preview');
+  const wrapper = document.getElementById('header-logo-preview-wrapper');
+  const nameEl = document.getElementById('header-logo-filename');
+  printerToolsState.headerLogoDataUrl = dataUrl || '';
+  if (img && wrapper) {
+    if (dataUrl) {
+      img.src = dataUrl;
+      wrapper.classList.remove('opacity-40');
+    } else {
+      img.removeAttribute('src');
+      wrapper.classList.add('opacity-40');
+    }
+  }
+  if (nameEl) {
+    nameEl.textContent = filenameText || (dataUrl ? 'Logo terpasang' : 'Belum ada file');
+  }
+}
+
+async function loadHeaderLogoSetting() {
+  try {
+    const res = await fetch('/api/printer/header-logo');
+    if (!res.ok) throw new Error('Failed to load header logo');
+    const json = await res.json();
+    if (json && json.success) {
+      const dataUrl = json.dataUrl || '';
+      setHeaderLogoPreview(dataUrl, dataUrl ? 'Logo tersimpan' : 'Belum ada file');
+    }
+  } catch (error) {
+    console.error('Gagal memuat logo header:', error);
+  }
+}
+
+async function saveHeaderLogoSetting(dataUrl) {
+  try {
+    const res = await fetch('/api/printer/header-logo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dataUrl: dataUrl || '' }),
+    });
+    if (!res.ok) throw new Error('Failed to save header logo');
+    const json = await res.json();
+    if (json && json.success) {
+      const saved = json.dataUrl || '';
+      setHeaderLogoPreview(saved, saved ? 'Logo tersimpan' : 'Belum ada file');
+    }
+  } catch (error) {
+    console.error('Gagal menyimpan logo header:', error);
+    alert('Gagal menyimpan logo header. Coba lagi.');
   }
 }
 
@@ -463,6 +564,8 @@ function applyPreviewWidth() {
     sample.style.width = `${widthCh}ch`;
     sample.style.minWidth = `${widthCh}ch`;
   }
+  // Update badge
+  document.querySelectorAll('[data-preview-columns-badge]').forEach(el => el.textContent = String(columns));
 }
 
 async function loadTemplates() {
@@ -492,7 +595,6 @@ async function loadTemplates() {
 
 async function loadSamplePreview(templateId) {
   const preview = document.getElementById('sample-preview');
-  const htmlPreview = document.getElementById('sample-preview-html');
   const qrContainer = document.getElementById('footer-qr-preview-container');
   const qrImage = document.getElementById('footer-qr-preview-image');
   const qrLabelEl = document.getElementById('footer-qr-preview-label');
@@ -500,10 +602,6 @@ async function loadSamplePreview(templateId) {
   if (preview) {
     preview.textContent = 'Memuat preview…';
     applyPreviewWidth();
-  }
-  if (htmlPreview) {
-    htmlPreview.innerHTML = '';
-    htmlPreview.classList.add('hidden');
   }
   if (qrContainer) qrContainer.classList.add('hidden');
   if (qrImage) qrImage.src = '';
@@ -570,20 +668,10 @@ async function loadSamplePreview(templateId) {
       preview.textContent = data.text;
     }
 
-    if (htmlPreview) {
-      if (data.html) {
-        htmlPreview.innerHTML = data.html;
-        htmlPreview.classList.remove('hidden');
-      } else {
-        htmlPreview.innerHTML = '';
-        htmlPreview.classList.add('hidden');
+      const htmlContainer = document.getElementById('sample-preview-html-inner');
+      if (htmlContainer) {
+        htmlContainer.innerHTML = data.html || '';
       }
-    }
-
-    const textWrapper = document.getElementById('sample-preview-text-wrapper');
-    if (textWrapper) {
-      textWrapper.open = !data.html;
-    }
 
     const qrEnabled = data.footerQrEnabled ?? printerToolsState.footerQrEnabled;
     const qrCanRender = data.footerQrCanRender ?? printerToolsState.footerQrCanRender ?? qrEnabled;
@@ -592,7 +680,8 @@ async function loadSamplePreview(templateId) {
     const qrLabelText = data.footerQrLabel || printerToolsState.footerQrLabel || printerToolsState.footerQrDefaultLabel || 'Scan QR';
 
     if (qrContainer) {
-      if (!data.html && qrEnabled && qrCanRender && data.footerQrBase64) {
+      const activeTab = getActivePreviewTab();
+      if (activeTab === 'qr' && qrEnabled && qrCanRender && data.footerQrBase64) {
         if (qrImage) qrImage.src = data.footerQrBase64;
         if (qrLabelEl) qrLabelEl.textContent = qrLabelText;
         qrContainer.classList.remove('hidden');
@@ -610,14 +699,39 @@ async function loadSamplePreview(templateId) {
     if (preview) {
       preview.textContent = 'Preview tidak tersedia.';
     }
-    if (htmlPreview) {
-      htmlPreview.innerHTML = '';
-      htmlPreview.classList.add('hidden');
-    }
-    const textWrapper = document.getElementById('sample-preview-text-wrapper');
-    if (textWrapper) {
-      textWrapper.open = true;
-    }
+  }
+}
+
+// Preview tabs controller
+function getActivePreviewTab() {
+  try {
+    return sessionStorage.getItem('toolsPrinter.previewTab') || 'visual';
+  } catch (_) {
+    return 'visual';
+  }
+}
+
+function setActivePreviewTab(name) {
+  const allowed = new Set(['text', 'visual', 'qr']);
+  const tab = allowed.has(name) ? name : 'text';
+  try { sessionStorage.setItem('toolsPrinter.previewTab', tab); } catch(_) {}
+  const btns = document.querySelectorAll('.preview-tab-btn');
+  btns.forEach(b => b.dataset.active = (b.getAttribute('data-preview-tab') === tab));
+  updatePreviewTabsVisibility();
+  // Refresh preview (ensures QR image is generated when switching to QR)
+  schedulePreviewUpdate();
+}
+
+function updatePreviewTabsVisibility() {
+  const tab = getActivePreviewTab();
+  const textPanel = document.getElementById('preview-panel-text');
+  const visualPanel = document.getElementById('preview-panel-visual');
+  const qrContainer = document.getElementById('footer-qr-preview-container');
+  if (textPanel) textPanel.classList.toggle('hidden', tab !== 'text');
+  if (visualPanel) visualPanel.classList.toggle('hidden', tab !== 'visual');
+  if (qrContainer) {
+    // Only the tab switch: final display depends on QR availability handled in loadSamplePreview
+    qrContainer.classList.toggle('hidden', tab !== 'qr');
   }
 }
 
@@ -767,6 +881,40 @@ function bindPrinterToolEvents() {
         showPrinterToast('Preview disalin ke clipboard', 'success');
       } catch (error) {
         showPrinterToast('Clipboard tidak tersedia di browser ini', 'error');
+      }
+    });
+  }
+
+  // Header logo upload / clear
+  const headerLogoFile = document.getElementById('header-logo-file');
+  const headerLogoClear = document.getElementById('header-logo-clear');
+  if (headerLogoFile) {
+    headerLogoFile.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      if (!/^image\/png$/i.test(file.type)) {
+        alert('Gunakan file PNG (hitam-putih) untuk logo header.');
+        headerLogoFile.value = '';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = String(ev.target.result || '');
+        setHeaderLogoPreview(dataUrl, file.name || 'Logo dipilih');
+        saveHeaderLogoSetting(dataUrl);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  if (headerLogoClear) {
+    headerLogoClear.addEventListener('click', () => {
+      if (!printerToolsState.headerLogoDataUrl) {
+        setHeaderLogoPreview('', 'Belum ada file');
+        return;
+      }
+      if (confirm('Hapus logo header dari pengaturan struk?')) {
+        setHeaderLogoPreview('', 'Belum ada file');
+        saveHeaderLogoSetting('');
       }
     });
   }
@@ -1012,8 +1160,16 @@ window.addEventListener('DOMContentLoaded', () => {
   loadTemplates();
   loadCustomText();
   loadFooterQrSettings();
+  loadHeaderLogoSetting();
   // Load custom template state last to update toggle and textarea
   loadFullCustomTemplate();
+
+  // Preview tab bindings
+  document.querySelectorAll('.preview-tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setActivePreviewTab(btn.getAttribute('data-preview-tab')));
+  });
+  // Initialize tabs from session
+  setActivePreviewTab(getActivePreviewTab());
 });
 
 async function loadCustomText() {

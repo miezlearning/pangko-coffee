@@ -147,6 +147,31 @@ router.get('/settings', (req, res) => {
 });
 
 /**
+ * GET /api/printer/header-logo
+ * Get header logo (PNG data URL)
+ */
+router.get('/header-logo', async (req, res) => {
+  try {
+    const logo = printerService.getHeaderLogoSetting();
+    res.json({ success: true, dataUrl: logo || '' });
+  } catch (err) {
+    console.error('Failed to load header logo setting', err);
+    res.status(500).json({ success: false, message: 'Gagal mengambil logo header' });
+  }
+});
+
+router.post('/header-logo', async (req, res) => {
+  try {
+    const { dataUrl } = req.body || {};
+    const saved = printerService.setHeaderLogoSetting(dataUrl || '');
+    res.json({ success: true, dataUrl: saved || '' });
+  } catch (err) {
+    console.error('Failed to save header logo setting', err);
+    res.status(500).json({ success: false, message: 'Gagal menyimpan logo header' });
+  }
+});
+
+/**
  * POST /api/printer/settings
  * Update receipt template selection
  */

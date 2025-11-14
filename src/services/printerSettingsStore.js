@@ -53,7 +53,7 @@ function loadSettings() {
     }
     const raw = fs.readFileSync(SETTINGS_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
-    return { ...DEFAULT_SETTINGS, ...parsed };
+    return parsed && typeof parsed === 'object' ? parsed : {};
   } catch (error) {
     console.error('[PrinterSettings] Failed to load settings, using defaults:', error.message);
     return { ...DEFAULT_SETTINGS };

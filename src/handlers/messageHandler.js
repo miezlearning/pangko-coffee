@@ -1,6 +1,7 @@
 const commands = require('../commands');
 const config = require('../config/config');
 const storeState = require('../services/storeState');
+const { inferIntentFromMessage } = require('../services/aiIntentRouter');
 
 /**
  * Message Handler
@@ -60,6 +61,61 @@ async function messageHandler(sock, msg) {
                         }
                     } catch (_) { /* ignore */ }
                 }
+            }
+
+            // No active interactive session: use AI intent router
+            try {
+                const menuExamples = require('../services/menuStore').getMenuItems({ available: true }).slice(0, 6).map(m => m.name);
+                const { intent, params } = await inferIntentFromMessage(messageText, {
+                    shopName: config.shop.name,
+                    menuExamples
+                });
+
+                console.log(`[AI-INTENT] ${from}: ${messageText} -> ${intent}`);
+
+                if (intent === 'show_menu') {
+                    const menuCmd = commands['menu'];
+                    if (menuCmd && typeof menuCmd.execute === 'function') {
+                        await menuCmd.execute(sock, msg, []);
+                        return;
+                    }
+                } else if (intent === 'create_order') {
+                    const orderCmd = commands['order'];
+                    if (orderCmd && typeof orderCmd.addItemToOrder === 'function' && Array.isArray(params.items) && params.items.length) {
+                        // Map first item only for now
+                        const item = params.items[0];
+                        const qty = Number.isFinite(Number(item.qty)) && Number(item.qty) > 0 ? String(item.qty) : '1';
+                        const nameToken = (item.id || item.code || '').toString().trim();
+                        // We expect ID menu, tapi kalau AI hanya kirim nama, user akan diarahkan ulang
+                        if (nameToken) {
+                            await orderCmd.addItemToOrder(sock, msg, [nameToken.toUpperCase(), qty]);
+                            return;
+                        }
+                    }
+                    // Fallback: arahkan user ke cara pakai !order
+                    await sock.sendMessage(from, { text: 'Untuk pesan, kak bisa tulis: *!order KODE_MENU JUMLAH*\nContoh: *!order C001 2* untuk 2 Espresso\nKetik *!menu* dulu kalau mau lihat kode lengkap.' });
+                    return;
+                } else if (intent === 'check_order_status') {
+                    const statusCmd = commands['status'];
+                    if (statusCmd && typeof statusCmd.execute === 'function') {
+                        const hint = params && params.hint ? String(params.hint) : '';
+                        const argsForStatus = hint ? [hint] : [];
+                        await statusCmd.execute(sock, msg, argsForStatus);
+                        return;
+                    }
+                } else if (intent === 'help') {
+                    const helpCmd = commands['help'];
+                    if (helpCmd && typeof helpCmd.execute === 'function') {
+                        await helpCmd.execute(sock, msg, []);
+                        return;
+                    }
+                } else if (intent === 'smalltalk') {
+                    await sock.sendMessage(from, { text: 'Sip kak 🙏 Kalau mau pesan, kak bisa ketik *!menu* dulu atau langsung *!order KODE_MENU JUMLAH*.' });
+                    return;
+                }
+                // unknown intent: do nothing (silent) to avoid spam
+            } catch (e) {
+                console.error('[AI-INTENT] error:', e.message || e);
             }
             return;
         }

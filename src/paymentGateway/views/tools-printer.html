@@ -26,13 +26,58 @@
     <style>
       body { font-family: Manrope, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui, sans-serif; }
       img.emoji { height: 1em; width: 1em; margin: 0 .05em; vertical-align: -0.15em; }
+      /* Desktop-only compact mode to reduce overall density on laptops (moderate, not too tight) */
+      @media (min-width: 1280px) {
+        main[data-compact="true"] { font-size: 15.5px; padding-top: 5rem; }
+        main[data-compact="true"] h1 { font-size: 2.25rem !important; }
+        main[data-compact="true"] h2 { font-size: 1.35rem !important; }
+        main[data-compact="true"] h3 { font-size: 1rem !important; }
+        main[data-compact="true"] .text-sm { font-size: 0.9rem !important; }
+        main[data-compact="true"] .text-base { font-size: 1rem !important; }
+        main[data-compact="true"] .p-6 { padding: 1.1rem !important; }
+        main[data-compact="true"] .p-5 { padding: 1rem !important; }
+        main[data-compact="true"] .p-4 { padding: 0.85rem !important; }
+        main[data-compact="true"] .p-3 { padding: 0.7rem !important; }
+        main[data-compact="true"] .px-6 { padding-left: 1rem !important; padding-right: 1rem !important; }
+        main[data-compact="true"] .px-4 { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+        main[data-compact="true"] .py-6 { padding-top: 1.1rem !important; padding-bottom: 1.1rem !important; }
+        main[data-compact="true"] .py-3 { padding-top: 0.7rem !important; padding-bottom: 0.7rem !important; }
+        main[data-compact="true"] .gap-6 { gap: 1.1rem !important; }
+        main[data-compact="true"] .gap-5 { gap: 0.9rem !important; }
+        main[data-compact="true"] .gap-4 { gap: 0.85rem !important; }
+        main[data-compact="true"] .gap-3 { gap: 0.6rem !important; }
+        main[data-compact="true"] .space-y-6 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: 0.9rem !important; }
+        main[data-compact="true"] .space-y-5 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: 0.65rem !important; }
+        main[data-compact="true"] .mt-6 { margin-top: 0.9rem !important; }
+        main[data-compact="true"] .mt-5 { margin-top: 0.85rem !important; }
+        main[data-compact="true"] .mt-4 { margin-top: 0.7rem !important; }
+        main[data-compact="true"] .rounded-3xl { border-radius: 1rem; }
+        main[data-compact="true"] .rounded-2xl { border-radius: 0.75rem; }
+        main[data-compact="true"] #hero { padding-top: 0.75rem !important; padding-bottom: 0.75rem !important; }
+        main[data-compact="true"] #sample-preview { max-height: 28rem !important; }
+        /* Form elements */
+        main[data-compact="true"] input[type="text"],
+        main[data-compact="true"] input[type="url"],
+        main[data-compact="true"] input[type="number"],
+        main[data-compact="true"] textarea,
+        main[data-compact="true"] select {
+          padding: 0.6rem 0.7rem !important;
+          min-height: 2.4rem !important;
+          font-size: 0.92rem !important;
+        }
+        main[data-compact="true"] button:not(.tab-btn) {
+          padding: 0.6rem 0.9rem !important;
+          font-size: 0.92rem !important;
+        }
+        main[data-compact="true"] .preview-paper { font-size: 12.5px !important; }
+      }
     </style>
   </head>
   <body class="min-h-screen bg-cream text-charcoal antialiased" data-page="tools-printer">
     <div id="navbar-container"></div>
 
-    <main class="mx-auto w-full max-w-[1180px] px-5 pt-32 pb-16">
-      <section class="relative mb-10 overflow-hidden rounded-3xl bg-white/90 px-6 py-8 shadow-glow md:px-12 md:py-12">
+    <main class="mx-auto w-full max-w-6xl px-4 pt-28 pb-16 sm:px-6 lg:px-8" data-compact="false">
+      <section id="hero" class="relative mb-10 overflow-hidden rounded-3xl bg-white/90 px-4 py-7 shadow-glow sm:px-6 md:px-10 md:py-10">
         <div class="pointer-events-none absolute -left-20 -top-24 h-72 w-72 rounded-full bg-matcha/25 blur-3xl"></div>
         <div class="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-peach/35 blur-3xl"></div>
         <div class="relative flex flex-col gap-8 xl:flex-row xl:items-center xl:justify-between">
@@ -65,10 +110,34 @@
         </div>
       </section>
 
-      <section class="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div class="space-y-6">
-          <div class="rounded-3xl border border-white/45 bg-white/90 p-6 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
-            <div class="flex items-start justify-between">
+      <!-- Tabs Navigation -->
+      <div class="mb-6 sticky top-16 z-30 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/50 bg-white/85 p-1 shadow-[0_18px_40px_-28px_rgba(51,51,51,0.25)] backdrop-blur supports-[backdrop-filter]:bg-white/65">
+        <div class="flex items-center gap-2">
+        <button data-tab="templates" class="tab-btn active inline-flex items-center gap-2 rounded-xl border border-charcoal/10 bg-white px-4 py-2 text-sm font-semibold text-charcoal transition hover:bg-charcoal/5 data-[active=true]:bg-matcha data-[active=true]:text-white data-[active=true]:border-transparent data-[active=true]:shadow" aria-current="page">
+          🗂️ <span>Templates</span>
+        </button>
+        <button data-tab="customize" class="tab-btn inline-flex items-center gap-2 rounded-xl border border-charcoal/10 bg-white px-4 py-2 text-sm font-semibold text-charcoal transition hover:bg-charcoal/5 data-[active=true]:bg-matcha data-[active=true]:text-white data-[active=true]:border-transparent data-[active=true]:shadow">
+          🎛️ <span>Kustomisasi</span>
+        </button>
+        <button data-tab="qr" class="tab-btn inline-flex items-center gap-2 rounded-xl border border-charcoal/10 bg-white px-4 py-2 text-sm font-semibold text-charcoal transition hover:bg-charcoal/5 data-[active=true]:bg-matcha data-[active=true]:text-white data-[active=true]:border-transparent data-[active=true]:shadow">
+          📱 <span>QR Footer</span>
+        </button>
+        <button data-tab="actions" class="tab-btn inline-flex items-center gap-2 rounded-xl border border-charcoal/10 bg-white px-4 py-2 text-sm font-semibold text-charcoal transition hover:bg-charcoal/5 data-[active=true]:bg-matcha data-[active=true]:text-white data-[active=true]:border-transparent data-[active=true]:shadow">
+          ⚙️ <span>Aksi</span>
+        </button>
+        </div>
+        <label class="mr-2 flex items-center gap-2 rounded-xl bg-white/70 px-3 py-1.5 text-xs font-semibold text-charcoal/70">
+          <span>Compact</span>
+          <input id="toggle-compact" type="checkbox" class="h-4 w-8 appearance-none rounded-full bg-charcoal/20 outline-none transition relative before:absolute before:left-0.5 before:top-0.5 before:h-3 before:w-3 before:rounded-full before:bg-white before:content-[''] checked:bg-matcha checked:before:translate-x-4" />
+        </label>
+      </div>
+
+      <section class="grid gap-4 xl:grid-cols-3">
+        <div class="space-y-5 xl:col-span-2">
+          <!-- SECTION: Templates -->
+          <div id="section-templates" data-section="templates" class="section-block">
+          <div class="rounded-3xl border border-white/45 bg-white/90 p-5 shadow-[0_20px_44px_-36px_rgba(51,51,51,0.35)] backdrop-blur overflow-hidden sm:p-5 xl:sticky xl:top-20">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 class="text-2xl font-bold">Pilih Ukuran Struk</h2>
                 <p class="mt-1 text-sm text-charcoal/60">Aktifkan salah satu template berikut. Perubahan langsung tersimpan dan dipakai untuk dashboard & kasir.</p>
@@ -77,47 +146,12 @@
                 🔄 Refresh
               </button>
             </div>
-            <div id="template-cards" class="mt-5 grid gap-4 sm:grid-cols-2"></div>
+             <div id="template-cards" class="mt-4 grid gap-3 sm:grid-cols-2"></div>
+          </div>
           </div>
 
-          <div class="rounded-3xl border border-white/45 bg-white/90 p-6 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
-            <div class="flex items-start justify-between">
-              <div>
-                <h2 class="text-2xl font-bold">Preview Contoh Struk</h2>
-                <p class="mt-1 text-sm text-charcoal/60">Preview menggunakan data contoh. Preview mengikuti template aktif.</p>
-              </div>
-              <button id="copy-preview" class="inline-flex items-center gap-2 rounded-full border border-charcoal/10 bg-white px-4 py-2 text-sm font-semibold text-charcoal transition hover:bg-charcoal/5" type="button">
-                📋 Salin Teks
-              </button>
-            </div>
-            <div class="mt-4 flex justify-center">
-              <div class="rounded-2xl border border-charcoal/10 bg-charcoal/3 p-4 shadow-sm flex flex-col items-center gap-4 w-full sm:w-auto">
-                <div id="sample-preview-html" class="hidden w-full max-w-[320px]"></div>
-                <details id="sample-preview-text-wrapper" class="w-full max-w-[320px] rounded-xl border border-charcoal/10 bg-white/70 p-3 text-sm text-charcoal/70" open>
-                  <summary class="cursor-pointer text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">Versi teks struk</summary>
-                  <pre id="sample-preview" class="preview-paper mt-3 inline-block max-h-[360px] w-full overflow-auto whitespace-pre-wrap bg-white/0 font-mono text-[13px] leading-relaxed">Memuat preview…</pre>
-                </details>
-                <div id="footer-qr-preview-container" class="hidden">
-                  <div class="inline-flex flex-col items-center gap-2 rounded-xl border border-charcoal/10 bg-white px-4 py-3 shadow-sm">
-                    <span id="footer-qr-preview-label" class="text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/60">Scan QR</span>
-                    <img id="footer-qr-preview-image" class="mx-auto h-28 w-28 rounded-md border border-charcoal/10 bg-white p-1" alt="QR Code Preview" />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="mt-4 flex justify-center">
-              <div class="w-full rounded-2xl border border-dashed border-charcoal/15 bg-white/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] sm:w-auto">
-                <div class="flex items-center justify-between gap-3">
-                  <h3 class="text-base font-semibold text-charcoal">Status QR Code Footer</h3>
-                  <div id="footer-qr-status-badge" class="text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">TIDAK AKTIF</div>
-                </div>
-                <p class="mt-1 text-sm text-charcoal/60">Preview QR code akan dicetak langsung oleh printer, bukan dalam bentuk teks ASCII.</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Bagian Struk & Customization -->
-          <div class="rounded-3xl border border-white/45 bg-white/90 p-6 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
+          <!-- SECTION: Customization -->
+          <div id="section-customize" data-section="customize" class="section-block hidden rounded-3xl border border-white/45 bg-white/90 p-5 shadow-[0_20px_44px_-36px_rgba(51,51,51,0.35)] backdrop-blur overflow-hidden sm:p-5">
             <div class="flex flex-wrap items-start justify-between gap-y-3">
               <div>
                 <h2 class="text-2xl font-bold">Kustomisasi Tampilan Struk</h2>
@@ -129,10 +163,10 @@
             </div>
 
             <!-- Per-Bagian Struk -->
-            <div class="mt-5 grid gap-6 md:grid-cols-2">
+            <div class="mt-5 grid gap-6 lg:grid-cols-12">
               <!-- Kolom Kiri: Informasi & Item -->
-              <div class="space-y-4">
-                <div class="rounded-2xl border border-charcoal/10 bg-charcoal/3 p-4">
+              <div class="space-y-5 lg:col-span-5">
+                <div class="rounded-2xl border border-charcoal/10 bg-white p-5 shadow-sm">
                   <div class="mb-3">
                     <label class="block text-sm font-semibold text-charcoal">Bagian Informasi</label>
                     <p class="mt-0.5 text-xs text-charcoal/50">Tampilkan/sembunyikan baris informasi di header.</p>
@@ -157,7 +191,7 @@
                   </div>
                 </div>
 
-                <div class="rounded-2xl border border-charcoal/10 bg-charcoal/3 p-4">
+                <div class="rounded-2xl border border-charcoal/10 bg-white p-5 shadow-sm">
                   <div class="mb-3">
                     <label class="block text-sm font-semibold text-charcoal">Detail Item</label>
                      <p class="mt-0.5 text-xs text-charcoal/50">Atur detail untuk setiap item yang dibeli.</p>
@@ -180,8 +214,35 @@
               </div>
 
               <!-- Kolom Kanan: Header, Footer, Styling -->
-              <div class="space-y-4">
-                <div class="rounded-2xl border border-charcoal/10 bg-charcoal/3 p-4">
+              <div class="space-y-5 lg:col-span-7">
+                <!-- Header Logo Upload -->
+                <div class="rounded-2xl border border-charcoal/10 bg-white p-5 shadow-sm">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <label class="block text-sm font-semibold text-charcoal">Logo Header (PNG hitam-putih)</label>
+                      <p class="mt-0.5 text-xs text-charcoal/50">Logo ini akan dicetak di atas teks header, sebaiknya PNG hitam-putih.</p>
+                    </div>
+                    <button id="header-logo-clear" type="button" class="inline-flex items-center gap-1 rounded-full border border-charcoal/15 bg-white px-3 py-1.5 text-xs font-semibold text-charcoal transition hover:bg-charcoal/5">
+                      ✕ Hapus
+                    </button>
+                  </div>
+                  <div class="mt-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+                    <div class="flex items-center gap-2">
+                      <label for="header-logo-file" class="inline-flex cursor-pointer items-center gap-2 rounded-full bg-matcha px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-matcha/90">
+                        📁 Pilih PNG
+                      </label>
+                      <input id="header-logo-file" type="file" accept="image/png" class="hidden" />
+                      <span id="header-logo-filename" class="text-xs text-charcoal/60">Belum ada file</span>
+                    </div>
+                    <div id="header-logo-preview-wrapper" class="mt-2 flex items-center gap-2 rounded-xl border border-charcoal/10 bg-white/80 px-3 py-2 opacity-40">
+                      <span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-charcoal/50">Preview</span>
+                      <img id="header-logo-preview" alt="Preview Logo Header" class="h-10 w-auto max-w-[120px] object-contain" />
+                    </div>
+                  </div>
+                  <p class="mt-2 text-[11px] text-charcoal/45">Tip: gunakan logo dengan background putih dan warna hitam saja supaya hasil di thermal printer lebih konsisten.</p>
+                </div>
+
+                <div class="rounded-2xl border border-charcoal/10 bg-white p-5 shadow-sm">
                   <label for="header-preset" class="mb-2 block text-sm font-semibold text-charcoal">Pola Header</label>
                   <select id="header-preset" class="w-full rounded-lg border border-charcoal/10 bg-white p-2.5 text-sm outline-none focus:border-matcha focus:ring-2 focus:ring-matcha/20">
                     <option value="shop-name">Nama Toko</option>
@@ -191,7 +252,7 @@
                     <option value="none">Kosong</option>
                   </select>
                   <div id="custom-header-container" class="mt-3 hidden">
-                    <div class="rounded-2xl border border-charcoal/10 bg-white/80 p-4">
+                    <div class="rounded-2xl border border-charcoal/10 bg-white p-4 shadow-sm">
                       <div class="flex items-center justify-between">
                         <div>
                           <p class="text-sm font-semibold text-charcoal">Susun Baris Header</p>
@@ -201,14 +262,14 @@
                           ➕ Tambah Baris
                         </button>
                       </div>
-                      <div id="header-lines-list" class="mt-3 space-y-3"></div>
+                      <div id="header-lines-list" class="mt-3 space-y-4 overflow-x-auto pr-1"></div>
                       <p class="mt-2 text-xs text-charcoal/45">Tip: gunakan kombinasi font besar dan rata tengah untuk headline, lalu font normal untuk detail.</p>
                     </div>
                     <textarea id="custom-header" rows="3" class="hidden"></textarea>
                   </div>
                 </div>
 
-                <div class="rounded-2xl border border-charcoal/10 bg-charcoal/3 p-4">
+                <div class="rounded-2xl border border-charcoal/10 bg-white p-5 shadow-sm">
                   <label for="footer-preset" class="mb-2 block text-sm font-semibold text-charcoal">Pola Footer</label>
                   <select id="footer-preset" class="w-full rounded-lg border border-charcoal/10 bg-white p-2.5 text-sm outline-none focus:border-matcha focus:ring-2 focus:ring-matcha/20">
                     <option value="thank-you">Ucapan Terima Kasih</option>
@@ -222,7 +283,7 @@
                   </div>
                 </div>
                 
-                <div class="rounded-2xl border border-charcoal/10 bg-charcoal/3 p-4">
+                <div class="rounded-2xl border border-charcoal/10 bg-white p-5 shadow-sm">
                   <label class="block text-sm font-semibold text-charcoal">Garis Pemisah</label>
                   <div class="mt-2 grid grid-cols-2 gap-2.5">
                     <label class="inline-flex items-center gap-2 text-sm text-charcoal/80">
@@ -239,14 +300,14 @@
               </div>
             </div>
             
-            <div class="mt-5 flex flex-wrap items-center justify-center gap-3 rounded-2xl bg-matcha/5 p-3">
+            <div class="mt-4 flex flex-wrap items-center justify-center gap-3 rounded-2xl bg-matcha/5 p-3">
               <button id="save-custom-text" class="inline-flex items-center gap-2 rounded-xl bg-matcha px-5 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" type="button">💾 Simpan Kustomisasi</button>
               <span class="inline-flex items-center gap-2 rounded-xl bg-white/80 px-4 py-2 text-xs font-semibold text-matcha">✨ Live Preview Aktif</span>
             </div>
           </div>
 
-          <!-- QR Code Footer - Simplified & Modern -->
-          <div class="rounded-3xl border border-white/45 bg-white/90 p-6 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
+          <!-- SECTION: QR Footer -->
+          <div id="section-qr" data-section="qr" class="section-block hidden rounded-3xl border border-white/45 bg-white/90 p-5 shadow-[0_20px_44px_-36px_rgba(51,51,51,0.35)] backdrop-blur overflow-hidden">
             <div class="mb-5 flex items-center justify-between">
               <div class="flex items-center gap-3">
                 <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-matcha to-matcha/80 text-xl shadow-sm">📱</div>
@@ -406,33 +467,80 @@
               </div>
             </div>
           </div>
-        </div>
 
-        <aside class="space-y-6">
-          <div class="rounded-3xl border border-white/45 bg-white/90 p-6 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
-            <h2 class="text-2xl font-bold">Kontrol Printer</h2>
-            <p class="mt-2 text-sm text-charcoal/60">Gunakan tombol berikut untuk memastikan printer siap dipakai.</p>
-            <div class="mt-5 grid gap-3">
-              <button id="activate-selected" class="inline-flex items-center justify-center gap-2 rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" type="button">
-                ✅ Jadikan Template Aktif
-              </button>
-              <button id="test-print" class="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-purple-400 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-700 transition hover:bg-purple-100" type="button">
-                🖨️ Test Print Contoh
-              </button>
-              <button id="open-drawer" class="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-orange-400 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-100" type="button">
-                💰 Buka Laci Kasir
+          <!-- SECTION: Actions -->
+          <div id="section-actions" data-section="actions" class="section-block hidden space-y-6">
+            <div class="rounded-3xl border border-white/45 bg-white/90 p-6 shadow-[0_25px_60px_-45px_rgba(51,51,51,0.35)] backdrop-blur">
+              <h2 class="text-2xl font-bold">Kontrol Printer</h2>
+              <p class="mt-2 text-sm text-charcoal/60">Gunakan tombol berikut untuk memastikan printer siap dipakai.</p>
+              <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                <button id="activate-selected" class="inline-flex items-center justify-center gap-2 rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" type="button">
+                  ✅ Jadikan Template Aktif
+                </button>
+                <button id="test-print" class="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-purple-400 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-700 transition hover:bg-purple-100" type="button">
+                  🖨️ Test Print Contoh
+                </button>
+                <button id="open-drawer" class="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-orange-400 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-100" type="button">
+                  💰 Buka Laci Kasir
+                </button>
+              </div>
+              <p class="mt-4 text-xs text-charcoal/50">Test print akan menggunakan template yang sedang dipilih. Pastikan printer terhubung dan siap.</p>
+            </div>
+            <div class="rounded-3xl border border-dashed border-charcoal/20 bg-white/70 p-6 text-sm text-charcoal/70">
+              <h3 class="text-base font-semibold text-charcoal">💡 Tips</h3>
+              <ul class="mt-3 space-y-2 list-disc pl-5">
+                <li>Simpan perubahan kustomisasi sebelum melakukan "Test Print".</li>
+                <li>Jika printer tidak merespon, cek koneksi dan restart service jika perlu.</li>
+                <li>Gunakan panel "Kustomisasi Tampilan Struk" untuk mengatur semua bagian struk dengan mudah.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <aside class="space-y-4 xl:col-span-1 xl:sticky xl:top-20 h-max isolate">
+          <!-- Sticky Preview Panel -->
+          <div class="rounded-3xl border border-white/45 bg-white/90 p-5 shadow-[0_20px_44px_-36px_rgba(51,51,51,0.35)] backdrop-blur overflow-hidden sm:p-5">
+            <div class="flex items-start justify-between">
+              <div>
+                <h2 class="text-2xl font-bold">Preview Contoh Struk</h2>
+                <p class="mt-1 text-sm text-charcoal/60">Preview menggunakan data contoh. Preview mengikuti template aktif.</p>
+              </div>
+              <button id="copy-preview" class="inline-flex items-center gap-2 rounded-full border border-charcoal/10 bg-white px-4 py-2 text-sm font-semibold text-charcoal transition hover:bg-charcoal/5" type="button">
+                📋 Salin Teks
               </button>
             </div>
-            <p class="mt-4 text-xs text-charcoal/50">Test print akan menggunakan template yang sedang dipilih. Pastikan printer terhubung dan siap.</p>
-          </div>
-
-          <div class="rounded-3xl border border-dashed border-charcoal/20 bg-white/70 p-6 text-sm text-charcoal/70">
-            <h3 class="text-base font-semibold text-charcoal">💡 Tips</h3>
-            <ul class="mt-3 space-y-2 list-disc pl-5">
-              <li>Simpan perubahan kustomisasi sebelum melakukan "Test Print".</li>
-              <li>Jika printer tidak merespon, cek koneksi dan restart service jika perlu.</li>
-              <li>Gunakan panel "Kustomisasi Tampilan Struk" untuk mengatur semua bagian struk dengan mudah.</li>
-            </ul>
+            <div class="mt-3 flex items-center justify-between">
+              <div class="inline-flex overflow-hidden rounded-lg border border-charcoal/10 bg-white shadow-sm">
+                <button class="preview-tab-btn px-3 py-1.5 text-xs font-semibold text-charcoal data-[active=true]:bg-matcha data-[active=true]:text-white" data-preview-tab="text">Teks</button>
+                <button class="preview-tab-btn px-3 py-1.5 text-xs font-semibold text-charcoal data-[active=true]:bg-matcha data-[active=true]:text-white" data-preview-tab="visual">Visual</button>
+                <button class="preview-tab-btn px-3 py-1.5 text-xs font-semibold text-charcoal data-[active=true]:bg-matcha data-[active=true]:text-white" data-preview-tab="qr">QR</button>
+              </div>
+              <span class="text-[10px] font-semibold uppercase tracking-[0.25em] text-charcoal/50">Lebar <span data-preview-columns-badge>—</span> kolom</span>
+            </div>
+            <div class="mt-4">
+              <div id="preview-panel-text" class="rounded-2xl border border-charcoal/10 bg-white/70 p-3 text-sm text-charcoal/70">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.25em] text-charcoal/50">Preview teks struk (asli printer)</p>
+                <pre id="sample-preview" class="preview-paper mt-3 max-h-[420px] xl:max-h-[520px] w-full overflow-auto whitespace-pre rounded-lg bg-white/0 font-mono text-[13px] leading-relaxed overscroll-contain">Memuat preview…</pre>
+              </div>
+              <div id="preview-panel-visual" class="mt-3 hidden rounded-2xl border border-charcoal/10 bg-white/80 p-3 text-xs text-charcoal/70">
+                <p class="mb-2 text-[10px] font-semibold uppercase tracking-[0.25em] text-charcoal/45">Preview visual (dengan logo)</p>
+                <div id="sample-preview-html-inner" data-no-twemoji="true" class="flex w-full justify-center max-h-[520px] overflow-auto overscroll-contain"></div>
+              </div>
+              <div id="footer-qr-preview-container" class="mt-4 hidden">
+                <div class="inline-flex flex-col items-center gap-2 rounded-xl border border-charcoal/10 bg-white px-4 py-3 shadow-sm">
+                  <span id="footer-qr-preview-label" class="text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/60">Scan QR</span>
+                  <img id="footer-qr-preview-image" class="mx-auto h-28 w-28 rounded-md border border-charcoal/10 bg-white p-1" alt="QR Code Preview" />
+                </div>
+              </div>
+            </div>
+            <div class="mt-4 flex justify-center">
+              <div class="w-full rounded-2xl border border-dashed border-charcoal/15 bg-white/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] sm:w-auto">
+                <div class="flex items-center justify-between gap-3">
+                  <h3 class="text-base font-semibold text-charcoal">Status QR Code Footer</h3>
+                  <div id="footer-qr-status-badge" class="text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/50">TIDAK AKTIF</div>
+                </div>
+                <p class="mt-1 text-sm text-charcoal/60">Preview QR code akan dicetak langsung oleh printer, bukan dalam bentuk teks HTML/ASCII.</p>
+              </div>
+            </div>
           </div>
         </aside>
       </section>
@@ -443,12 +551,56 @@
     </div>
 
     <script src="/public/js/navbar.js"></script>
-    <script src="/public/js/tools-printer.js"></script>
+    <script src="/public/js/tools-printer.js?v=20251115-3"></script>
+    <script>
+      // Simple tabs controller (non-intrusive, keeps existing IDs working)
+      (function () {
+        const btns = Array.from(document.querySelectorAll('.tab-btn'));
+        const sections = Array.from(document.querySelectorAll('.section-block'));
+        function activate(name) {
+          btns.forEach(b => b.dataset.active = (b.getAttribute('data-tab') === name));
+          sections.forEach(s => {
+            s.classList.toggle('hidden', s.getAttribute('data-section') !== name);
+          });
+          // Persist selection per session
+          try { sessionStorage.setItem('toolsPrinter.activeTab', name); } catch(_){}
+        }
+        btns.forEach(b => b.addEventListener('click', () => activate(b.getAttribute('data-tab'))));
+        // Default from storage or templates
+        let initial = 'templates';
+        try { initial = sessionStorage.getItem('toolsPrinter.activeTab') || initial; } catch(_){}
+        activate(initial);
+        // Compact toggle persistence
+        const mainEl = document.querySelector('main');
+        const compactToggle = document.getElementById('toggle-compact');
+        let compact = false;
+        try { compact = JSON.parse(localStorage.getItem('toolsPrinter.compact') || 'false'); } catch(_){}
+        if (compactToggle) {
+          compactToggle.checked = !!compact;
+        }
+        if (mainEl) {
+          mainEl.setAttribute('data-compact', compact ? 'true' : 'false');
+        }
+        if (compactToggle) {
+          compactToggle.addEventListener('change', (e) => {
+            const enabled = !!e.target.checked;
+            if (mainEl) mainEl.setAttribute('data-compact', enabled ? 'true' : 'false');
+            try { localStorage.setItem('toolsPrinter.compact', JSON.stringify(enabled)); } catch(_){ }
+          });
+        }
+      })();
+    </script>
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         if (window.twemoji) {
           const parseAll = () => {
-            try { twemoji.parse(document.body, { folder: 'svg', ext: '.svg' }); } catch (_) {}
+            try {
+              // Parse all elements except those inside [data-no-twemoji]
+              document.querySelectorAll('body *:not([data-no-twemoji])').forEach((el) => {
+                if (el.closest('[data-no-twemoji]')) return;
+                twemoji.parse(el, { folder: 'svg', ext: '.svg' });
+              });
+            } catch (_) {}
           };
           parseAll();
           const obs = new MutationObserver(() => parseAll());

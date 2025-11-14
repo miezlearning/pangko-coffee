@@ -459,37 +459,35 @@ function formatReceipt(order, receiptTemplate, options = {}) {
   const orderItems = Array.isArray(order?.items) ? order.items : [];
   orderItems.forEach((item) => {
     const name = item?.name || 'Item';
-    pushLines('items', wrapText(name, width));
-
     const qty = Number(item?.quantity || 1);
     const baseUnit = getBaseUnitPrice(item);
     const addonSum = sumAddons(item?.addons);
     const subtotalLineTotal = (qty * baseUnit) + addonSum;
     const priceLabel = formatCurrency(baseUnit);
     const subtotalLabel = formatCurrency(subtotalLineTotal);
+    // Baris 1: Nama item + total baris ini
+    const titleLine = rightAlign(name, subtotalLabel, width);
+    pushLine('items', titleLine, { align: 'left', displayText: titleLine });
+    // Baris 2: qty × harga satuan
+    const qtyLine = rightAlign(`  ${qty} × ${priceLabel}`, '', width);
+    pushLine('items', qtyLine, { align: 'left', displayText: qtyLine });
 
-    const kv = (label, value) => rightAlign(`  ${label}`, value, width);
-
-    if (detailedItemBreakdown) {
-      pushLine('items', kv('Harga 1x', priceLabel), { align: 'left', displayText: kv('Harga 1x', priceLabel) });
-      if (addonSum > 0) {
-        const formattedAddon = kv('Add-on', formatCurrency(addonSum));
-        pushLine('items', formattedAddon, { align: 'left', displayText: formattedAddon });
-      }
-      pushLine('items', kv(`${qty}x Total`, subtotalLabel), { align: 'left', displayText: kv(`${qty}x Total`, subtotalLabel) });
-    } else {
-      const left = `  ${qty}x @${priceLabel}`;
-      const formatted = rightAlign(left, subtotalLabel, width);
-      pushLine('items', formatted, { align: 'left', displayText: formatted });
+    // Add-on (jika ada)
+    if (showItemAddons && addonSum > 0) {
+      pushLine('items', '  Add On:', { align: 'left' });
+      const addons = buildAddonDetails(item?.addons) || [];
+      addons.forEach(addon => {
+        const addonText = `  + ${addon.name} x${addon.quantity} ${addon.totalFormatted}`;
+        pushLines('items', wrapText(addonText, width));
+      });
     }
 
+    // Catatan (jika ada)
     if (showItemNotes && item?.notes) {
-      pushLines('items', wrapText(`  Note: ${item.notes}`, width));
+      pushLines('items', wrapText(`  Catatan: ${item.notes}`, width));
     }
-    if (showItemAddons) {
-      const addonLines = buildAddonLines(item?.addons, width);
-      pushLines('items', addonLines);
-    }
+    // Spasi pemisah antar item
+    pushLine('items', '', { align: 'left', displayText: '' });
   });
 
   const subtotal = orderItems.reduce((sum, item) => {

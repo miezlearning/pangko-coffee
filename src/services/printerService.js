@@ -506,6 +506,18 @@ class PrinterService {
       // fallback: non-serial flows use composer with structured metadata
       this.printer.alignLeft();
 
+      // Optional header logo (centered) before any text
+      const headerLogo = this.getHeaderLogoSetting();
+      if (headerLogo) {
+        try {
+          this.printer.alignCenter();
+          await this.printFooterImage(headerLogo);
+          this.printer.newLine();
+        } catch (e) {
+          console.warn('[Printer] Failed to print header logo, continue without it:', e.message);
+        }
+      }
+
       const printEntry = (entry) => {
         if (entry.align === 'center') this.printer.alignCenter();
         else if (entry.align === 'right') this.printer.alignRight();
@@ -869,6 +881,24 @@ class PrinterService {
     return this.getFooterQrSetting();
   }
 
+  // Header logo helpers (PNG data URL stored in settings.headerLogoImageData)
+  getHeaderLogoSetting() {
+    this.settings = this.settings || {};
+    const data = this.settings.headerLogoImageData || '';
+    return typeof data === 'string' && data.startsWith('data:image') ? data : '';
+  }
+
+  setHeaderLogoSetting(dataUrl) {
+    this.settings = this.settings || {};
+    if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image')) {
+      this.settings.headerLogoImageData = dataUrl;
+    } else if (!dataUrl) {
+      this.settings.headerLogoImageData = '';
+    }
+    saveSettings(this.settings);
+    return this.getHeaderLogoSetting();
+  }
+
   getCustomText() {
     this.settings = this.settings || {};
     const allowedFonts = new Set(['normal', 'double-height', 'double-width', 'double']);
@@ -1083,173 +1113,43 @@ class PrinterService {
   }
 
   buildHtmlPreview(_order, receipt) {
-    const meta = receipt && receipt.meta ? receipt.meta : null;
-    const safeText = escapeHtml(receipt?.previewText || receipt?.text || '');
+    const width = Number(receipt?.width || 32);
+    const headerLogo = this.getHeaderLogoSetting();
 
-    if (!meta || !meta.shop || !meta.order) {
-      return `
-        <div style="width:100%;display:flex;justify-content:center;">
-          <div style="max-width:320px;background:#ffffff;border-radius:18px;border:1px solid rgba(148,163,184,0.3);padding:18px;box-shadow:0 30px 60px -45px rgba(51,51,51,0.4);">
-            <pre style="margin:0;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.5;color:#111827;white-space:pre-wrap;">${safeText}</pre>
-          </div>
-        </div>`;
-    }
-
-    const shop = meta.shop || {};
-    const orderMeta = meta.order || {};
-    const totals = meta.totals || {};
-    const items = Array.isArray(meta.items) ? meta.items : [];
-    const footerInfo = meta.footer || {};
-    const footerQr = receipt.footerQr || {};
-    const qrImageSrc = typeof receipt.footerQrBase64 === 'string' && receipt.footerQrBase64.startsWith('data:image')
-      ? receipt.footerQrBase64
+    const logoHtml = headerLogo
+      ? `<div style="display:flex;justify-content:center;margin-bottom:8px;"><img src="${headerLogo}" alt="Logo" style="max-height:40px;max-width:${width}ch;object-fit:contain;" /></div>`
       : '';
 
-    const headerEntries = Array.isArray(receipt?.structuredSections?.header)
-      ? receipt.structuredSections.header
-      : [];
+    const entries = Array.isArray(receipt?.structuredLines) && receipt.structuredLines.length
+      ? receipt.structuredLines
+      : (Array.isArray(receipt?.lines) ? receipt.lines.map((t) => ({ displayText: t, font: 'normal' }))
+         : String(receipt?.text || '').split(/\r?\n/).map((t) => ({ displayText: t, font: 'normal' })));
 
-    const previewFontStyle = (font) => {
-      switch (font) {
-        case 'double-height':
-          return 'font-size:18px;font-weight:700;letter-spacing:0.04em;';
-        case 'double-width':
-          return 'font-size:18px;font-weight:700;letter-spacing:0.12em;';
-        case 'double':
-          return 'font-size:20px;font-weight:700;letter-spacing:0.08em;';
-        default:
-          return 'font-size:15px;font-weight:600;letter-spacing:0.02em;';
+    const lineHtml = entries.map((entry) => {
+      const font = entry?.font || 'normal';
+      let extra = '';
+      if (font === 'double' || font === 'double-height') {
+        extra = 'font-size:14px;line-height:1.6;font-weight:600;';
+      } else if (font === 'double-width') {
+        extra = 'letter-spacing:0.15ch;font-weight:600;';
       }
-    };
+      const text = escapeHtml(String(entry?.displayText ?? ''));
+      return `<div style="white-space:pre;font-family:'JetBrains Mono','Consolas',monospace;font-size:12px;line-height:1.45;color:#111827;${extra}">${text}</div>`;
+    }).join('');
 
-    const headerPreviewLines = headerEntries
-      .filter((entry) => entry.rawText && !/^[-=\s]+$/.test(entry.rawText.trim()))
-      .map((entry) => {
-        const align = entry.align === 'right' ? 'right' : entry.align === 'left' ? 'left' : 'center';
-        const style = previewFontStyle(entry.font);
-        return `<div style="text-align:${align};${style}margin-bottom:4px;">${escapeHtml(entry.rawText)}</div>`;
-      });
-
-    const headerPreviewHtml = headerPreviewLines.length
-      ? `<div style="margin-bottom:16px;">${headerPreviewLines.join('')}</div>`
+    const qrImg = (receipt?.footerQr && receipt.footerQr.enabled && receipt.footerQrBase64)
+      ? `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:8px;">
+           <img src="${escapeAttr(receipt.footerQrBase64)}" alt="QR Code" style="height:112px;width:112px;border:1px solid rgba(148,163,184,0.35);border-radius:8px;background:#fff;padding:4px" />
+           <div style="font-family:'JetBrains Mono','Consolas',monospace;font-size:11px;color:#6b7280;">${escapeHtml(receipt.footerQr?.label || 'Scan QR')}</div>
+         </div>`
       : '';
-
-    const infoRows = [];
-    if (orderMeta.id) infoRows.push({ label: 'No. Order', value: orderMeta.id });
-    if (orderMeta.createdAtLabel) infoRows.push({ label: 'Tanggal', value: orderMeta.createdAtLabel });
-    if (orderMeta.createdAtTime) infoRows.push({ label: 'Jam', value: orderMeta.createdAtTime });
-    if (orderMeta.customerName) infoRows.push({ label: 'Customer', value: orderMeta.customerName });
-    if (orderMeta.paymentMethodLabel) infoRows.push({ label: 'Pembayaran', value: orderMeta.paymentMethodLabel });
-    if (orderMeta.tableName) infoRows.push({ label: 'Meja', value: orderMeta.tableName });
-    if (orderMeta.additionalInfo) infoRows.push({ label: 'Catatan', value: orderMeta.additionalInfo });
-
-    const infoRowsHtml = infoRows.map(row => (
-      `<div style="display:flex;justify-content:space-between;font-size:12px;color:#4b5563;margin-bottom:4px;">
-        <span>${escapeHtml(row.label)}</span>
-        <span style="font-weight:600;">${escapeHtml(row.value)}</span>
-      </div>`
-    )).join('');
-
-    const itemsHtml = items.length
-      ? items.map((item, index) => {
-          const addons = Array.isArray(item.addons) ? item.addons : [];
-          const addonsHtml = addons.map(addon => (
-            `<div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;margin-top:3px;">
-              <span>+ ${escapeHtml(addon.name)} x${escapeHtml(addon.quantity)}</span>
-              <span>${escapeHtml(addon.totalFormatted || '')}</span>
-            </div>`
-          )).join('');
-          const notesHtml = item.notes
-            ? `<div style="margin-top:4px;font-size:11px;color:#f97316;">Catatan: ${escapeHtml(item.notes)}</div>`
-            : '';
-          const borderStyle = index === items.length - 1 ? '' : 'border-bottom:1px dashed #e5e7eb;';
-          return `
-            <div style="padding:12px 0;${borderStyle}">
-              <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:#1f2937;">
-                <span>${escapeHtml(item.name)}</span>
-                <span>${escapeHtml(item.subtotalFormatted || '')}</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7280;margin-top:4px;">
-                <span>${escapeHtml(item.quantity)} × ${escapeHtml(item.unitPriceFormatted || '')}</span>
-                <span></span>
-              </div>
-              ${addonsHtml}
-              ${notesHtml}
-            </div>`;
-        }).join('')
-      : `<div style="padding:16px;border:1px dashed #d1d5db;border-radius:12px;font-size:12px;color:#6b7280;text-align:center;">Belum ada item dalam order</div>`;
-
-    const feeLine = totals.fee > 0
-      ? `<div style="display:flex;justify-content:space-between;font-size:12px;color:#047857;margin-top:6px;"><span>Biaya</span><span>${escapeHtml(totals.feeFormatted || '')}</span></div>`
-      : '';
-    const discountLine = totals.discount > 0
-      ? `<div style="display:flex;justify-content:space-between;font-size:12px;color:#b91c1c;margin-top:6px;"><span>Diskon</span><span>- ${escapeHtml(totals.discountFormatted || '')}</span></div>`
-      : '';
-    const totalsHtml = `
-      <div style="margin-top:16px;padding:16px;border:1px solid rgba(34,197,94,0.35);border-radius:14px;background:rgba(34,197,94,0.08);">
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:#047857;">
-          <span>Subtotal</span>
-          <span>${escapeHtml(totals.subtotalFormatted || '')}</span>
-        </div>
-        ${feeLine}
-        ${discountLine}
-        <div style="margin-top:10px;padding:10px 12px;border-radius:12px;background:#16a34a;color:#ffffff;display:flex;justify-content:space-between;font-size:14px;font-weight:700;">
-          <span>Total</span>
-          <span>${escapeHtml(totals.totalFormatted || '')}</span>
-        </div>
-      </div>`;
-
-  let qrHtml = '';
-  // Only show QR preview when enabled and there is a renderable image payload
-  if (footerQr && footerQr.enabled && footerQr.canRender && qrImageSrc) {
-      const label = footerQr.label ? escapeHtml(footerQr.label) : 'Scan QR di bawah ini';
-      let linkHtml = '';
-      if (footerQr.type === 'link' && footerQr.value) {
-        const truncated = truncateMiddle(footerQr.value, 56);
-        const href = escapeAttr(footerQr.value);
-        linkHtml = `<a href="${href}" target="_blank" rel="noopener" style="display:block;margin-top:6px;font-size:11px;color:#2563eb;word-break:break-word;">${escapeHtml(truncated)}</a>`;
-      } else if ((footerQr.type === 'qr' || footerQr.type === 'text') && footerQr.value && isLikelyUrl(footerQr.value)) {
-        const truncated = truncateMiddle(footerQr.value, 56);
-        const href = escapeAttr(footerQr.value);
-        linkHtml = `<a href="${href}" target="_blank" rel="noopener" style="display:block;margin-top:6px;font-size:11px;color:#2563eb;word-break:break-word;">${escapeHtml(truncated)}</a>`;
-      }
-      qrHtml = `
-        <div style="margin-top:18px;padding:18px;border:1px dashed #d1d5db;border-radius:16px;text-align:center;background:#f9fafb;">
-          <div style="font-size:12px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.12em;">${label}</div>
-          ${linkHtml}
-          <img src="${qrImageSrc}" alt="QR Code" style="margin-top:12px;width:150px;height:150px;border-radius:12px;border:1px solid #e5e7eb;display:inline-block;background:#ffffff;padding:10px;" />
-        </div>`;
-    }
-
-    const footerLines = Array.isArray(footerInfo.lines)
-      ? footerInfo.lines.filter(line => line && !/^[-=\s]+$/.test(String(line).trim()))
-      : [];
-    const footerHtml = footerLines.length
-      ? `<div style="margin-top:18px;text-align:center;font-size:11px;color:#9ca3af;line-height:1.4;">
-          ${footerLines.map(line => `<div>${escapeHtml(line)}</div>`).join('')}
-        </div>`
-      : '';
-
-    const headerSubtitleParts = [];
-    if (shop.address) headerSubtitleParts.push(formatMultiline(shop.address));
-    if (shop.phone) headerSubtitleParts.push(escapeHtml(shop.phone));
-    const headerSubtitle = headerSubtitleParts.join('<br />');
 
     return `
       <div style="width:100%;display:flex;justify-content:center;">
-        <div style="width:100%;max-width:320px;background:#ffffff;border-radius:22px;border:1px solid rgba(148,163,184,0.35);box-shadow:0 30px 60px -45px rgba(51,51,51,0.45);overflow:hidden;">
-          <div style="background:#16a34a;color:#ffffff;text-align:center;padding:18px 22px;">
-            <div style="font-size:18px;font-weight:700;letter-spacing:0.02em;">${escapeHtml(shop.name || 'Struk Pembayaran')}</div>
-            ${headerSubtitle ? `<div style="margin-top:6px;font-size:11px;opacity:0.9;line-height:1.5;">${headerSubtitle}</div>` : ''}
-          </div>
-          <div style="padding:20px 22px;font-family:'Manrope','Segoe UI',sans-serif;color:#111827;">
-            ${headerPreviewHtml}
-            ${infoRowsHtml ? `<div style="margin-bottom:16px;">${infoRowsHtml}</div>` : ''}
-            <div>${itemsHtml}</div>
-            ${totalsHtml}
-            ${qrHtml}
-            ${footerHtml}
-          </div>
+        <div style="max-width:${width + 4}ch;background:#ffffff;border-radius:16px;border:1px solid rgba(148,163,184,0.35);padding:16px 18px 20px 18px;box-shadow:0 18px 40px -28px rgba(51,51,51,0.45);overflow:hidden;">
+          ${logoHtml}
+          ${lineHtml}
+          ${qrImg}
         </div>
       </div>`;
   }
