@@ -1127,12 +1127,19 @@ class PrinterService {
 
     const lineHtml = entries.map((entry) => {
       const font = entry?.font || 'normal';
+      // Lebih sederhana agar tidak berlebihan: double-height & double diberi sedikit penekanan;
+      // double-width tidak mengubah ukuran (supaya alignment kolom tetap), hanya bold ringan.
       let extra = '';
-      if (font === 'double' || font === 'double-height') {
-        extra = 'font-size:15px;line-height:1.6;font-weight:600;';
-      } else if (font === 'double-width') {
-        // Avoid horizontal overflow; approximate with heavier weight only
-        extra = 'font-weight:700;';
+      switch (font) {
+        case 'double-height':
+        case 'double':
+          extra = 'font-size:13px;line-height:1.5;font-weight:600;';
+          break;
+        case 'double-width':
+          extra = 'font-weight:600;';
+          break;
+        default:
+          extra = ''; // normal
       }
       const text = escapeHtml(String(entry?.displayText ?? ''));
       return `<div style="white-space:pre;font-family:'JetBrains Mono','Consolas',monospace;font-size:12px;line-height:1.45;color:#111827;${extra}">${text}</div>`;
