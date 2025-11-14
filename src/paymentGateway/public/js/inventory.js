@@ -281,7 +281,7 @@ async function handleCloseSubmit(event) {
     await refreshState();
     if (!state.activeSession) resetOpeningForm(getDefaultPrefillNames());
     await loadReport();
-    await previewRecap();
+    await livePreviewHandler();
   } else {
     showInlineStatus('closeResult', `❌ ${response.message || 'Gagal menyimpan closing.'}`, 'error');
   }
@@ -373,33 +373,118 @@ async function renderRecapChecklist() {
     row.appendChild(label);
     row.appendChild(meta);
     wrap.appendChild(row);
+    // update preview when checkbox changes
+    cb.addEventListener('change', () => {
+      updateBlockPreviewFromChecklist();
+    });
   });
 }
 
 async function generateAiRecommendations() {
   const status = $('recapAiStatus');
   const result = $('recapAiResult');
+  const aiBtn = $('recapAiBtn');
+  if (aiBtn) { aiBtn.disabled = true; aiBtn.classList.add('opacity-60'); }
   if (status) status.textContent = 'Meminta rekomendasi...';
-  const res = await api('/recap/ai', { method: 'POST', body: {} });
-  if (res.success) {
-    if (result) result.textContent = res.text || '';
+  if (result) result.textContent = '';
+  try {
+    // show spinner inside button
+    if (aiBtn) {
+      aiBtn.dataset._orig = aiBtn.innerHTML;
+      aiBtn.innerHTML = '<span class="spinner"></span>Meminta...';
+    }
+    const res = await api('/recap/ai', { method: 'POST', body: {} });
+    if (!res || !res.success) {
+      if (result) result.textContent = res?.message || 'Gagal membuat rekomendasi.';
+      if (status) status.textContent = '';
+      return [];
+    }
+
+    // Prefer structured JSON if provided, but also keep raw text
+    let aiText = res.text || '';
+    const structured = res.structured || null;
+
+    if (structured && typeof structured === 'object') {
+      // Build a human-friendly text from structured output
+      const parts = [];
+      if (Array.isArray(structured.insights) && structured.insights.length) {
+        parts.push('🔍 Insights:');
+        structured.insights.forEach((it, idx) => {
+          const title = it.title || `Insight ${idx+1}`;
+          const detail = it.detail || '';
+          parts.push(`- ${title}: ${detail}`);
+        });
+        parts.push('');
+      }
+      if (Array.isArray(structured.recommendations) && structured.recommendations.length) {
+        parts.push('📝 Rekomendasi:');
+        structured.recommendations.forEach((r) => {
+          const name = r.name || r.nama || '-';
+          const priority = r.priority !== undefined ? `#${r.priority}` : '';
+          const reason = r.reason ? `(${r.reason})` : '';
+          const qty = (r.suggestedQty !== undefined && r.suggestedQty !== null) ? `${r.suggestedQty}` : '-';
+          const unit = r.unit ? ` ${r.unit}` : '';
+          const conf = r.confidence !== undefined ? ` conf:${Math.round((Number(r.confidence)||0)*100)}%` : '';
+          parts.push(`- ${name} ${priority} ${reason} — Rekomendasi: pesan ~${qty}${unit}${conf}`.trim());
+        });
+        parts.push('');
+      }
+
+      const built = parts.join('\n');
+      if (built.trim()) aiText = built;
+    }
+
+    // Display result and populate recap textarea so user can send/copy immediately
+    if (result) result.textContent = aiText || res.message || '';
+    const textarea = $('recapText');
+    if (textarea && (aiText || res.text)) textarea.value = aiText || res.text || textarea.value;
     if (status) status.textContent = 'Rekomendasi siap';
-    return res.recommended || [];
-  } else {
-    if (result) result.textContent = res.message || 'Gagal membuat rekomendasi.';
-    if (status) status.textContent = '';
-    return [];
+
+    // Build recommended name list for checkbox applying
+    let recommendedNames = [];
+    if (structured && Array.isArray(structured.recommendations)) {
+      recommendedNames = structured.recommendations.map(r => (r.name || r.nama || '').trim()).filter(Boolean);
+    }
+    if (!recommendedNames.length && Array.isArray(res.recommended)) {
+      recommendedNames = res.recommended.map(r => (r || '').trim()).filter(Boolean);
+    }
+    // final fallback: try to extract hyphen-list from aiText
+    if (!recommendedNames.length && aiText) {
+      const lines = aiText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      for (const ln of lines) {
+        // allow em-dash (—), en-dash (–) and plain hyphen (-) in separators
+        const m = ln.match(/^-\s*([^—\-–:]+)\s*(?:[—\-–:]|$)/);
+        if (m) recommendedNames.push(m[1].trim());
+      }
+    }
+
+    return Array.from(new Set(recommendedNames));
+  } finally {
+    if (aiBtn) {
+      aiBtn.disabled = false; aiBtn.classList.remove('opacity-60');
+      if (aiBtn.dataset && aiBtn.dataset._orig) { aiBtn.innerHTML = aiBtn.dataset._orig; delete aiBtn.dataset._orig; }
+    }
   }
 }
 
 async function applyAiRecommendations() {
+  const applyBtn = $('applyAiBtn');
+  if (applyBtn) { applyBtn.dataset._orig = applyBtn.innerHTML; applyBtn.disabled = true; applyBtn.classList.add('opacity-60'); applyBtn.innerHTML = '<span class="spinner"></span>Terapkan...'; }
+  // Get recommendations and AI text (generateAiRecommendations populates textarea)
   const recs = await generateAiRecommendations();
-  if (!recs || !recs.length) return;
   const checkboxes = Array.from(document.querySelectorAll('.recap-mark'));
-  checkboxes.forEach(cb => {
-    const name = cb.dataset.name || '';
-    if (recs.find(r => (r || '').toLowerCase() === name.toLowerCase())) cb.checked = true;
-  });
+  if (recs && recs.length) {
+    checkboxes.forEach(cb => {
+      const name = cb.dataset.name || '';
+      if (recs.find(r => (r || '').toLowerCase() === name.toLowerCase())) cb.checked = true;
+    });
+  }
+
+  // refresh preview to reflect applied recommendations
+  await updateBlockPreviewFromChecklist();
+  const status = $('recapAiStatus');
+  if (status) status.textContent = '✅ Rekomendasi diterapkan';
+  if (applyBtn) { applyBtn.disabled = false; applyBtn.classList.remove('opacity-60'); if (applyBtn.dataset && applyBtn.dataset._orig) { applyBtn.innerHTML = applyBtn.dataset._orig; delete applyBtn.dataset._orig; } }
 }
 
 async function loadReport() {
@@ -491,7 +576,7 @@ async function copyRecap() {
   const status = $('recapStatus');
   if (!textarea || !status) return;
   if (!textarea.value) {
-    status.textContent = 'ℹ️ Belum ada teks rekap. Klik Preview terlebih dahulu.';
+    status.textContent = 'ℹ️ Belum ada teks rekap. Pilih format untuk melihat preview.';
     return;
   }
   try {
@@ -806,7 +891,8 @@ function bindCoreEvents() {
   if (resetBtn) resetBtn.addEventListener('click', resetSessionHandler);
 
   const previewBtn = $('previewRecap');
-  if (previewBtn) previewBtn.addEventListener('click', previewRecap);
+  // Preview is now live; remove binding for Preview button if present
+  if (previewBtn) previewBtn.remove();
 
   const copyRecapBtn = $('copyRecap');
   if (copyRecapBtn) copyRecapBtn.addEventListener('click', copyRecap);
@@ -817,6 +903,13 @@ function bindCoreEvents() {
   const refreshReportBtn = $('refreshReport');
   if (refreshReportBtn) refreshReportBtn.addEventListener('click', loadReport);
 
+  const recapFormat = $('recapFormat');
+  if (recapFormat) recapFormat.addEventListener('change', livePreviewHandler);
+  const aiBtn = $('recapAiBtn');
+  if (aiBtn) aiBtn.addEventListener('click', generateAiRecommendations);
+  const applyBtn = $('applyAiBtn');
+  if (applyBtn) applyBtn.addEventListener('click', applyAiRecommendations);
+
   const masterForm = $('masterForm');
   if (masterForm) masterForm.addEventListener('submit', handleMasterSubmit);
 
@@ -825,6 +918,67 @@ function bindCoreEvents() {
 
   const masterTable = $('masterTableBody');
   if (masterTable) masterTable.addEventListener('click', handleMasterTableClick);
+}
+
+async function livePreviewHandler() {
+  const textarea = $('recapText');
+  const status = $('recapStatus');
+  if (!textarea) return;
+  const formatEl = $('recapFormat');
+  const fmt = formatEl ? (formatEl.value || 'detail') : 'detail';
+  status && (status.textContent = 'Membuat preview...');
+  if (fmt === 'block') {
+    // ensure checklist rendered
+    await renderRecapChecklist();
+    await updateBlockPreviewFromChecklist();
+    status && (status.textContent = '✅ Preview siap (blok)');
+    return;
+  }
+  const response = await api(`/recap?format=${encodeURIComponent(fmt)}`);
+  if (response.success && response.text) {
+    textarea.value = response.text;
+    status && (status.textContent = '✅ Preview siap');
+  } else {
+    textarea.value = response && response.text ? response.text : '';
+    status && (status.textContent = `❌ ${response.message || 'Belum ada data untuk rekap.'}`);
+  }
+}
+
+async function updateBlockPreviewFromChecklist() {
+  const textarea = $('recapText');
+  if (!textarea) return;
+  const reportRes = await api('/report');
+  if (!reportRes.success || !reportRes.report) {
+    textarea.value = 'Belum ada data untuk preview blok.';
+    return;
+  }
+  const report = reportRes.report;
+  const ingredients = Object.keys(report.ingredients || {});
+  const checked = Array.from(document.querySelectorAll('.recap-mark:checked')).map(cb => cb.dataset.name).filter(Boolean);
+
+  const lines = [];
+  const openedAt = report.openedAt ? new Date(report.openedAt).toLocaleString('id-ID', { hour12: false }) : '-';
+  const closedAt = report.closedAt ? new Date(report.closedAt).toLocaleString('id-ID', { hour12: false }) : 'Belum closing';
+  lines.push(`📅 Periode: ${openedAt} → ${closedAt}`);
+  lines.push('');
+  for (const name of ingredients.sort((a,b)=>a.localeCompare(b,'id'))) {
+    const item = report.ingredients[name] || {};
+    const o = Number(item.opening || 0);
+    const c = Number(item.closing || 0);
+    const used = Math.max(o - c, 0);
+    let status = '✅ Cukup';
+    if (!Number.isFinite(c) || c <= 0) status = '❌ Habis';
+    else if (o > 0 && c / o <= 0.1) status = '‼️ Segera pesan';
+    const suggestedQty = Math.max(Math.round(o - c), 0);
+    const suggestedText = suggestedQty > 0 ? `Rekomendasi: Pesan minimal ${suggestedQty}` : 'Rekomendasi: -';
+    const isMarked = checked.find(n => (n || '').toLowerCase() === (name || '').toLowerCase());
+    lines.push(`${name}${isMarked ? ' 🔖' : ''}`);
+    lines.push(`⌯ Ketersediaan: ${status}`);
+    lines.push(`⌯ Rekomendasi Tindakan: ${suggestedQty > 0 ? `Pertimbangkan pemesanan (${suggestedQty})` : '-'}`);
+    lines.push(`${suggestedText}`);
+    lines.push('');
+  }
+  textarea.value = lines.join('\n');
 }
 
 function setupInitialRows() {
@@ -837,5 +991,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupInitialRows();
   bindCoreEvents();
   await refreshAll();
-  await previewRecap();
+  await livePreviewHandler();
 });

@@ -21,12 +21,16 @@ async function main() {
         // Start payment gateway dashboard
         PaymentGateway.startServer();
         
-        // Start WhatsApp bot
-        const bot = new WhatsAppBot();
-        await bot.start();
-        
-        // Connect payment gateway to bot
-        PaymentGateway.setBotInstance(bot);
+        // Start WhatsApp bot (skip when NO_BOT=1 for web-only testing)
+        if (process.env.NO_BOT === '1' || (config.bot && config.bot.enabled === false)) {
+            console.log('⚠️  Skipping WhatsApp bot startup (NO_BOT=1 or config.bot.enabled=false)');
+            PaymentGateway.setBotInstance(null);
+        } else {
+            const bot = new WhatsAppBot();
+            await bot.start();
+            // Connect payment gateway to bot
+            PaymentGateway.setBotInstance(bot);
+        }
 
         // Handle process termination
         process.on('SIGINT', () => {

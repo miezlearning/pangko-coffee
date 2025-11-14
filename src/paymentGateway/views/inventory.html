@@ -124,12 +124,12 @@
             <option value="compact">Ringkas</option>
             <option value="block">Per Item (Blok) — mudah dibaca</option>
           </select>
-          <button id="previewRecap" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">Preview</button>
+          <!-- Preview is now live when switching templates or changing checklist -->
           <button id="copyRecap" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">Copy</button>
           <button id="sendRecap" class="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700">Kirim ke WhatsApp</button>
         </div>
       </div>
-      <textarea id="recapText" rows="8" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100" placeholder="Klik tombol Preview untuk melihat rekap terakhir..."></textarea>
+      <textarea id="recapText" rows="8" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono text-slate-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100" placeholder="Preview akan tampil otomatis saat memilih format atau menandai item."></textarea>
       <p id="recapStatus" class="mt-2 text-xs text-slate-500"></p>
 
       <div id="recapExtras" class="mt-4">

@@ -8,7 +8,7 @@ const config = require('../../config/config');
 router.get('/active', (req, res) => {
   try {
     const active = inventory.getActiveSession();
-    if (!active) return res.status(404).json({ success: false, message: 'Tidak ada sesi aktif' });
+    if (!active) return res.json({ success: false, message: 'Tidak ada sesi aktif' });
     res.json({ success: true, session: active });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -293,7 +293,7 @@ router.get('/recap', (req, res) => {
     } else {
       session = inventory.getLastClosedSession() || inventory.getActiveSession();
     }
-    if (!session) return res.status(404).json({ success: false, message: 'Belum ada data' });
+    if (!session) return res.json({ success: false, message: 'Belum ada data' });
     const opening = session.openingIngredients || {};
     const closing = session.closingIngredients || {};
     const sessionDate = session.date || session.openedAt?.split('T')[0] || '';
@@ -315,7 +315,7 @@ router.get('/recap', (req, res) => {
 router.post('/recap/send', async (req, res) => {
   try {
     let session = inventory.getLastClosedSession() || inventory.getActiveSession();
-    if (!session) return res.status(404).json({ success: false, message: 'Belum ada data' });
+    if (!session) return res.json({ success: false, message: 'Belum ada data' });
     const opening = session.openingIngredients || {};
     const closing = session.closingIngredients || {};
     const format = ((req.query && req.query.format) || (req.body && req.body.format) || '').toLowerCase();
@@ -354,7 +354,7 @@ router.get('/recap/json', (req, res) => {
     } else {
       session = inventory.getLastClosedSession() || inventory.getActiveSession();
     }
-    if (!session) return res.status(404).json({ success: false, message: 'Belum ada data' });
+    if (!session) return res.json({ success: false, message: 'Belum ada data' });
     const opening = session.openingIngredients || {};
     const closing = session.closingIngredients || {};
     const openingClass = classifyFromOpenClose(opening, opening);
@@ -382,12 +382,24 @@ router.post('/recap/ai', async (req, res) => {
       const o = Number(opening[name] || 0);
       const c = Number(closing[name] || 0);
       const unit = (meta[name] && (meta[name].unit || meta[name].nettoUnit)) || '';
-      const qty = Math.max(Math.round(o - c), 0);
+      let qty = Math.max(Math.round(o - c), 0);
+      // If we have no measured qty but it's out of stock, pick a sensible default
+      if (qty <= 0) {
+        const info = meta[name] || {};
+        if (info.nettoValue && Number.isFinite(Number(info.nettoValue)) && Number(info.nettoValue) > 0) {
+          qty = Math.max(1, Math.round(Number(info.nettoValue)));
+        } else if (info.buyPackage && Number.isFinite(Number(info.buyPackage))) {
+          qty = Math.max(1, Math.round(Number(info.buyPackage)));
+        } else {
+          qty = 1; // default minimal suggestion
+        }
+      }
       return { name, reason: classified.outOfStock.includes(name) ? 'Habis' : 'Hampir habis', suggestedQty: qty, unit };
     });
 
     // Check for configured AI endpoint (gemini-like) in config or env
-    const defaultAiUrl = (config && config.gemini && config.gemini.apiUrl) || process.env.GEMINI_API_URL || '';
+    // Default to the public siputzx proxy if nothing configured
+    const defaultAiUrl = (config && config.gemini && config.gemini.apiUrl) || process.env.GEMINI_API_URL || 'https://api.siputzx.my.id/api/ai/gemini-lite';
     const aiKey = (config && config.gemini && config.gemini.apiKey) || process.env.GEMINI_API_KEY || '';
     const modelName = (config && config.gemini && config.gemini.model) || process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
 
@@ -418,11 +430,27 @@ router.post('/recap/ai', async (req, res) => {
       return res.json({ success: true, ai: false, text: textParts.join('\n'), recommended: suggestions.map(s => s.name), raw: payload });
     }
 
-    // Build prompt for AI (Indonesian)
-    const promptParts = [];
-    promptParts.push('Anda adalah asisten inventori untuk sebuah kedai kopi kecil. Berikan 4 rekomendasi tindakan singkat (1-2 kalimat tiap rekomendasi) terkait stok, pembelian, dan prioritas pemesanan. Balas dalam bahasa Indonesia.');
-    promptParts.push(`Context JSON: ${JSON.stringify(payload)}`);
-    const prompt = promptParts.join('\n\n');
+      // Build prompt for AI (Indonesian) - ask for structured JSON output
+      const promptParts = [];
+      promptParts.push('Anda adalah asisten inventori untuk sebuah kedai kopi kecil. Berdasarkan konteks yang diberikan, berikan rekomendasi tindakan terprioritas untuk pengadaan bahan, serta insight singkat mengenai keadaan stok.');
+      promptParts.push('Sangat penting: KEMBALIKAN HANYA SATU OBJEK JSON (tanpa teks tambahan) yang mengikuti skema di bawah ini. Jika tidak perlu rekomendasi, kembalikan daftar rekomendasi kosong [].');
+      promptParts.push('Skema JSON (contoh):');
+      promptParts.push(`{
+    "insights": [
+    { "title": "Ringkasan singkat", "detail": "..." }
+    ],
+    "recommendations": [
+    { "name": "Bubuk Kopi", "priority": 1, "reason": "Habis", "suggestedQty": 2, "unit": "kg", "confidence": 0.9 }
+    ]
+  }`);
+      promptParts.push('\nContext JSON: ' + JSON.stringify(payload));
+      promptParts.push('\nInstruksi tambahan:');
+      promptParts.push('- Gunakan bahasa Indonesia.');
+      promptParts.push('- Berikan maksimal 6 rekomendasi, urut dari prioritas 1 (tertinggi) ke bawah.');
+      promptParts.push('- Untuk setiap rekomendasi sertakan: name, priority (angka), reason (kata pendek), suggestedQty (angka), unit (string), confidence (0-1).');
+      promptParts.push('- Untuk insights, berikan 2-4 item dengan title dan detail singkat (1-2 kalimat).');
+      promptParts.push('- Jangan sertakan penjelasan lain di luar objek JSON.');
+      const prompt = promptParts.join('\n\n');
 
     // Build external URL (gemini-lite style: ?prompt=...&model=...)
     const endpoint = defaultAiUrl;
@@ -466,7 +494,34 @@ router.post('/recap/ai', async (req, res) => {
       aiText = aiJson ? JSON.stringify(aiJson) : '';
     }
 
-    return res.json({ success: true, ai: true, text: aiText, recommended: suggestions.map(s => s.name), raw: payload, aiResponse: aiJson });
+    // Attempt to parse structured JSON from AI output. Accept raw JSON or embedded JSON.
+    let aiStructured = null;
+    try {
+      aiStructured = JSON.parse(aiText);
+    } catch (e) {
+      // try to extract JSON object from text
+      const m = aiText.match(/(\{[\s\S]*\})/);
+      if (m) {
+        try { aiStructured = JSON.parse(m[1]); } catch (__) { aiStructured = null; }
+      }
+    }
+
+    // If parsing failed, try a lightweight heuristic to extract recommendations
+    let fallbackParsed = null;
+    if (!aiStructured) {
+      const lines = aiText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const recs = [];
+      for (const ln of lines) {
+        // look for lines like '- Item — Reason' or '- Item - Reason'
+        const m = ln.match(/^-\s*([^—-]+?)\s*(?:[—-]\s*(.+))?$/);
+        if (m) {
+          recs.push({ name: m[1].trim(), reason: (m[2] || '').trim() });
+        }
+      }
+      if (recs.length) fallbackParsed = { recommendations: recs };
+    }
+
+    return res.json({ success: true, ai: true, text: aiText, structured: aiStructured || fallbackParsed || null, recommended: suggestions.map(s => s.name), raw: payload, aiResponse: aiJson });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

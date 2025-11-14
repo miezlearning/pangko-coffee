@@ -28,3 +28,6 @@ table.min-w-full td, table.min-w-full th{ padding-top:10px; padding-bottom:10px;
 @media (max-width:640px){
   .ingredient-unit{ text-align:left; margin-left:0; }
 }
+/* Spinner for AI actions */
+.spinner{ display:inline-block; width:14px; height:14px; border:2px solid rgba(0,0,0,0.12); border-left-color:var(--accent); border-radius:50%; animation:spin .9s linear infinite; margin-right:8px; vertical-align:middle; }
+@keyframes spin{ to { transform: rotate(360deg); } }

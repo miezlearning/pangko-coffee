@@ -1,6 +1,7 @@
 module.exports = {
     // Bot Configuration
     bot: {
+        enabled: true,
         name: 'Pangko Coffee Bot',
         prefix: '!',
         timezone: 'Asia/Makassar'
