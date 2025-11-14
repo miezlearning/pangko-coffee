@@ -221,7 +221,8 @@ function buildRoundedAsciiRecap(session) {
 
   const keys = Array.from(new Set([...Object.keys(opening || {}), ...Object.keys(closing || {})])).sort((a,b)=>a.localeCompare(b,'id'));
   const rows = [];
-  rows.push(['Item', 'Opening', 'Closing', 'Terpakai', '% Sisa', 'Status']);
+  // shorter headers supaya muat di layar WA
+  rows.push(['Item', 'O', 'C', 'Use', '%', 'St']);
 
   const qtyFmt = (v, unit) => (Number.isFinite(v) ? `${Intl.NumberFormat('id-ID').format(v)}${unit ? ` ${unit}` : ''}` : '-');
 
@@ -340,6 +341,72 @@ function buildBlockRecap(session, marked = []) {
   return header.concat(lines).join('\n');
 }
 
+// WA-friendly simple block recap (teks saja, tanpa tabel ASCII)
+function buildWaBlockRecap(session) {
+  if (!session) return '';
+  const opening = session.openingIngredients || {};
+  const closing = session.closingIngredients || {};
+  const recipes = inventory.loadRecipes();
+  const meta = (recipes && recipes.ingredients) ? recipes.ingredients : {};
+
+  const sessionDate = session.date || (session.openedAt && session.openedAt.split('T')[0]) || '';
+  const openedAt = session.openedAt ? new Date(session.openedAt).toLocaleString('id-ID', { hour12: false }) : '-';
+  const closedAt = session.closedAt ? new Date(session.closedAt).toLocaleString('id-ID', { hour12: false }) : 'Belum closing';
+
+  const lines = [];
+  lines.push(`📅 Tanggal : ${sessionDate}`);
+  lines.push(`🕒 Periode : ${openedAt} → ${closedAt}`);
+  lines.push(`👤 Kasir   : buka ${session.cashier || '-'} | tutup ${session.closedBy || '-'}`);
+  lines.push(`💰 Kas    : Awal ${formatCurrencyID(session.openingCash)} | Akhir ${formatCurrencyID(session.closingCash)} | Selisih ${formatCurrencyID((Number(session.closingCash||0) - Number(session.openingCash||0)))}`);
+  lines.push('');
+
+  const keys = Array.from(new Set([...Object.keys(opening || {}), ...Object.keys(closing || {})])).sort((a,b)=>a.localeCompare(b,'id'));
+  const qtyFmt = (v, unit) => (Number.isFinite(v) ? `${Intl.NumberFormat('id-ID').format(v)}${unit ? ` ${unit}` : ''}` : '-');
+
+  for (const name of keys) {
+    const o = Number(opening[name] || 0);
+    const c = Number(closing[name] || 0);
+    const used = Math.max(o - c, 0);
+    const percent = o > 0 ? Math.round((c / o) * 100) : null;
+    const info = meta[name] || {};
+    const unit = info.unit || info.nettoUnit || '';
+    let status = '✅ Cukup';
+    if (!Number.isFinite(c) || c <= 0) status = '❌ Habis';
+    else if (o > 0 && c / o <= BUY_SOON_THRESHOLD) status = '‼️ Segera pesan';
+
+    lines.push(name);
+    lines.push(`  • Opening : ${qtyFmt(o, unit)}`);
+    lines.push(`  • Closing : ${qtyFmt(c, unit)}`);
+    lines.push(`  • Terpakai: ${qtyFmt(used, unit)}`);
+    lines.push(`  • % Sisa  : ${percent === null ? '-' : percent + '%'}`);
+    lines.push(`  • Status  : ${status}`);
+    lines.push('');
+  }
+
+  const classified = classifyFromOpenClose(opening, closing);
+  lines.push('📌 Ringkasan:');
+  if (classified.outOfStock.length) {
+    lines.push(`- ❌ : ${classified.outOfStock.length} item (habis) → ${classified.outOfStock.join(', ')}`);
+  } else {
+    lines.push('- ❌ : 0 item (habis)');
+  }
+  if (classified.buySoon.length) {
+    lines.push(`- ‼️ : ${classified.buySoon.length} item (segera pesan) → ${classified.buySoon.join(', ')}`);
+  } else {
+    lines.push('- ‼️ : 0 item (segera pesan)');
+  }
+  lines.push(`- ✅ : ${classified.ok.length} item (cukup)`);
+  lines.push('');
+  if (classified.outOfStock.length || classified.buySoon.length) {
+    const toOrder = [...classified.outOfStock, ...classified.buySoon];
+    lines.push(`➡️ Mohon cek & pesan: ${toOrder.join(', ')}`);
+  }
+  lines.push('');
+  lines.push('Legenda emoji status: ❌ = habis, ‼️ = segera dibeli, ✅ = stok cukup.');
+  lines.push('Catatan: % Sisa dibandingkan nilai opening. Batas "segera" mengikuti konfigurasi persentase.');
+  return lines.join('\n');
+}
+
 function classifyFromOpenClose(opening = {}, closing = {}) {
   const outOfStock = [];
   const buySoon = [];
@@ -383,6 +450,8 @@ router.get('/recap', (req, res) => {
       const parts = [`📅 Rekap Tanggal: ${sessionDate}`, '', '🟢 Stok Saat Opening', buildRecapTextFromOpenClose(opening, opening)];
       if (Object.keys(closing).length) parts.push('', '🔴 Stok Saat Closing', buildRecapTextFromOpenClose(opening, closing));
       text = parts.join('\n');
+    } else if (format === 'wa-block') {
+      text = buildWaBlockRecap(session);
     } else {
       if (format === 'rounded') text = buildRoundedAsciiRecap(session);
       else text = buildProfessionalRecap(session);
@@ -409,6 +478,7 @@ router.post('/recap/send', async (req, res) => {
       text = parts.join('\n');
     } else {
       if (format === 'block') text = buildBlockRecap(session, marked);
+      else if (format === 'wa-block') text = buildWaBlockRecap(session);
       else if (format === 'rounded') text = buildRoundedAsciiRecap(session);
       else text = buildProfessionalRecap(session);
     }

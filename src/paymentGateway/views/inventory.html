@@ -120,11 +120,13 @@
         <div class="ml-auto flex items-center gap-2">
           <label for="recapFormat" class="sr-only">Format Rekap</label>
           <select id="recapFormat" class="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
-            <option value="rounded">Tabel Rounded (WA) — Direkomendasikan</option>
+            <option value="rounded">Tabel Compact (WA)</option>
             <option value="compact">Ringkas</option>
             <option value="block">Per Item (Blok)</option>
+            <option value="wa-block">Blok (WA Friendly)</option>
             <option value="professional">Detail</option>
           </select>
+          <!-- Mode gambar dinonaktifkan untuk sementara; kirim sebagai teks agar lebih konsisten di WA -->
           <!-- Preview is now live when switching templates or changing checklist -->
           <button id="copyRecap" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">Copy</button>
           <button id="sendRecap" class="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700">Kirim ke WhatsApp</button>
