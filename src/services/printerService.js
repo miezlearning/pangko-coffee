@@ -1129,20 +1129,29 @@ class PrinterService {
       const font = entry?.font || 'normal';
       let extra = '';
       if (font === 'double' || font === 'double-height') {
-        extra = 'font-size:14px;line-height:1.6;font-weight:600;';
+        extra = 'font-size:15px;line-height:1.6;font-weight:600;';
       } else if (font === 'double-width') {
-        extra = 'letter-spacing:0.15ch;font-weight:600;';
+        // Avoid horizontal overflow; approximate with heavier weight only
+        extra = 'font-weight:700;';
       }
       const text = escapeHtml(String(entry?.displayText ?? ''));
       return `<div style="white-space:pre;font-family:'JetBrains Mono','Consolas',monospace;font-size:12px;line-height:1.45;color:#111827;${extra}">${text}</div>`;
     }).join('');
 
-    const qrImg = (receipt?.footerQr && receipt.footerQr.enabled && receipt.footerQrBase64)
-      ? `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:8px;">
+    let qrImg = '';
+    if (receipt?.footerQr && receipt.footerQr.enabled) {
+      if (receipt.footerQrBase64) {
+        qrImg = `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:8px;">
            <img src="${escapeAttr(receipt.footerQrBase64)}" alt="QR Code" style="height:112px;width:112px;border:1px solid rgba(148,163,184,0.35);border-radius:8px;background:#fff;padding:4px" />
            <div style="font-family:'JetBrains Mono','Consolas',monospace;font-size:11px;color:#6b7280;">${escapeHtml(receipt.footerQr?.label || 'Scan QR')}</div>
-         </div>`
-      : '';
+         </div>`;
+      } else {
+        qrImg = `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:8px;">
+           <div style="height:112px;width:112px;border:1px dashed rgba(148,163,184,0.6);border-radius:8px;background:#f8fafc;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-weight:700;font-family:'JetBrains Mono','Consolas',monospace;">QR</div>
+           <div style="font-family:'JetBrains Mono','Consolas',monospace;font-size:11px;color:#6b7280;">${escapeHtml(receipt.footerQr?.label || 'Scan QR')}</div>
+         </div>`;
+      }
+    }
 
     return `
       <div style="width:100%;display:flex;justify-content:center;">
