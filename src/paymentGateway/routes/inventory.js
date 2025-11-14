@@ -4,6 +4,11 @@ const inventory = require('../../services/inventoryTracker');
 const dataStore = require('../dataStore');
 const config = require('../../config/config');
 
+// Buy-soon threshold (fraction). Use config.inventory.buySoonThreshold if set, otherwise default 0.20 (20%).
+const BUY_SOON_THRESHOLD = (config && config.inventory && Number.isFinite(Number(config.inventory.buySoonThreshold)))
+  ? Number(config.inventory.buySoonThreshold)
+  : 0.20;
+
 // GET active session
 router.get('/active', (req, res) => {
   try {
@@ -134,7 +139,7 @@ function buildRecapTextFromOpenClose(opening = {}, closing = {}) {
     const close = Number(closing[k] || 0);
     let badge = '✅️';
     if (!Number.isFinite(close) || close <= 0) badge = '❌️';
-    else if (open > 0 && close / open <= 0.1) badge = '‼️';
+    else if (open > 0 && close / open <= BUY_SOON_THRESHOLD) badge = '‼️';
     items.push(`- ${k} : ${badge}`);
   }
   return lines.concat(items).join('\n');
@@ -167,25 +172,10 @@ function buildProfessionalRecap(session) {
   header.push('');
 
   const keys = Array.from(new Set([...Object.keys(opening || {}), ...Object.keys(closing || {})])).sort((a,b)=>a.localeCompare(b,'id'));
-  // Build a monospace table inside a code block so WhatsApp shows aligned columns
+  // Build a compact, device-friendly list (one line per item) instead of a wide ASCII table
   const lines = [];
   lines.push('🔎 Detail Stok:');
-  // Column widths (adjust if needed)
-  const nameW = 20; // name column width
-  const qtyW = 12; // qty columns width
-  const pctW = 6;
-  const statusW = 12;
-
-  const pad = (s, w, left = false) => {
-    const str = String(s == null ? '-' : s);
-    if (str.length >= w) return left ? str.slice(0, w) : str;
-    return left ? str.padStart(w, ' ') : str.padEnd(w, ' ');
-  };
-
-  const headerCols = [pad('Item', nameW), pad('Open', qtyW, true), pad('Close', qtyW, true), pad('Used', qtyW, true), pad('%', pctW, true), pad('Status', statusW)];
-  lines.push('```');
-  lines.push(headerCols.join(' | '));
-  lines.push('-'.repeat(nameW + qtyW * 3 + pctW + statusW + 15));
+  const qtyFmt = (v, unit) => (Number.isFinite(v) ? `${Intl.NumberFormat('id-ID').format(v)}${unit ? ` ${unit}` : ''}` : '-');
 
   for (const name of keys) {
     const o = Number(opening[name] || 0);
@@ -196,15 +186,12 @@ function buildProfessionalRecap(session) {
     const unit = info.unit || info.nettoUnit || '';
     let status = '✅ Cukup';
     if (!Number.isFinite(c) || c <= 0) status = '❌ Habis';
-    else if (o > 0 && c / o <= 0.1) status = '‼️ Segera';
+    else if (o > 0 && (c / o) <= BUY_SOON_THRESHOLD) status = '‼️ Segera';
 
-    const qtyFmt = (v) => (Number.isFinite(v) ? `${Intl.NumberFormat('id-ID').format(v)}${unit ? ` ${unit}` : ''}` : '-');
     const pctLabel = percent === null ? '-' : `${percent}%`;
-
-    const cols = [pad(name, nameW), pad(qtyFmt(o), qtyW, true), pad(qtyFmt(c), qtyW, true), pad(qtyFmt(used), qtyW, true), pad(pctLabel, pctW, true), pad(status, statusW)];
-    lines.push(cols.join(' | '));
+    // Compose a compact single-line summary per item
+    lines.push(`• ${name} — O:${qtyFmt(o, unit)} | C:${qtyFmt(c, unit)} | U:${qtyFmt(used, unit)} | ${pctLabel} • ${status}`);
   }
-  lines.push('```');
 
   // summary
   const classified = classifyFromOpenClose(opening, closing);
@@ -223,6 +210,92 @@ function buildProfessionalRecap(session) {
   }
 
   return header.concat(lines, summary).join('\n');
+}
+
+function buildRoundedAsciiRecap(session) {
+  if (!session) return '';
+  const opening = session.openingIngredients || {};
+  const closing = session.closingIngredients || {};
+  const recipes = inventory.loadRecipes();
+  const meta = (recipes && recipes.ingredients) ? recipes.ingredients : {};
+
+  const keys = Array.from(new Set([...Object.keys(opening || {}), ...Object.keys(closing || {})])).sort((a,b)=>a.localeCompare(b,'id'));
+  const rows = [];
+  rows.push(['Item', 'Opening', 'Closing', 'Terpakai', '% Sisa', 'Status']);
+
+  const qtyFmt = (v, unit) => (Number.isFinite(v) ? `${Intl.NumberFormat('id-ID').format(v)}${unit ? ` ${unit}` : ''}` : '-');
+
+  for (const name of keys) {
+    const o = Number(opening[name] || 0);
+    const c = Number(closing[name] || 0);
+    const used = Math.max(o - c, 0);
+    const percent = o > 0 ? Math.round((c / o) * 100) : null;
+    const info = meta[name] || {};
+    const unit = info.unit || info.nettoUnit || '';
+    let status = '✅';
+    if (!Number.isFinite(c) || c <= 0) status = '❌';
+    else if (o > 0 && c / o <= BUY_SOON_THRESHOLD) status = '‼️';
+
+    rows.push([
+      name,
+      qtyFmt(o, unit),
+      qtyFmt(c, unit),
+      qtyFmt(used, unit),
+      percent === null ? '-' : `${percent}%`,
+      status
+    ]);
+  }
+
+  // compute column widths
+  const widths = rows[0].map((_,ci)=> Math.max(...rows.map(r => String(r[ci]||'').length)));
+
+  const repeat = (ch, n) => Array(n+1).join(ch);
+  const pad = (s, w) => s + repeat(' ', w - String(s).length);
+
+  // Borders (rounded corners)
+  const top = '╭' + widths.map((w,i)=> repeat('─', w + 2)).join('┬') + '╮';
+  const sep = '├' + widths.map((w,i)=> repeat('─', w + 2)).join('┼') + '┤';
+  const bottom = '╰' + widths.map((w,i)=> repeat('─', w + 2)).join('┴') + '╯';
+
+  const sessionDate = session.date || (session.openedAt && session.openedAt.split('T')[0]) || '';
+  const openedAt = session.openedAt ? new Date(session.openedAt).toLocaleString('id-ID', { hour12: false }) : '-';
+  const closedAt = session.closedAt ? new Date(session.closedAt).toLocaleString('id-ID', { hour12: false }) : 'Belum closing';
+
+  const lines = [];
+  // header mirip format detail
+  lines.push(`📅 Tanggal: ${sessionDate}`);
+  lines.push(`🕒 Periode: ${openedAt} → ${closedAt}`);
+  lines.push(`👤 Kasir (buka): ${session.cashier || '-'}  |  👤 Kasir (tutup): ${session.closedBy || '-'}`);
+  lines.push(`💰 Kas Awal: ${formatCurrencyID(session.openingCash)}  |  Kas Akhir: ${formatCurrencyID(session.closingCash)}  |  Selisih: ${formatCurrencyID((Number(session.closingCash||0) - Number(session.openingCash||0)))}`);
+  lines.push('');
+  lines.push(top);
+  // header
+  const hdr = rows[0].map((c,i)=> ` ${pad(c, widths[i])} `).join('│');
+  lines.push('│' + hdr + '│');
+  lines.push(sep);
+  for (let r=1;r<rows.length;r++) {
+    const row = rows[r];
+    const line = row.map((c,i)=> ` ${pad(c, widths[i])} `).join('│');
+    lines.push('│' + line + '│');
+  }
+  lines.push(bottom);
+
+  // ringkasan singkat untuk owner/barista
+  const classified = classifyFromOpenClose(opening, closing);
+  lines.push('');
+  lines.push('📌 Ringkasan:');
+  lines.push(`- ❌ : ${classified.outOfStock.length} item (habis)${classified.outOfStock.length? ` → ${classified.outOfStock.join(', ')}` : ''}`);
+  lines.push(`- ‼️ : ${classified.buySoon.length} item (segera pesan)${classified.buySoon.length? ` → ${classified.buySoon.join(', ')}` : ''}`);
+  lines.push(`- ✅ : ${classified.ok.length} item (cukup)`);
+  if (classified.outOfStock.length || classified.buySoon.length) {
+    const toOrder = [...classified.outOfStock, ...classified.buySoon];
+    lines.push('');
+    lines.push(`➡️ Mohon cek & pesan: ${toOrder.join(', ')}`);
+  }
+  lines.push('');
+  lines.push('Legenda emoji status: ❌ = habis, ‼️ = segera dibeli, ✅ = stok cukup.');
+  lines.push('Catatan: % Sisa dibandingkan nilai opening. Batas "segera" mengikuti konfigurasi persentase.');
+  return lines.join('\n');
 }
 
 function buildBlockRecap(session, marked = []) {
@@ -250,9 +323,9 @@ function buildBlockRecap(session, marked = []) {
     const unit = info.unit || info.nettoUnit || '';
     let status = '✅ Cukup';
     if (!Number.isFinite(c) || c <= 0) status = '❌ Habis';
-    else if (o > 0 && c / o <= 0.1) status = '‼️ Segera pesan';
+    else if (o > 0 && c / o <= BUY_SOON_THRESHOLD) status = '‼️ Segera pesan';
 
-    const rec = (!Number.isFinite(c) || c <= 0) ? `Segera pesan ${name}` : (o>0 && c / o <= 0.1 ? `Pertimbangkan pemesanan ${name}` : '-');
+    const rec = (!Number.isFinite(c) || c <= 0) ? `Segera pesan ${name}` : (o>0 && c / o <= BUY_SOON_THRESHOLD ? `Pertimbangkan pemesanan ${name}` : '-');
     const suggestedQty = Math.max(Math.round(o - c), 0);
     const suggestedText = suggestedQty > 0 ? `Rekomendasi: Pesan minimal ${suggestedQty}${unit ? ` ${unit}` : ''}` : 'Rekomendasi: -';
     const isMarked = Array.isArray(marked) && marked.find(m => (m||'').toLowerCase() === (name||'').toLowerCase());
@@ -276,17 +349,25 @@ function classifyFromOpenClose(opening = {}, closing = {}) {
     const open = Number(opening[k] || 0);
     const close = Number(closing[k] || 0);
     if (!Number.isFinite(close) || close <= 0) outOfStock.push(k);
-    else if (open > 0 && close / open <= 0.1) buySoon.push(k);
+    else if (open > 0 && close / open <= BUY_SOON_THRESHOLD) buySoon.push(k);
     else ok.push(k);
   }
   return { outOfStock: outOfStock.sort(), buySoon: buySoon.sort(), ok: ok.sort() };
+}
+
+// Resolve recap format based on query/body and config default
+function resolveRecapFormat(rawFormat) {
+  const fromReq = (rawFormat || '').toLowerCase();
+  if (fromReq) return fromReq;
+  const def = config && config.inventory && config.inventory.defaultRecapFormat;
+  return (def || 'professional').toLowerCase();
 }
 
 // GET /api/inventory/recap -> preview using last closed or active opening
 router.get('/recap', (req, res) => {
   try {
     const date = req.query.date; // YYYY-MM-DD
-    const format = (req.query.format || '').toLowerCase();
+    const format = resolveRecapFormat(req.query.format);
     let session = null;
     if (date) {
       session = inventory.getSessionByDate(date);
@@ -303,7 +384,8 @@ router.get('/recap', (req, res) => {
       if (Object.keys(closing).length) parts.push('', '🔴 Stok Saat Closing', buildRecapTextFromOpenClose(opening, closing));
       text = parts.join('\n');
     } else {
-      text = buildProfessionalRecap(session);
+      if (format === 'rounded') text = buildRoundedAsciiRecap(session);
+      else text = buildProfessionalRecap(session);
     }
     res.json({ success: true, text, date: sessionDate });
   } catch (e) {
@@ -318,7 +400,7 @@ router.post('/recap/send', async (req, res) => {
     if (!session) return res.json({ success: false, message: 'Belum ada data' });
     const opening = session.openingIngredients || {};
     const closing = session.closingIngredients || {};
-    const format = ((req.query && req.query.format) || (req.body && req.body.format) || '').toLowerCase();
+    const format = resolveRecapFormat((req.query && req.query.format) || (req.body && req.body.format));
     let text = '';
     const marked = (req.body && Array.isArray(req.body.marked)) ? req.body.marked : [];
     if (format === 'compact' || format === 'ringkas') {
@@ -327,6 +409,7 @@ router.post('/recap/send', async (req, res) => {
       text = parts.join('\n');
     } else {
       if (format === 'block') text = buildBlockRecap(session, marked);
+      else if (format === 'rounded') text = buildRoundedAsciiRecap(session);
       else text = buildProfessionalRecap(session);
     }
 

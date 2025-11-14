@@ -230,6 +230,15 @@ Silakan ambil di counter dengan menyebutkan *Order ID* dan *nama pemesan*.
 Terima kasih telah memesan di *{shopName}*! ☕`
     }
 ,
+    // Inventory / Stok recap configuration
+    inventory: {
+        // Default format when UI tidak mengirim format eksplisit
+        // opsi: 'professional' | 'compact' | 'rounded' | 'block'
+        defaultRecapFormat: 'rounded',
+        // Ambang batas "segera pesan" (fraction), mis. 0.2 = 20%
+        buySoonThreshold: 0.2
+    },
+
     // AI Insights (Gemini or user-provided endpoint)
     // Configure with environment variables in production
     gemini: {
