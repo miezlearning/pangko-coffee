@@ -205,6 +205,8 @@ class PrinterService {
     this.config = null;
     this.settings = loadSettings();
     this.receiptTemplateId = this.settings.receiptTemplate || DEFAULT_TEMPLATE_ID;
+    this.mode = 'unknown';
+    this.lastRawbtUrl = '';
   }
 
   /**
@@ -233,7 +235,12 @@ class PrinterService {
       // - 'serial': write buffers via SerialPort (hybrid approach)
       // - 'tcp': let node-thermal-printer handle TCP
       // - 'spooler/printer': NOT supported without native driver
-      this.mode = config.serialPort ? 'serial' : (config.tcpHost ? 'tcp' : (config.printerName ? 'printer' : 'unknown'));
+      // - 'rawbt': generate rawbt:// link for Android RawBT app
+      if (config.rawbt && config.rawbt.enabled) {
+        this.mode = 'rawbt';
+      } else {
+        this.mode = config.serialPort ? 'serial' : (config.tcpHost ? 'tcp' : (config.printerName ? 'printer' : 'unknown'));
+      }
 
       // Build a dummy interface so we can use node-thermal-printer to compose buffers
       // We WON'T call .execute() for serial mode.
@@ -244,6 +251,9 @@ class PrinterService {
         // Force an informative failure early for Windows spooler path
         console.warn('[Printer] Windows spooler printing requires native "printer" driver which is not installed. Prefer serialPort or tcpHost.');
         ifaceForComposer = {}; // still allow composing buffers
+      } else if (this.mode === 'rawbt') {
+        // Use local composer only to build buffer/text; we won't execute
+        ifaceForComposer = {};
       }
 
       this.printer = new ThermalPrinter({
@@ -258,7 +268,7 @@ class PrinterService {
       });
 
       this.isConnected = true;
-      const where = this.mode === 'serial' ? `COM ${config.serialPort}` : (this.mode === 'tcp' ? `TCP ${config.tcpHost}` : 'local composer');
+      const where = this.mode === 'serial' ? `COM ${config.serialPort}` : (this.mode === 'tcp' ? `TCP ${config.tcpHost}` : (this.mode === 'rawbt' ? 'RawBT link generator' : 'local composer'));
       console.log(`[Printer] ✅ Initialized in ${this.mode.toUpperCase()} mode (${where})`);
 
       // Apply template preference from config or persisted settings
@@ -406,7 +416,7 @@ class PrinterService {
       };
 
       // If using serial mode, send a minimal raw ESC/POS payload (same concept as scripts/printTest-tight.js)
-      if (this.mode === 'serial') {
+      if (this.mode === 'serial' || this.mode === 'rawbt') {
         const parts = [];
         // ESC @, ESC 3 0 (line spacing 0)
         parts.push(Buffer.from([0x1B, 0x40]));
@@ -495,12 +505,25 @@ class PrinterService {
         parts.push(Buffer.from([0x1D, 0x56, 0x00])); // GS V 0 (cut)
 
         const out = Buffer.concat(parts);
-        await this.writeSerial(out);
-        // clear composer buffer and return
-        this.printer.clear();
-        console.log(`[Printer] 🖨️  Receipt printed for ${order.orderId} (serial raw, template: ${receipt.template})`);
-        if (!templateId) this.updateStoredTemplate(this.receiptTemplateId);
-        return { success: true, message: 'Receipt printed (serial raw)', template: receipt.template };
+        if (this.mode === 'serial') {
+          await this.writeSerial(out);
+          // clear composer buffer and return
+          this.printer.clear();
+          console.log(`[Printer] 🖨️  Receipt printed for ${order.orderId} (serial raw, template: ${receipt.template})`);
+          if (!templateId) this.updateStoredTemplate(this.receiptTemplateId);
+          return { success: true, message: 'Receipt printed (serial raw)', template: receipt.template };
+        } else {
+          // RAWBT: generate rawbt:// link using readable text fallback to ensure broad compatibility
+          const plainText = safeFinalLines.join('\n');
+          const title = (this.config?.rawbt?.title || `Receipt ${order.orderId || ''}`).trim();
+          const url = this.buildRawbtUrlFromText(plainText, title);
+          this.lastRawbtUrl = url;
+          // clear composer buffer and return URL to caller
+          this.printer.clear();
+          console.log(`[Printer] 🔗 RawBT link prepared for ${order.orderId}: ${url.slice(0, 80)}...`);
+          if (!templateId) this.updateStoredTemplate(this.receiptTemplateId);
+          return { success: true, message: 'RawBT link generated', rawbtUrl: url, template: receipt.template };
+        }
       }
 
       // fallback: non-serial flows use composer with structured metadata
@@ -634,6 +657,15 @@ class PrinterService {
         await this.printer.execute();
       } else if (this.mode === 'printer') {
         throw new Error('Windows spooler printing is not supported without native driver. Use serialPort or tcpHost.');
+      } else if (this.mode === 'rawbt') {
+        // In rawbt mode we don't send binary buffer from backend. Use the earlier rawbt branch.
+        // Fallback safeguard if code path reaches here.
+        const plainText = safeFinalLines.join('\n');
+        const title = (this.config?.rawbt?.title || `Receipt ${order.orderId || ''}`).trim();
+        const url = this.buildRawbtUrlFromText(plainText, title);
+        this.lastRawbtUrl = url;
+        this.printer.clear();
+        return { success: true, message: 'RawBT link generated', rawbtUrl: url, template: receipt.template };
       } else {
         throw new Error('Unknown printer mode');
       }
@@ -651,6 +683,21 @@ class PrinterService {
       console.error('[Printer] ❌ Failed to print:', error.message);
       throw error;
     }
+  }
+
+  /**
+   * Build a RawBT deeplink from plain text content.
+   * Note: We intentionally use `text` query to maximize compatibility in RawBT.
+   */
+  buildRawbtUrlFromText(text, title = 'Receipt') {
+    const safeTitle = encodeURIComponent(String(title || 'Receipt'));
+    const safeText = encodeURIComponent(String(text || ''));
+    return `rawbt://print?title=${safeTitle}&text=${safeText}`;
+  }
+
+  /** Return the last generated RawBT URL (if any) */
+  getLastRawbtUrl() {
+    return this.lastRawbtUrl || '';
   }
   /**
    * Resolve QR cell size to use for printer QR rendering.

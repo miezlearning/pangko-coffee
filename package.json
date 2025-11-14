@@ -7,7 +7,8 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "import:orders": "node scripts/importOrders.js",
-    "print:test": "node scripts/printTest.js"
+    "print:test": "node scripts/printTest.js",
+    "print:rawbt": "node scripts/printRawBT.js"
   },
   "keywords": [
     "whatsapp",

@@ -6,6 +6,7 @@
 ✅ **Auto-Open Cash Drawer** - Otomatis buka laci kasir setelah print  
 ✅ **Manual Controls** - Tombol manual di dashboard untuk print & buka laci  
 ✅ **ESC/POS Protocol** - Kompatibel dengan berbagai thermal printer  
+✅ **RawBT (Android) Link** - Bisa generate tautan `rawbt://` untuk cetak dari HP
 
 ---
 
@@ -43,6 +44,12 @@ printer: {
     shopName: 'PANGKO COFFEE',
     shopAddress: 'Jl. Contoh No. 123',
     shopPhone: '0812-3456-7890'
+},
+
+// Opsional: Integrasi RawBT (Android)
+rawbt: {
+  enabled: false,            // set ke true untuk mode RawBT
+  title: 'Pangko Receipt'    // judul di aplikasi RawBT
 },
 ```
 
@@ -83,6 +90,28 @@ interface: 'com://COM3'           // Windows
 interface: '/dev/ttyUSB0'         // Linux
 interface: '/dev/tty.usbserial'   // Mac
 ```
+
+#### D. RawBT (Android) – Tanpa koneksi langsung dari server
+
+Jika Anda ingin mencetak dari HP Android yang terpasang aplikasi RawBT:
+
+1) Set `rawbt.enabled: true` pada `config.js`.
+2) Jalankan dashboard seperti biasa. Di mode ini, server TIDAK mengirim data ke printer fisik.
+3) Ambil tautan `rawbt://` lalu buka di HP Android untuk memicu cetak:
+
+Cara mendapatkan tautan:
+
+- Via API (sample):
+  - Buka: `http://localhost:3000/api/printer/rawbt/sample-link`
+  - Hasil JSON berisi `rawbtUrl`. Kirim/scan link itu di Android, lalu klik untuk cetak via RawBT.
+- Via per-order:
+  - Buka: `http://localhost:3000/api/printer/rawbt/link/<ORDER_ID>`
+- Via script:
+  - Jalankan: `npm run print:rawbt` lalu salin URL yang ditampilkan.
+
+Catatan:
+- Tautan `rawbt://` berisi teks struk yang sudah diformat. Ini memastikan kompatibilitas luas.
+- Untuk cetak QR dalam bentuk grafis penuh diperlukan integrasi biner ESC/POS; versi awal ini fokus pada teks yang rapi terlebih dulu.
 
 ### Step 3: Pilih Type Printer
 
@@ -314,6 +343,8 @@ printer: {
 - `POST /api/printer/open-drawer` - Buka laci manual
 - `POST /api/printer/print/:orderId` - Print struk (tanpa buka laci)
 - `POST /api/printer/print-and-open/:orderId` - Print + buka laci
+- `GET /api/printer/rawbt/sample-link` - Dapatkan tautan RawBT untuk struk contoh (mode RawBT)
+- `GET /api/printer/rawbt/link/:orderId` - Dapatkan tautan RawBT untuk Order tertentu (mode RawBT)
 
 ---
 

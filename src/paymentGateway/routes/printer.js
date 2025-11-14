@@ -453,4 +453,55 @@ router.post('/print-and-open/:orderId', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/printer/rawbt/sample-link
+ * Return a RawBT deeplink for a sample receipt (when RawBT mode is enabled)
+ */
+router.get('/rawbt/sample-link', async (req, res) => {
+  try {
+    const status = printerService.getStatus();
+    if (!status.enabled) return res.status(400).json({ success: false, message: 'Printer disabled in config' });
+    if (!String(printerService.mode || '').toLowerCase || String(printerService.mode).toLowerCase() !== 'rawbt') {
+      return res.status(400).json({ success: false, message: 'RawBT mode is not enabled' });
+    }
+    const templateId = req.query && req.query.template;
+    const result = await printerService.printSampleReceipt(templateId);
+    if (result && result.rawbtUrl) {
+      return res.json({ success: true, rawbtUrl: result.rawbtUrl, template: result.template });
+    }
+    const last = printerService.getLastRawbtUrl();
+    if (last) return res.json({ success: true, rawbtUrl: last });
+    return res.status(500).json({ success: false, message: 'Unable to build RawBT link' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /api/printer/rawbt/link/:orderId
+ * Compose receipt and return RawBT deeplink for a specific order (when RawBT mode is enabled)
+ */
+router.get('/rawbt/link/:orderId', async (req, res) => {
+  try {
+    const status = printerService.getStatus();
+    if (!status.enabled) return res.status(400).json({ success: false, message: 'Printer disabled in config' });
+    if (!String(printerService.mode || '').toLowerCase || String(printerService.mode).toLowerCase() !== 'rawbt') {
+      return res.status(400).json({ success: false, message: 'RawBT mode is not enabled' });
+    }
+    const { orderId } = req.params;
+    const templateId = req.query && req.query.template;
+    const order = orderManager.getOrder(orderId);
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    const result = await printerService.printReceipt(order, templateId);
+    if (result && result.rawbtUrl) {
+      return res.json({ success: true, rawbtUrl: result.rawbtUrl, template: result.template });
+    }
+    const last = printerService.getLastRawbtUrl();
+    if (last) return res.json({ success: true, rawbtUrl: last });
+    return res.status(500).json({ success: false, message: 'Unable to build RawBT link' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

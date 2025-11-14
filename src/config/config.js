@@ -180,7 +180,16 @@ module.exports = {
         shopAddress: 'Jl. Contoh No. 123',
         shopPhone: '0812-3456-7890',
         // Tampilkan rincian harga item yang terpisah (harga dasar, add-on, total per item)
-        detailedItemBreakdown: true
+        detailedItemBreakdown: true,
+        // Opsional: Integrasi RawBT (Android)
+        // Jika Anda ingin mencetak lewat aplikasi RawBT di Android,
+        // set `rawbt.enabled: true`. Aplikasi akan menghasilkan tautan `rawbt://`
+        // yang dapat diklik dari perangkat Android untuk memicu cetak.
+        // Catatan: Mode ini tidak mengirim data ke printer dari server Windows.
+        rawbt: {
+            enabled: true,
+            title: 'Pangko Receipt' // Judul yang muncul di RawBT
+        }
     },
 
     // Messages Template
