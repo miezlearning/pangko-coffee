@@ -750,7 +750,7 @@ function renderProcessingOrders() {
         </div>
 
         <!-- Action Buttons -->
-        <div class="mt-6 grid gap-3 sm:grid-cols-3">
+        <div class="mt-6 grid gap-3 sm:grid-cols-4">
           <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-charcoal/15 bg-white px-4 py-3 text-sm font-semibold text-charcoal transition hover:-translate-y-0.5 hover:shadow-lg" onclick="previewReceipt('${order.orderId}')">
             <span>👀</span>
             <span>Preview Struk</span>
@@ -758,6 +758,10 @@ function renderProcessingOrders() {
           <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-peach bg-white px-4 py-3 text-sm font-semibold text-peach transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printReceipt('${order.orderId}')">
             <span>🖨️</span>
             <span>Print & Buka Laci</span>
+          </button>
+          <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-indigo-300 bg-white px-4 py-3 text-sm font-semibold text-indigo-700 transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printViaRawBT('${order.orderId}')">
+            <span>📱</span>
+            <span>Print via RawBT</span>
           </button>
           <button class="flex items-center justify-center gap-2 rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="markOrderReady('${order.orderId}', '${customerName}')">
             <span>✅</span>
@@ -1387,7 +1391,7 @@ function renderReadyOrders() {
         </div>
 
         <!-- Action Buttons -->
-        <div class="mt-6 grid gap-3 sm:grid-cols-3">
+        <div class="mt-6 grid gap-3 sm:grid-cols-4">
           <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-charcoal/15 bg-white px-4 py-3 text-sm font-semibold text-charcoal transition hover:-translate-y-0.5 hover:shadow-lg" onclick="previewReceipt('${order.orderId}')">
             <span>👀</span>
             <span>Preview Struk</span>
@@ -1395,6 +1399,10 @@ function renderReadyOrders() {
           <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-peach bg-white px-4 py-3 text-sm font-semibold text-peach transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printReceipt('${order.orderId}')">
             <span>🖨️</span>
             <span>Print & Buka Laci</span>
+          </button>
+          <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-indigo-300 bg-white px-4 py-3 text-sm font-semibold text-indigo-700 transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printViaRawBT('${order.orderId}')">
+            <span>📱</span>
+            <span>Print via RawBT</span>
           </button>
           <button class="flex items-center justify-center gap-2 rounded-2xl bg-charcoal px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="completeOrder('${order.orderId}', '${customerName}')">
             <span>✔️</span>
@@ -1435,19 +1443,29 @@ async function printReceipt(orderId) {
   if (!proceed) return;
   
   try {
-    showNotification('🖨️ Mencetak struk...', 'info');
-    // Use server's active template & settings for full sync
-    const res = await fetch(`/api/printer/print-and-open/${orderId}`, {
-      method: 'POST'
-    });
-    
-    const data = await res.json();
-    
-    if (data.success) {
-      showNotification('✅ Struk berhasil dicetak & laci terbuka');
-    } else {
-      showNotification('❌ Gagal: ' + (data.message || 'Unknown error'));
+    // On Android tablet with RawBT installed, try RawBT first (1-tap)
+    const isAndroid = /Android/i.test(navigator.userAgent || '');
+    if (isAndroid) {
+      try {
+        showNotification('📱 Menyiapkan cetak via RawBT...', 'info');
+        const r = await fetch(`/api/printer/rawbt/link/${orderId}`);
+        const j = await r.json();
+        if (j?.success && j.rawbtUrl) {
+          window.location.href = j.rawbtUrl; // opens RawBT app
+          showNotification('🔗 Membuka RawBT…');
+          return; // stop here; RawBT handles printing & drawer (ESC/POS)
+        }
+      } catch (_) {
+        // ignore and fallback to server-side printing
+      }
     }
+
+    // Fallback: server-side printing (serial/TCP/etc.)
+    showNotification('🖨️ Mencetak struk...', 'info');
+    const res = await fetch(`/api/printer/print-and-open/${orderId}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) showNotification('✅ Struk berhasil dicetak & laci terbuka');
+    else showNotification('❌ Gagal: ' + (data.message || 'Unknown error'));
   } catch (e) {
     showNotification('❌ Error: ' + e.message);
   }
@@ -1525,6 +1543,33 @@ async function testOpenDrawer() {
     }
   } catch (e) {
     showNotification('❌ Error: ' + e.message);
+  }
+}
+
+/**
+ * Print via RawBT on tablet/Android (opens rawbt:// link)
+ */
+async function printViaRawBT(orderId) {
+  try {
+    showNotification('📱 Menyiapkan cetak via RawBT...', 'info');
+    const res = await fetch(`/api/printer/rawbt/link/${orderId}`);
+    const data = await res.json();
+    if (data?.success && data.rawbtUrl) {
+      try {
+        // Attempt to open RawBT app via custom scheme
+        window.location.href = data.rawbtUrl;
+        showNotification('🔗 Membuka RawBT…');
+      } catch (_) {
+        // Fallback: show link to copy
+        navigator.clipboard && navigator.clipboard.writeText(data.rawbtUrl).catch(()=>{});
+        alert('Buka tautan ini di perangkat Android yang terpasang RawBT:\n\n' + data.rawbtUrl);
+      }
+    } else {
+      const msg = data?.message || 'RawBT tidak aktif. Aktifkan printer.rawbt.enabled.';
+      showNotification('❌ ' + msg);
+    }
+  } catch (e) {
+    showNotification('❌ Error RawBT: ' + e.message);
   }
 }
 

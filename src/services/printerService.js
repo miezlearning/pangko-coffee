@@ -513,16 +513,32 @@ class PrinterService {
           if (!templateId) this.updateStoredTemplate(this.receiptTemplateId);
           return { success: true, message: 'Receipt printed (serial raw)', template: receipt.template };
         } else {
-          // RAWBT: generate rawbt:// link using readable text fallback to ensure broad compatibility
-          const plainText = safeFinalLines.join('\n');
+          // RAWBT: generate rawbt:// link
           const title = (this.config?.rawbt?.title || `Receipt ${order.orderId || ''}`).trim();
-          const url = this.buildRawbtUrlFromText(plainText, title);
+          let url = '';
+          const rawbtMode = String(this.config?.rawbt?.mode || 'text').toLowerCase();
+          if (rawbtMode === 'escpos') {
+            // Optionally append drawer pulse at end if configured
+            let payload = Buffer.from(out);
+            if (this.config?.autoOpenDrawer) {
+              const pin = (this.config.drawer?.pin ?? 0) & 0x01;
+              const t1 = (this.config.drawer?.t1 ?? 80) & 0xFF;
+              const t2 = (this.config.drawer?.t2 ?? 80) & 0xFF;
+              const pulse = Buffer.from([0x1B, 0x70, pin, t1, t2]);
+              payload = Buffer.concat([payload, pulse]);
+            }
+            url = this.buildRawbtUrlFromEscpos(payload, title);
+          } else {
+            // Fallback to plain text for broad compatibility
+            const plainText = safeFinalLines.join('\n');
+            url = this.buildRawbtUrlFromText(plainText, title);
+          }
           this.lastRawbtUrl = url;
           // clear composer buffer and return URL to caller
           this.printer.clear();
           console.log(`[Printer] 🔗 RawBT link prepared for ${order.orderId}: ${url.slice(0, 80)}...`);
           if (!templateId) this.updateStoredTemplate(this.receiptTemplateId);
-          return { success: true, message: 'RawBT link generated', rawbtUrl: url, template: receipt.template };
+          return { success: true, message: 'RawBT link generated', rawbtUrl: url, rawbtMode, template: receipt.template };
         }
       }
 
@@ -660,12 +676,35 @@ class PrinterService {
       } else if (this.mode === 'rawbt') {
         // In rawbt mode we don't send binary buffer from backend. Use the earlier rawbt branch.
         // Fallback safeguard if code path reaches here.
-        const plainText = safeFinalLines.join('\n');
         const title = (this.config?.rawbt?.title || `Receipt ${order.orderId || ''}`).trim();
-        const url = this.buildRawbtUrlFromText(plainText, title);
+        const rawbtMode = String(this.config?.rawbt?.mode || 'text').toLowerCase();
+        let url = '';
+        if (rawbtMode === 'escpos') {
+          // Build a minimal ESC/POS payload from the structured text
+          const lf = Buffer.from([0x0A]);
+          let payload = Buffer.concat([
+            Buffer.from([0x1B, 0x40]), // ESC @ init
+            Buffer.from([0x1B, 0x33, 0x00]), // ESC 3 0 line spacing
+            Buffer.from(safeFinalLines.join('\n'), 'ascii'),
+            lf,
+            Buffer.from([0x1B, 0x4A, 0x00]), // feed 0
+            Buffer.from([0x1D, 0x56, 0x00])  // cut
+          ]);
+          if (this.config?.autoOpenDrawer) {
+            const pin = (this.config.drawer?.pin ?? 0) & 0x01;
+            const t1 = (this.config.drawer?.t1 ?? 80) & 0xFF;
+            const t2 = (this.config.drawer?.t2 ?? 80) & 0xFF;
+            const pulse = Buffer.from([0x1B, 0x70, pin, t1, t2]);
+            payload = Buffer.concat([payload, pulse]);
+          }
+          url = this.buildRawbtUrlFromEscpos(payload, title);
+        } else {
+          const plainText = safeFinalLines.join('\n');
+          url = this.buildRawbtUrlFromText(plainText, title);
+        }
         this.lastRawbtUrl = url;
         this.printer.clear();
-        return { success: true, message: 'RawBT link generated', rawbtUrl: url, template: receipt.template };
+        return { success: true, message: 'RawBT link generated', rawbtUrl: url, rawbtMode, template: receipt.template };
       } else {
         throw new Error('Unknown printer mode');
       }
@@ -693,6 +732,17 @@ class PrinterService {
     const safeTitle = encodeURIComponent(String(title || 'Receipt'));
     const safeText = encodeURIComponent(String(text || ''));
     return `rawbt://print?title=${safeTitle}&text=${safeText}`;
+  }
+
+  /**
+   * Build RawBT deeplink from ESC/POS binary payload (base64-encoded).
+   * Note: Some RawBT versions accept `data=<base64>` payload.
+   */
+  buildRawbtUrlFromEscpos(buffer, title = 'Receipt') {
+    const safeTitle = encodeURIComponent(String(title || 'Receipt'));
+    const base64 = Buffer.from(buffer || []).toString('base64');
+    const safeData = encodeURIComponent(base64);
+    return `rawbt://print?title=${safeTitle}&data=${safeData}`;
   }
 
   /** Return the last generated RawBT URL (if any) */

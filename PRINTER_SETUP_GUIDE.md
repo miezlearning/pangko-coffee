@@ -95,7 +95,7 @@ interface: '/dev/tty.usbserial'   // Mac
 
 Jika Anda ingin mencetak dari HP Android yang terpasang aplikasi RawBT:
 
-1) Set `rawbt.enabled: true` pada `config.js`.
+1) Set `printer.rawbt.enabled: true` pada `config.js`.
 2) Jalankan dashboard seperti biasa. Di mode ini, server TIDAK mengirim data ke printer fisik.
 3) Ambil tautan `rawbt://` lalu buka di HP Android untuk memicu cetak:
 
@@ -110,8 +110,9 @@ Cara mendapatkan tautan:
   - Jalankan: `npm run print:rawbt` lalu salin URL yang ditampilkan.
 
 Catatan:
-- Tautan `rawbt://` berisi teks struk yang sudah diformat. Ini memastikan kompatibilitas luas.
-- Untuk cetak QR dalam bentuk grafis penuh diperlukan integrasi biner ESC/POS; versi awal ini fokus pada teks yang rapi terlebih dulu.
+- Mode default (`rawbt.mode: 'text'`) mengirim teks terformat – paling kompatibel.
+- Jika Anda ingin kick laci otomatis via RawBT, ubah ke `rawbt.mode: 'escpos'`. Mode ini menyertakan job ESC/POS biner dan akan menambahkan perintah drawer pulse (ESC p) saat `printer.autoOpenDrawer: true`.
+- Pastikan laci terhubung ke port RJ11 printer yang dipakai Android (RawBT akan meneruskan ESC/POS ke printer tersebut).
 
 ### Step 3: Pilih Type Printer
 
