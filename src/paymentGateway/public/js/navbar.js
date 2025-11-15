@@ -40,9 +40,20 @@ function generateNavbar(activePage = 'dashboard') {
             ${navHTML}
           </div>
           <div id="store-controls" class="ml-4 hidden sm:flex items-center gap-3"></div>
-          <div class="sm:hidden flex items-center gap-2">
-            <a href="/search" class="rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Cari →</a>
-            <a href="/analytics" class="rounded-full border border-matcha/40 bg-white/80 px-4 py-2 text-sm font-semibold text-matcha shadow-sm">Analisis →</a>
+          <!-- Mobile menu button -->
+          <button id="nav-mobile-toggle" class="sm:hidden inline-flex items-center justify-center rounded-full border border-matcha/40 bg-white/80 px-3 py-2 text-sm font-semibold text-matcha shadow-sm" aria-label="Buka menu">
+            ☰
+          </button>
+        </div>
+        <!-- Mobile dropdown menu -->
+        <div id="nav-mobile-menu" class="sm:hidden mt-2 hidden rounded-2xl border border-white/40 bg-white/90 px-4 py-3 text-sm font-semibold shadow">
+          <div class="flex flex-col gap-2">
+            ${navItems.map(item => {
+              const isActive = item.id === activePage;
+              const activeClass = isActive ? 'bg-matcha text-white' : 'hover:bg-matcha hover:text-white';
+              const ariaCurrent = isActive ? 'aria-current="page"' : '';
+              return `<a href="${item.href}" class="rounded-full px-4 py-2 transition ${activeClass}" ${ariaCurrent}>${item.label}</a>`;
+            }).join('')}
           </div>
         </div>
       </div>
@@ -74,6 +85,22 @@ function initNavbar(activePage = 'dashboard') {
   
   // Add scroll effect for navbar (optional enhancement)
   addScrollEffect();
+
+  // Wire mobile menu toggle
+  const toggleBtn = document.getElementById('nav-mobile-toggle');
+  const mobileMenu = document.getElementById('nav-mobile-menu');
+  if (toggleBtn && mobileMenu) {
+    toggleBtn.addEventListener('click', () => {
+      mobileMenu.classList.toggle('hidden');
+    });
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!mobileMenu.classList.contains('hidden')) {
+        const within = mobileMenu.contains(e.target) || toggleBtn.contains(e.target);
+        if (!within) mobileMenu.classList.add('hidden');
+      }
+    });
+  }
 }
 
 // Render store controls and wire actions

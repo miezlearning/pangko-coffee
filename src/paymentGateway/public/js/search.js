@@ -4,6 +4,9 @@ function formatNumber(num) {
   return new Intl.NumberFormat('id-ID').format(num);
 }
 
+// Environment helpers
+const isAndroid = /Android/i.test(navigator.userAgent || '');
+
 // --- Modal helpers ---
 function openModal() {
   const modal = document.getElementById('detail-modal');
@@ -188,19 +191,39 @@ async function viewDetail(orderId) {
 
     body.innerHTML = itemsHtml + summaryHtml + paymentHtml;
 
-    // --- Render Actions ---
+    // --- Render Actions (sinkron dengan Dashboard) ---
     const status = (isOrder ? (data.status || '') : 'pending_payment').toLowerCase();
+    // Always provide Print via RawBT + optional Agent button
+    const rawbtBtn = `<button onclick="printViaRawBT('${orderId}')" class="rounded-xl bg-matcha px-4 py-3 font-semibold text-white transition hover:bg-matcha/90">🖨️ Print via RawBT</button>`;
+    const agentBtn = `<button onclick="printViaAgent('${orderId}')" class="rounded-xl border border-charcoal/15 bg-white px-4 py-3 font-semibold text-charcoal transition hover:bg-charcoal/5">🤖 Kirim ke Agent</button>`;
+
     if (status === 'pending_cash') {
       actions.innerHTML = `
+        ${rawbtBtn}
+        ${agentBtn}
         <button onclick="acceptCash('${orderId}')" class="rounded-xl bg-green-500 px-4 py-3 font-semibold text-white transition hover:bg-green-600">✅ Terima Tunai</button>
         <button onclick="cancelCash('${orderId}')" class="rounded-xl bg-red-500 px-4 py-3 font-semibold text-white transition hover:bg-red-600">❌ Batalkan</button>
       `;
     } else if (status === 'cancelled' && (paymentMethod || '').toUpperCase() === 'CASH') {
-      actions.innerHTML = `<button onclick="cashierReopen('${orderId}')" class="rounded-xl bg-sky-500 px-4 py-3 font-semibold text-white transition hover:bg-sky-600 col-span-2">↩️ Buka Kembali</button>`;
+      actions.innerHTML = `
+        ${rawbtBtn}
+        ${agentBtn}
+        <button onclick="cashierReopen('${orderId}')" class="rounded-xl bg-sky-500 px-4 py-3 font-semibold text-white transition hover:bg-sky-600 col-span-2">↩️ Buka Kembali</button>`;
     } else if (status === 'processing') {
-      actions.innerHTML = `<button onclick="markOrderReady('${orderId}', '${data.customerName || 'Customer'}')" class="rounded-xl bg-green-500 px-4 py-3 font-semibold text-white transition hover:bg-green-600 col-span-2">✅ Tandai Siap Diambil</button>`;
+      actions.innerHTML = `
+        ${rawbtBtn}
+        ${agentBtn}
+        <button onclick="markOrderReady('${orderId}', '${data.customerName || 'Customer'}')" class="rounded-xl bg-green-500 px-4 py-3 font-semibold text-white transition hover:bg-green-600 col-span-2">✅ Tandai Siap Diambil</button>`;
+    } else if (status === 'ready') {
+      actions.innerHTML = `
+        ${rawbtBtn}
+        ${agentBtn}
+        <button onclick="completeOrder('${orderId}', '${data.customerName || 'Customer'}')" class="rounded-xl bg-charcoal px-4 py-3 font-semibold text-white transition hover:bg-black/90 col-span-2">✔️ Tandai Sudah Diambil</button>`;
     } else {
-      actions.innerHTML = '<p class="text-center text-sm text-charcoal/50 col-span-2">Tidak ada aksi yang tersedia untuk status ini.</p>';
+      actions.innerHTML = `
+        ${rawbtBtn}
+        ${agentBtn}
+      `;
     }
 
   } catch (error) {
@@ -232,6 +255,50 @@ async function markOrderReady(orderId, customerName) {
   alert(`Order ${orderId} (${customerName}) telah ditandai SIAP DIAMBIL. Notifikasi dikirim ke customer.`);
   closeModal();
   runSearch();
+}
+
+// Mark order as completed (picked up)
+async function completeOrder(orderId, customerName) {
+  await fetch(`/api/orders/complete/${orderId}`, { method: 'POST' });
+  alert(`Order ${orderId} (${customerName}) telah ditandai SELESAI.`);
+  closeModal();
+  runSearch();
+}
+
+// Print via RawBT: generate rawbt:// link and open on Android
+async function printViaRawBT(orderId) {
+  try {
+    const res = await fetch(`/api/printer/rawbt/link/${encodeURIComponent(orderId)}?openDrawer=1`);
+    const data = await res.json();
+    if (data?.success && data.rawbtUrl) {
+      if (isAndroid) {
+        window.location.href = data.rawbtUrl;
+      } else {
+        try { await navigator.clipboard.writeText(data.rawbtUrl); } catch (_) {}
+        alert(`Buka tautan ini di Android (RawBT terpasang):\n\n${data.rawbtUrl}`);
+      }
+    } else {
+      alert(`RawBT tidak aktif atau link gagal dibuat${data?.message ? `: ${data.message}` : ''}`);
+    }
+  } catch (e) {
+    alert('Gagal menyiapkan RawBT: ' + (e.message || e));
+  }
+}
+
+// Print via Agent: ask server to dispatch job to local worker (if configured)
+async function printViaAgent(orderId) {
+  try {
+    // Try a conventional endpoint name. Adjust if your API differs.
+    const res = await fetch(`/api/printer/agent/print-and-open/${encodeURIComponent(orderId)}`, { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && (data.success !== false)) {
+      alert('Job dikirim ke Agent. Cek perangkat kasir.');
+    } else {
+      alert(`Gagal kirim ke Agent${data?.message ? `: ${data.message}` : ''}. Pastikan Local Worker aktif.`);
+    }
+  } catch (e) {
+    alert('Gagal kirim ke Agent: ' + (e.message || e));
+  }
 }
 
 // --- Bind events ---

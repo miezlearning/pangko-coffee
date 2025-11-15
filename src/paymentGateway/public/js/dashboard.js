@@ -24,6 +24,9 @@ const dashboardData = {
   cancelled: []
 };
 
+// Environment detection
+const isAndroid = /Android/i.test(navigator.userAgent || '');
+
 const dashboardFilters = {
   qris: { search: '', sort: 'newest' },
   cash: { search: '', sort: 'newest' },
@@ -750,7 +753,7 @@ function renderProcessingOrders() {
         </div>
 
         <!-- Action Buttons -->
-        <div class="mt-6 grid gap-3 sm:grid-cols-4">
+        <div class="mt-6 grid gap-3 grid-cols-2 sm:grid-cols-4">
           <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-charcoal/15 bg-white px-4 py-3 text-sm font-semibold text-charcoal transition hover:-translate-y-0.5 hover:shadow-lg" onclick="previewReceipt('${order.orderId}')">
             <span>👀</span>
             <span>Preview Struk</span>
@@ -759,10 +762,10 @@ function renderProcessingOrders() {
             <span>🖨️</span>
             <span>Print & Buka Laci</span>
           </button>
-          <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-indigo-300 bg-white px-4 py-3 text-sm font-semibold text-indigo-700 transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printViaRawBT('${order.orderId}')">
+          ${isAndroid ? `<button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-indigo-300 bg-white px-4 py-3 text-sm font-semibold text-indigo-700 transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printViaRawBT('${order.orderId}')">
             <span>📱</span>
             <span>Print via RawBT</span>
-          </button>
+          </button>` : ''}
           <button class="flex items-center justify-center gap-2 rounded-2xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="markOrderReady('${order.orderId}', '${customerName}')">
             <span>✅</span>
             <span>Tandai Siap</span>
@@ -1391,7 +1394,7 @@ function renderReadyOrders() {
         </div>
 
         <!-- Action Buttons -->
-        <div class="mt-6 grid gap-3 sm:grid-cols-4">
+        <div class="mt-6 grid gap-3 grid-cols-2 sm:grid-cols-4">
           <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-charcoal/15 bg-white px-4 py-3 text-sm font-semibold text-charcoal transition hover:-translate-y-0.5 hover:shadow-lg" onclick="previewReceipt('${order.orderId}')">
             <span>👀</span>
             <span>Preview Struk</span>
@@ -1400,10 +1403,10 @@ function renderReadyOrders() {
             <span>🖨️</span>
             <span>Print & Buka Laci</span>
           </button>
-          <button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-indigo-300 bg-white px-4 py-3 text-sm font-semibold text-indigo-700 transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printViaRawBT('${order.orderId}')">
+          ${isAndroid ? `<button class="flex items-center justify-center gap-2 rounded-2xl border-2 border-indigo-300 bg-white px-4 py-3 text-sm font-semibold text-indigo-700 transition hover:-translate-y-0.5 hover:shadow-lg" onclick="printViaRawBT('${order.orderId}')">
             <span>📱</span>
             <span>Print via RawBT</span>
-          </button>
+          </button>` : ''}
           <button class="flex items-center justify-center gap-2 rounded-2xl bg-charcoal px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg" onclick="completeOrder('${order.orderId}', '${customerName}')">
             <span>✔️</span>
             <span>Tandai Sudah Diambil</span>
@@ -1443,24 +1446,7 @@ async function printReceipt(orderId) {
   if (!proceed) return;
   
   try {
-    // On Android tablet with RawBT installed, try RawBT first (1-tap)
-    const isAndroid = /Android/i.test(navigator.userAgent || '');
-    if (isAndroid) {
-      try {
-        showNotification('📱 Menyiapkan cetak via RawBT...', 'info');
-        const r = await fetch(`/api/printer/rawbt/link/${orderId}`);
-        const j = await r.json();
-        if (j?.success && j.rawbtUrl) {
-          window.location.href = j.rawbtUrl; // opens RawBT app
-          showNotification('🔗 Membuka RawBT…');
-          return; // stop here; RawBT handles printing & drawer (ESC/POS)
-        }
-      } catch (_) {
-        // ignore and fallback to server-side printing
-      }
-    }
-
-    // Fallback: server-side printing (serial/TCP/etc.)
+    // Server-side printing only (separated from RawBT)
     showNotification('🖨️ Mencetak struk...', 'info');
     const res = await fetch(`/api/printer/print-and-open/${orderId}`, { method: 'POST' });
     const data = await res.json();
