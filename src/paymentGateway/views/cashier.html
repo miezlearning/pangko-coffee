@@ -56,14 +56,24 @@
       }
       .category-chip:hover {
         border-color: #74A662;
-        background: #74A66210;
+        background: linear-gradient(135deg, #74A66210, #74A66220);
         transform: translateY(-1px);
       }
       .category-chip.active {
-        background: #74A662;
+        background: linear-gradient(135deg, #74A662, #5a8350);
         color: white;
         border-color: #74A662;
-        box-shadow: 0 2px 8px rgba(116, 166, 98, 0.3);
+        box-shadow: 0 3px 10px rgba(116, 166, 98, 0.4);
+        transform: translateY(-1px);
+      }
+      
+      /* Scrollbar hide utility */
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
       }
       
       /* Smooth transitions */
@@ -74,161 +84,168 @@
   <body class="min-h-screen bg-cream text-charcoal antialiased" data-page="cashier">
     <div id="navbar-container"></div>
 
-    <main class="mx-auto w-full max-w-7xl px-4 pt-40 pb-16">
-      <section class="relative mb-10 overflow-hidden rounded-3xl bg-white/92 px-6 py-8 shadow-glow md:px-12 md:py-12">
-        <div class="pointer-events-none absolute -left-28 -top-24 h-72 w-72 rounded-full bg-matcha/25 blur-3xl"></div>
-        <div class="pointer-events-none absolute -right-16 bottom-0 h-64 w-64 rounded-full bg-peach/35 blur-3xl"></div>
-        <div class="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-          <div class="max-w-xl space-y-4">
-            <span class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-5 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-matcha">Kasir Live</span>
-            <h1 class="text-4xl font-extrabold leading-tight md:text-5xl">🧾 Kasir (Point of Sale)</h1>
-            <p class="text-base text-charcoal/65 md:text-lg">Tambah produk ke keranjang, atur diskon, dan proses pembayaran QRIS maupun tunai dari satu layar yang responsif.</p>
-            <div class="flex flex-wrap items-center gap-3">
-              <button id="hero-new-order" type="button" onclick="document.getElementById('search-input')?.focus()" class="inline-flex items-center gap-2 rounded-2xl bg-matcha px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-matcha/25 transition hover:-translate-y-0.5 hover:bg-matcha/90">➕ Tambah Item</button>
-              <button type="button" onclick="document.getElementById('refresh-menu')?.click()" class="inline-flex items-center gap-2 rounded-2xl border border-matcha/35 bg-white px-5 py-3 text-sm font-semibold text-matcha transition hover:-translate-y-0.5 hover:bg-matcha/10">🔄 Refresh Menu</button>
-            </div>
-          </div>
-          <div class="relative w-full max-w-sm space-y-4 rounded-2xl border border-white/50 bg-white/85 p-6 shadow-[0_45px_80px_-60px_rgba(51,51,51,0.55)]">
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-charcoal/55">Status Toko</p>
-                <p class="mt-1 text-sm text-charcoal/65">Sinkron dengan tombol di navbar.</p>
-              </div>
-              <span id="store-state-badge" class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-3 py-1 text-xs font-semibold text-matcha">
+    <main class="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8 pt-28 pb-12">
+      <!-- Compact Header -->
+      <section class="relative mb-6 overflow-hidden rounded-2xl bg-white/95 px-6 py-6 shadow-lg backdrop-blur-sm">
+        <div class="pointer-events-none absolute -left-20 -top-20 h-56 w-56 rounded-full bg-matcha/15 blur-3xl"></div>
+        <div class="pointer-events-none absolute -right-12 bottom-0 h-48 w-48 rounded-full bg-peach/20 blur-3xl"></div>
+        <div class="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex-1 space-y-3">
+            <div class="flex items-center gap-3">
+              <span class="inline-flex items-center gap-2 rounded-xl bg-matcha/15 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-matcha">
+                <span class="h-2 w-2 rounded-full bg-matcha animate-pulse"></span>
+                Kasir Live
+              </span>
+              <span id="store-state-badge" class="inline-flex items-center gap-2 rounded-xl bg-matcha/15 px-3 py-1.5 text-xs font-bold text-matcha">
                 <span id="store-state-indicator" class="h-2 w-2 rounded-full bg-matcha"></span>
                 <span id="store-state-chip">Memuat…</span>
               </span>
             </div>
-            <div class="rounded-2xl border border-charcoal/10 bg-charcoal/5 p-4 text-xs text-charcoal/60">
-              <p class="font-semibold text-charcoal">Tip Cepat</p>
-              <p class="mt-2">Gunakan <kbd class="rounded bg-white px-1.5 py-0.5 shadow-inner">Enter</kbd> untuk menambahkan item terpilih dan <kbd class="rounded bg-white px-1.5 py-0.5 shadow-inner">Ctrl</kbd> + <kbd class="rounded bg-white px-1.5 py-0.5 shadow-inner">B</kbd> untuk proses pembayaran.</p>
-            </div>
+            <h1 class="text-2xl font-extrabold leading-tight text-charcoal md:text-3xl">🧾 Point of Sale</h1>
+            <p class="text-sm text-charcoal/60 max-w-2xl">Tambah produk, atur diskon, dan proses pembayaran QRIS atau tunai dengan cepat.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="hero-new-order" type="button" onclick="document.getElementById('search-input')?.focus()" class="inline-flex items-center gap-2 rounded-xl bg-matcha px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-matcha/20 transition-all hover:-translate-y-0.5 hover:shadow-lg">
+              ➕ Tambah Item
+            </button>
+            <button type="button" onclick="document.getElementById('refresh-menu')?.click()" class="inline-flex items-center gap-2 rounded-xl border-2 border-matcha/30 bg-white px-4 py-2.5 text-sm font-bold text-matcha transition-all hover:bg-matcha/10">
+              🔄 Refresh
+            </button>
           </div>
         </div>
       </section>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 lg:gap-8">
+      <div class="grid grid-cols-1 lg:grid-cols-[1fr_400px] xl:grid-cols-[1fr_450px] gap-6">
         
         <!-- Left Column: Menu & Filters -->
-        <div class="lg:col-span-2">
-          <div class="rounded-2xl border border-white/60 bg-white/95 p-5 shadow-sm backdrop-blur-lg">
+        <div class="order-2 lg:order-1">
+          <div class="rounded-2xl border border-white/50 bg-white/95 p-5 shadow-lg backdrop-blur-sm">
             <!-- Search & Filter Section -->
             <div class="mb-5 space-y-3">
               <div class="relative">
-                <input id="search-input" type="text" placeholder="🔍 Cari nama menu..." class="w-full rounded-xl border-gray-200 bg-gray-50 px-4 py-3 text-base transition focus:border-matcha/50 focus:bg-white focus:ring-2 focus:ring-matcha/30" />
-                <button id="clear-search" class="absolute right-3 top-1/2 hidden -translate-y-1/2 text-charcoal/40 transition hover:text-charcoal">
-                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-charcoal/40">
+                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </div>
+                <input id="search-input" type="text" placeholder="Cari nama menu atau deskripsi..." class="w-full rounded-xl border-2 border-charcoal/10 bg-white pl-11 pr-10 py-3 text-sm font-medium transition-all focus:border-matcha/50 focus:bg-white focus:ring-2 focus:ring-matcha/20" />
+                <button id="clear-search" class="absolute right-3 top-1/2 hidden -translate-y-1/2 text-charcoal/40 transition-all hover:text-charcoal hover:scale-110">
+                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
               </div>
               <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold text-charcoal/60 whitespace-nowrap">Kategori:</span>
-                <div id="category-chips" class="flex flex-wrap gap-2 overflow-x-auto pb-1">
-                  <button data-category="all" class="category-chip active px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all whitespace-nowrap">
+                <span class="text-xs font-bold text-charcoal/60 whitespace-nowrap">Filter:</span>
+                <div id="category-chips" class="flex flex-wrap gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                  <button data-category="all" class="category-chip active px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all whitespace-nowrap shadow-sm">
                     📂 Semua
                   </button>
                 </div>
               </div>
-              <div class="flex items-center justify-between pt-1 text-xs text-charcoal/60">
+              <div class="flex items-center justify-between pt-1 text-xs font-semibold text-charcoal/60">
                 <span id="results-count">Memuat menu...</span>
-                <button id="refresh-menu" class="inline-flex items-center gap-1 transition hover:text-matcha">
-                  <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                  Refresh Menu
+                <button id="refresh-menu" class="inline-flex items-center gap-1.5 transition-all hover:text-matcha hover:scale-105">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  Refresh
                 </button>
               </div>
             </div>
             
             <!-- Menu Grid -->
-            <div id="menu-grid" class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+            <div id="menu-grid" class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3"></div>
           </div>
         </div>
 
         <!-- Right Column: Cart & Actions -->
-        <aside class="lg:col-span-1">
-          <div class="sticky top-28 space-y-6">
-            <div class="rounded-2xl border border-white/60 bg-white/95 p-5 shadow-lg backdrop-blur-lg">
-              <h2 class="text-xl font-bold mb-4 flex items-center gap-3">
-                <span class="rounded-full bg-matcha/10 p-2 text-xl">🛒</span>
-                <span>Keranjang</span>
-              </h2>
-              <div id="cart-list" class="space-y-3 max-h-[35vh] overflow-auto pr-2"></div>
+        <aside class="order-1 lg:order-2">
+          <div class="sticky top-24 space-y-4">
+            <div class="rounded-2xl border border-white/50 bg-white/95 p-5 shadow-lg backdrop-blur-sm">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-extrabold flex items-center gap-2">
+                  <span class="rounded-xl bg-matcha/15 p-2 text-lg">🛒</span>
+                  <span>Keranjang</span>
+                </h2>
+                <span class="text-xs font-bold text-charcoal/50" id="cart-count">0 item</span>
+              </div>
+              
+              <div id="cart-list" class="space-y-2 max-h-[40vh] overflow-auto pr-1 mb-4"></div>
               
               <!-- Totals -->
-              <div class="mt-4 border-t-2 border-dashed border-charcoal/10 pt-4 space-y-2">
-                <div class="flex justify-between text-base text-charcoal/80">
-                  <span>Subtotal</span><span id="subtotal" class="font-semibold">Rp 0</span>
+              <div class="border-t-2 border-dashed border-charcoal/10 pt-4 space-y-2">
+                <div class="flex justify-between text-sm text-charcoal/70">
+                  <span>Subtotal</span><span id="subtotal" class="font-bold">Rp 0</span>
                 </div>
-                <div class="flex justify-between text-base text-charcoal/80">
-                  <span>Biaya</span><span id="fee" class="font-semibold">Rp 0</span>
+                <div class="flex justify-between text-sm text-charcoal/70">
+                  <span>Biaya</span><span id="fee" class="font-bold">Rp 0</span>
                 </div>
-                <div class="flex justify-between text-base text-charcoal/80">
-                  <span>Diskon</span><span id="discount" class="font-semibold text-red-600">- Rp 0</span>
+                <div class="flex justify-between text-sm text-charcoal/70">
+                  <span>Diskon</span><span id="discount" class="font-bold text-red-600">- Rp 0</span>
                 </div>
-                <div class="flex justify-between text-2xl font-bold mt-3 pt-3 border-t border-matcha/30">
+                <div class="flex justify-between text-xl font-extrabold mt-3 pt-3 border-t-2 border-matcha/30">
                   <span>Total</span><span id="total" class="text-matcha">Rp 0</span>
                 </div>
               </div>
 
               <!-- Actions -->
               <div class="mt-5 space-y-3">
-                <input id="customer-name" type="text" placeholder="👤 Nama pelanggan (opsional)" class="w-full rounded-lg border-gray-200 bg-gray-50 px-4 py-3 text-sm transition focus:border-matcha/50 focus:bg-white focus:ring-1 focus:ring-matcha/30" />
+                <input id="customer-name" type="text" placeholder="👤 Nama pelanggan (opsional)" class="w-full rounded-xl border-2 border-charcoal/10 bg-white px-4 py-2.5 text-sm font-medium transition-all focus:border-matcha/50 focus:ring-2 focus:ring-matcha/20" />
                 <div>
-                  <input id="customer-phone" type="tel" placeholder="📱 No. WA (e.g., 62812...)" class="w-full rounded-lg border-gray-200 bg-gray-50 px-4 py-3 text-sm transition focus:border-matcha/50 focus:bg-white focus:ring-1 focus:ring-matcha/30" />
-                  <label class="mt-2 flex items-center gap-2 text-xs text-charcoal/70 pl-1">
+                  <input id="customer-phone" type="tel" placeholder="📱 No. WA (e.g., 62812...)" class="w-full rounded-xl border-2 border-charcoal/10 bg-white px-4 py-2.5 text-sm font-medium transition-all focus:border-matcha/50 focus:ring-2 focus:ring-matcha/20" />
+                  <label class="mt-2 flex items-center gap-2 text-xs font-semibold text-charcoal/70 pl-1">
                     <input id="send-notif-check" type="checkbox" class="rounded border-gray-300 text-matcha shadow-sm focus:ring-matcha/50" />
-                    <span>Kirim notifikasi via WhatsApp</span>
+                    <span>Kirim notifikasi WA</span>
                   </label>
                 </div>
                 
                 <details class="group">
                   <summary class="cursor-pointer list-none">
-                    <div class="text-xs font-semibold text-matcha hover:underline py-1.5">
-                      💰 Tambah Diskon Promo
+                    <div class="text-xs font-bold text-matcha hover:underline py-2 flex items-center gap-1.5">
+                      💰 Tambah Diskon
+                      <svg class="h-3 w-3 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                     </div>
                   </summary>
-                  <div class="grid grid-cols-2 gap-2 pt-1">
+                  <div class="grid grid-cols-2 gap-2 pt-2">
                     <div>
-                      <label for="discount-rp" class="block text-xs font-medium text-charcoal/60 mb-1">Diskon (Rp)</label>
-                      <input id="discount-rp" type="number" min="0" step="100" placeholder="0" class="w-full rounded-lg border-gray-200 bg-gray-50 px-3 py-2 text-sm transition focus:border-matcha/50 focus:bg-white focus:ring-1 focus:ring-matcha/30" />
+                      <label for="discount-rp" class="block text-xs font-bold text-charcoal/60 mb-1">Diskon (Rp)</label>
+                      <input id="discount-rp" type="number" min="0" step="100" placeholder="0" class="w-full rounded-lg border-2 border-charcoal/10 bg-white px-3 py-2 text-sm font-medium transition-all focus:border-matcha/50 focus:ring-2 focus:ring-matcha/20" />
                     </div>
                     <div>
-                      <label for="discount-pct" class="block text-xs font-medium text-charcoal/60 mb-1">Diskon (%)</label>
-                      <input id="discount-pct" type="number" min="0" max="100" step="1" placeholder="0" class="w-full rounded-lg border-gray-200 bg-gray-50 px-3 py-2 text-sm transition focus:border-matcha/50 focus:bg-white focus:ring-1 focus:ring-matcha/30" />
+                      <label for="discount-pct" class="block text-xs font-bold text-charcoal/60 mb-1">Diskon (%)</label>
+                      <input id="discount-pct" type="number" min="0" max="100" step="1" placeholder="0" class="w-full rounded-lg border-2 border-charcoal/10 bg-white px-3 py-2 text-sm font-medium transition-all focus:border-matcha/50 focus:ring-2 focus:ring-matcha/20" />
                     </div>
                   </div>
                 </details>
 
-                <div class="flex items-center gap-4 text-sm pt-2">
-                  <label class="flex items-center gap-2 cursor-pointer font-semibold">
+                <div class="flex items-center gap-3 text-sm pt-2 bg-charcoal/5 rounded-xl p-3">
+                  <span class="text-xs font-bold text-charcoal/60">Metode:</span>
+                  <label class="flex items-center gap-2 cursor-pointer font-bold">
                     <input type="radio" name="pm" value="QRIS" checked class="text-matcha focus:ring-matcha/50" /> 
                     <span>💳 QRIS</span>
                   </label>
-                  <label class="flex items-center gap-2 cursor-pointer font-semibold">
+                  <label class="flex items-center gap-2 cursor-pointer font-bold">
                     <input type="radio" name="pm" value="CASH" class="text-matcha focus:ring-matcha/50" /> 
                     <span>💵 Tunai</span>
                   </label>
                 </div>
 
-                <button id="create-order-btn" class="w-full rounded-xl bg-matcha px-4 py-4 text-lg font-bold text-white shadow-lg shadow-matcha/20 transition hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98]">
+                <button id="create-order-btn" class="w-full rounded-xl bg-gradient-to-r from-matcha to-green-600 px-4 py-4 text-base font-extrabold text-white shadow-lg shadow-matcha/30 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98]">
                   🚀 Buat Pesanan
                 </button>
 
-                <div class="flex items-center justify-between pt-1 text-xs text-charcoal/50">
+                <div class="flex items-center justify-between pt-1 text-xs font-semibold text-charcoal/50">
                   <span id="draft-indicator">Draft belum tersimpan</span>
-                  <button id="clear-draft-btn" class="underline transition hover:text-charcoal">Hapus</button>
+                  <button id="clear-draft-btn" class="underline transition-all hover:text-charcoal hover:scale-105">Hapus</button>
                 </div>
               </div>
             </div>
 
-            <div id="payment-panel" class="hidden rounded-2xl border border-white/60 bg-white/95 p-5 shadow-lg backdrop-blur-lg"></div>
+            <div id="payment-panel" class="hidden rounded-2xl border border-white/50 bg-white/95 p-5 shadow-lg backdrop-blur-sm"></div>
 
-            <div class="rounded-2xl border border-matcha/20 bg-matcha/5 p-4">
-              <p class="mb-2.5 flex items-center gap-2 text-sm font-semibold text-matcha/80">
+            <div class="rounded-2xl border-2 border-matcha/20 bg-gradient-to-br from-matcha/5 to-matcha/10 p-4">
+              <p class="mb-3 flex items-center gap-2 text-sm font-bold text-matcha">
                 <span>🔔</span> Notifikasi Suara
               </p>
-              <button id="sound-toggle" class="w-full rounded-lg border border-matcha/40 bg-white px-3 py-2 text-sm font-semibold text-matcha transition hover:bg-matcha hover:text-white">
+              <button id="sound-toggle" class="w-full rounded-xl border-2 border-matcha/40 bg-white px-3 py-2.5 text-sm font-bold text-matcha transition-all hover:bg-matcha hover:text-white shadow-sm">
                 Sound: ON
               </button>
-              <select id="notif-sound-select" class="mt-2 w-full rounded-lg border border-matcha/30 bg-white px-3 py-2 text-xs text-matcha focus:outline-none focus:ring-2 focus:ring-matcha/30">
+              <select id="notif-sound-select" class="mt-2 w-full rounded-xl border-2 border-matcha/30 bg-white px-3 py-2 text-xs font-bold text-matcha focus:outline-none focus:ring-2 focus:ring-matcha/30 transition-all">
                 <option value="/sounds/sound1.mp3">Efek 1</option>
                 <option value="/sounds/sound2.mp3">Efek 2</option>
                 <option value="/sounds/sound3.mp3">Efek 3</option>
@@ -252,51 +269,60 @@
     </div>
 
     <!-- Add/Edit Note Modal -->
-    <div id="note-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden">
-      <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full relative transform transition-all opacity-0 scale-95">
-        <button id="close-note-modal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition">
-          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    <div id="note-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
+      <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full relative transform transition-all opacity-0 scale-95">
+        <button id="close-note-modal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition-all hover:scale-110">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
-        <h2 id="note-modal-title" class="text-2xl font-bold mb-2">Catatan untuk Item</h2>
-        <p class="text-charcoal/70 mb-4">Tambahkan detail atau permintaan khusus dari pelanggan.</p>
-        <textarea id="note-input" rows="4" class="w-full rounded-xl border-gray-300 bg-gray-50 p-3 text-base transition focus:border-matcha/50 focus:bg-white focus:ring-2 focus:ring-matcha/30" placeholder="Contoh: Es sedikit, jangan pakai gula, dll."></textarea>
+        <h2 id="note-modal-title" class="text-xl font-extrabold mb-2 flex items-center gap-2">
+          <span class="text-2xl">📝</span>
+          Catatan Item
+        </h2>
+        <p class="text-sm text-charcoal/60 mb-4">Tambahkan detail atau permintaan khusus pelanggan.</p>
+        <textarea id="note-input" rows="4" class="w-full rounded-xl border-2 border-charcoal/10 bg-white p-3 text-sm font-medium transition-all focus:border-matcha/50 focus:ring-2 focus:ring-matcha/20" placeholder="Contoh: Es sedikit, jangan pakai gula, extra shot, dll."></textarea>
         <div class="mt-5 grid grid-cols-2 gap-3">
-          <button id="cancel-note-btn" class="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-charcoal/80 transition hover:bg-gray-50">Batal</button>
-          <button id="save-note-btn" class="rounded-xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:bg-matcha/90">Simpan Catatan</button>
+          <button id="cancel-note-btn" class="rounded-xl border-2 border-charcoal/10 bg-white px-4 py-3 text-sm font-bold text-charcoal/80 transition-all hover:bg-gray-50 active:scale-95">Batal</button>
+          <button id="save-note-btn" class="rounded-xl bg-gradient-to-r from-matcha to-green-600 px-4 py-3 text-sm font-bold text-white transition-all hover:shadow-lg active:scale-95">Simpan</button>
         </div>
       </div>
     </div>
 
     <!-- Add-on Selection Modal -->
-    <div id="addon-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden">
-      <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-2xl w-full relative transform transition-all opacity-0 scale-95">
-        <button id="close-addon-modal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition">
-          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    <div id="addon-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
+      <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-2xl w-full relative transform transition-all opacity-0 scale-95 max-h-[90vh] overflow-auto">
+        <button id="close-addon-modal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition-all hover:scale-110 z-10">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
-        <div class="space-y-6">
+        <div class="space-y-5">
           <div>
-            <h2 id="addon-modal-title" class="text-2xl font-bold">Pilih Add-on</h2>
-            <p id="addon-modal-subtitle" class="text-charcoal/70 mt-1">Tambahkan variasi atau topping untuk pesanan.</p>
+            <h2 id="addon-modal-title" class="text-xl font-extrabold flex items-center gap-2">
+              <span class="text-2xl">➕</span>
+              Pilih Add-on
+            </h2>
+            <p id="addon-modal-subtitle" class="text-sm text-charcoal/60 mt-1">Atur jumlah add-on sebelum menambah ke keranjang.</p>
           </div>
-          <div id="addon-modal-error" class="hidden rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600"></div>
-          <div id="addon-modal-list" class="max-h-72 overflow-auto pr-2 space-y-3"></div>
-          <div id="addon-modal-summary" class="rounded-2xl border border-matcha/20 bg-matcha/5 px-4 py-3 text-sm font-semibold text-matcha"></div>
+          <div id="addon-modal-error" class="hidden rounded-xl border-2 border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600"></div>
+          <div id="addon-modal-list" class="max-h-64 overflow-auto pr-2 space-y-2"></div>
+          <div id="addon-modal-summary" class="rounded-xl border-2 border-matcha/20 bg-gradient-to-br from-matcha/5 to-matcha/10 px-4 py-3 text-sm font-bold text-matcha"></div>
           <div class="grid gap-3 sm:grid-cols-2">
-            <button id="addon-skip-btn" class="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-charcoal/80 transition hover:bg-gray-50">Tanpa Add-on</button>
-            <button id="addon-confirm-btn" class="rounded-xl bg-matcha px-4 py-3 text-sm font-semibold text-white transition hover:bg-matcha/90">Tambah ke Keranjang</button>
+            <button id="addon-skip-btn" class="rounded-xl border-2 border-charcoal/10 bg-white px-4 py-3 text-sm font-bold text-charcoal/80 transition-all hover:bg-gray-50 active:scale-95">Tanpa Add-on</button>
+            <button id="addon-confirm-btn" class="rounded-xl bg-gradient-to-r from-matcha to-green-600 px-4 py-3 text-sm font-bold text-white transition-all hover:shadow-lg active:scale-95">Tambah ke Keranjang</button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- QRIS Modal -->
-    <div id="qris-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden">
-      <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center relative transform transition-all opacity-0 scale-95">
-        <button id="close-qris-modal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition">
-          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    <div id="qris-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
+      <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full text-center relative transform transition-all opacity-0 scale-95">
+        <button id="close-qris-modal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition-all hover:scale-110">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
-        <h2 class="text-2xl font-bold mb-2">Scan untuk Membayar</h2>
-        <p class="text-charcoal/70 mb-4">Tunjukkan QRIS ini kepada pelanggan.</p>
+        <h2 class="text-xl font-extrabold mb-2 flex items-center justify-center gap-2">
+          <span class="text-2xl">💳</span>
+          Scan untuk Membayar
+        </h2>
+        <p class="text-sm text-charcoal/60 mb-4">Tunjukkan QRIS ini kepada pelanggan.</p>
         <div id="qris-modal-content" class="space-y-4">
           <!-- QR Code and details will be injected here -->
         </div>

@@ -279,40 +279,38 @@ function renderMenu(){
         </div>`
       : '';
     
-    return `<div class="group relative rounded-xl border border-charcoal/10 bg-white shadow-sm hover:shadow-xl hover:border-matcha/40 transition-all duration-200">
+    return `<div class="group relative rounded-xl border-2 border-charcoal/10 bg-white shadow-sm hover:shadow-lg hover:border-matcha/50 hover:-translate-y-1 transition-all duration-200">
       ${stockBadge}
       <div class="flex flex-col h-full">
         ${it.image 
-          ? `<div class="relative w-full h-32 rounded-t-xl overflow-hidden bg-gradient-to-br from-cream to-peach/20">
-              <img src="${it.image}" alt="${it.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full text-5xl\\'>${emoji}</div>'">
+          ? `<div class="relative w-full h-28 rounded-t-xl overflow-hidden bg-gradient-to-br from-cream to-peach/20">
+              <img src="${it.image}" alt="${it.name}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full text-4xl\\'>${emoji}</div>'">
             </div>`
-          : `<div class="relative w-full h-32 rounded-t-xl bg-gradient-to-br from-cream to-peach/20 flex items-center justify-center border-b border-charcoal/5">
-              <div class="text-5xl group-hover:scale-110 transition-transform">${emoji}</div>
+          : `<div class="relative w-full h-28 rounded-t-xl bg-gradient-to-br from-cream to-peach/20 flex items-center justify-center border-b border-charcoal/5">
+              <div class="text-4xl group-hover:scale-110 transition-transform">${emoji}</div>
             </div>`
         }
         <div class="flex flex-col flex-1 p-3">
-          <div class="flex items-start justify-between gap-2 mb-2">
-            <div class="flex-1 min-w-0">
-              <div class="font-bold text-sm leading-tight mb-1 line-clamp-2 group-hover:text-matcha transition">${it.name}</div>
-              <div class="text-xs px-2 py-0.5 rounded-full bg-matcha/10 text-matcha/80 font-medium inline-block">${catName}</div>
-            </div>
+          <div class="flex-1 min-w-0 mb-2">
+            <div class="font-bold text-sm leading-tight mb-1.5 line-clamp-2 group-hover:text-matcha transition">${it.name}</div>
+            <div class="text-[10px] px-2 py-0.5 rounded-full bg-matcha/10 text-matcha font-bold inline-block">${catName}</div>
           </div>
           ${it.description 
-            ? `<div class="text-xs text-charcoal/60 mb-2 line-clamp-2">${it.description}</div>`
+            ? `<div class="text-xs text-charcoal/60 mb-2 line-clamp-2 leading-snug">${it.description}</div>`
             : ''
           }
-          <div class="mt-auto">
+          <div class="mt-auto space-y-2">
             ${showOriginal
-              ? `<div class="flex items-baseline gap-2 mb-2">
-                   <span class="text-xs text-red-500 line-through">Rp ${fmt(basePriceNum)}</span>
-                   <span class="text-lg font-extrabold text-matcha">Rp ${price}</span>
+              ? `<div class="flex items-baseline gap-2">
+                   <span class="text-xs text-red-500 line-through font-semibold">Rp ${fmt(basePriceNum)}</span>
+                   <span class="text-base font-extrabold text-matcha">Rp ${price}</span>
                  </div>`
-              : `<div class="text-lg font-extrabold text-matcha mb-2">Rp ${price}</div>`
+              : `<div class="text-base font-extrabold text-matcha">Rp ${price}</div>`
             }
-            <button class="w-full bg-matcha text-white rounded-lg py-2.5 text-sm font-bold hover:bg-matcha/90 active:scale-95 transition-all shadow-md hover:shadow-lg add-to-cart-btn" data-item-id="${it.id}">
-              <span class="inline-flex items-center gap-1">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                Tambah ke Keranjang
+            <button class="w-full bg-gradient-to-r from-matcha to-green-600 text-white rounded-lg py-2 text-xs font-extrabold hover:shadow-md active:scale-95 transition-all add-to-cart-btn" data-item-id="${it.id}">
+              <span class="inline-flex items-center justify-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                Tambah
               </span>
             </button>
           </div>
@@ -407,19 +405,19 @@ function renderAddonModal(){
       requirements.push(`maks ${addon.maxQuantity}`);
     }
 
-    return `<div class="rounded-2xl border border-charcoal/10 bg-white px-4 py-3">
+    return `<div class="rounded-xl border-2 border-charcoal/10 bg-gradient-to-br from-white to-cream/30 px-4 py-3 hover:border-matcha/30 transition-all">
       <div class="flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0">
-          <div class="font-semibold text-sm text-charcoal">${addon.name}</div>
-          <div class="text-xs text-charcoal/60 mt-0.5">Rp ${fmt(addon.unitPrice)}${requirements.length ? ` • ${requirements.join(', ')}` : ''}</div>
+          <div class="font-bold text-sm text-charcoal">${addon.name}</div>
+          <div class="text-xs text-charcoal/60 mt-0.5 font-semibold">Rp ${fmt(addon.unitPrice)}${requirements.length ? ` • ${requirements.join(', ')}` : ''}</div>
         </div>
-        <div class="flex items-center gap-2 bg-gray-50 rounded-full px-2 py-1">
-          <button class="w-8 h-8 rounded-full bg-white border border-charcoal/10 text-lg leading-none" data-addon-action="dec" data-index="${index}">−</button>
-          <div id="addon-qty-${index}" class="w-8 text-center font-bold text-sm">${qty}</div>
-          <button class="w-8 h-8 rounded-full bg-matcha text-white border border-matcha/10 text-lg leading-none" data-addon-action="inc" data-index="${index}">+</button>
+        <div class="flex items-center gap-1.5 bg-white rounded-xl px-2 py-1 border-2 border-charcoal/10 shadow-sm">
+          <button class="w-7 h-7 rounded-lg bg-white border border-charcoal/10 text-base font-bold leading-none hover:bg-charcoal/5 active:scale-95 transition-all" data-addon-action="dec" data-index="${index}">−</button>
+          <div id="addon-qty-${index}" class="w-7 text-center font-extrabold text-sm">${qty}</div>
+          <button class="w-7 h-7 rounded-lg bg-matcha text-white border border-matcha text-base font-bold leading-none hover:bg-matcha/90 active:scale-95 transition-all" data-addon-action="inc" data-index="${index}">+</button>
         </div>
       </div>
-      <div class="mt-2 text-xs text-charcoal/50" id="addon-subtotal-${index}">Subtotal: Rp ${fmt(subtotal)}</div>
+      <div class="mt-2 text-xs font-bold text-matcha" id="addon-subtotal-${index}">Subtotal: Rp ${fmt(subtotal)}</div>
     </div>`;
   }).join('');
 
@@ -596,28 +594,34 @@ function calcTotals(){
 
 function renderCart(){
   const list = el('cart-list');
+  const cartCount = el('cart-count');
+  
+  // Update cart count
+  const totalItems = CART.reduce((sum, i) => sum + i.quantity, 0);
+  if(cartCount) cartCount.textContent = `${totalItems} item${totalItems !== 1 ? 's' : ''}`;
+  
   if(CART.length===0){ 
-    list.innerHTML='<div class="text-center py-8 text-sm text-charcoal/50">🛒 Keranjang masih kosong</div>'; 
+    list.innerHTML='<div class="text-center py-12 text-sm text-charcoal/50"><div class="text-4xl mb-2">🛒</div><div class="font-semibold">Keranjang masih kosong</div><div class="text-xs mt-1">Tambahkan menu dari daftar</div></div>'; 
   }
   else{
     list.innerHTML = CART.map(i=>
-      `<div class="flex items-start gap-3 p-2.5 rounded-lg bg-cream/50 border border-charcoal/5 hover:bg-cream/80 transition">
+      `<div class="flex items-start gap-2 p-3 rounded-xl bg-gradient-to-br from-cream/60 to-cream/40 border border-charcoal/10 hover:border-matcha/30 hover:shadow-sm transition-all">
         <div class="flex-1 min-w-0">
-          <div class="font-semibold text-sm truncate">${i.name}</div>
-          <div class="text-xs text-charcoal/60 mt-0.5">Harga satuan: Rp ${fmt(i.price)}</div>
-          <div class="text-xs text-charcoal/60">Subtotal: Rp ${fmt(i.price * i.quantity)}</div>
+          <div class="font-bold text-sm truncate text-charcoal">${i.name}</div>
+          <div class="text-xs text-charcoal/60 mt-0.5">@ Rp ${fmt(i.price)} × ${i.quantity}</div>
+          <div class="text-xs font-bold text-matcha mt-0.5">Subtotal: Rp ${fmt(i.price * i.quantity)}</div>
           ${formatAddonLines(i.addons || [])}
-          ${i.notes ? `<div class="text-xs text-charcoal/70 mt-1.5 bg-white/80 px-2 py-1 rounded border border-charcoal/10">📝 ${i.notes.replace(/</g,'&lt;')}</div>` : ''}
+          ${i.notes ? `<div class="text-xs text-charcoal/70 mt-2 bg-white/90 px-2 py-1.5 rounded-lg border border-charcoal/10 flex items-start gap-1"><span class="flex-shrink-0">📝</span><span class="flex-1">${i.notes.replace(/</g,'&lt;')}</span></div>` : ''}
         </div>
-        <div class="flex flex-col gap-1">
-          <div class="flex items-center gap-1 bg-white rounded-lg border border-charcoal/10">
-            <button class="px-2 py-1 hover:bg-charcoal/5 rounded-l-lg transition" onclick="changeQty('${i.cartKey}',-1)">−</button>
-            <div class="w-8 text-center font-bold text-sm">${i.quantity}</div>
-            <button class="px-2 py-1 hover:bg-charcoal/5 rounded-r-lg transition" onclick="changeQty('${i.cartKey}',1)">+</button>
+        <div class="flex flex-col gap-1.5 flex-shrink-0">
+          <div class="flex items-center gap-0.5 bg-white rounded-lg border-2 border-charcoal/10 shadow-sm">
+            <button class="px-2 py-1 hover:bg-charcoal/5 rounded-l-lg transition-all active:scale-95 font-bold" onclick="changeQty('${i.cartKey}',-1)">−</button>
+            <div class="w-7 text-center font-extrabold text-sm">${i.quantity}</div>
+            <button class="px-2 py-1 hover:bg-matcha/10 rounded-r-lg transition-all active:scale-95 font-bold text-matcha" onclick="changeQty('${i.cartKey}',1)">+</button>
           </div>
           <div class="flex gap-1">
-            <button class="px-2 py-1 text-xs hover:bg-white rounded border border-charcoal/10 transition" title="Catatan" onclick="editNote('${i.cartKey}')">📝</button>
-            <button class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded border border-red-200 transition" title="Hapus" onclick="removeItem('${i.cartKey}')">🗑</button>
+            <button class="px-2 py-1 text-xs hover:bg-white rounded-lg border border-charcoal/10 transition-all active:scale-95 shadow-sm" title="Catatan" onclick="editNote('${i.cartKey}')">📝</button>
+            <button class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition-all active:scale-95 shadow-sm" title="Hapus" onclick="removeItem('${i.cartKey}')">🗑</button>
           </div>
         </div>
       </div>`
