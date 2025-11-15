@@ -188,8 +188,8 @@ function renderCategoryChips(){
   ];
   
   container.innerHTML = chips.map(c => 
-    `<button data-category="${c.id}" class="category-chip ${c.id==='all'?'active':''} px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all whitespace-nowrap">
-      ${c.emoji} ${c.name}
+    `<button data-category="${c.id}" class="category-chip ${c.id==='all'?'active':''} px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all whitespace-nowrap shadow-sm">
+     ${c.name}
     </button>`
   ).join('');
   

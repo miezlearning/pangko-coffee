@@ -31,26 +31,36 @@
     <!-- Navbar Container -->
     <div id="navbar-container"></div>
 
-    <main class="relative mx-auto w-full max-w-[1180px] px-5 pt-32 pb-20">
-      <section class="relative overflow-hidden rounded-3xl bg-white/90 px-6 py-8 shadow-glow backdrop-blur md:px-10 md:py-10">
-        <div class="pointer-events-none absolute -left-24 -top-20 h-52 w-52 rounded-full bg-matcha/25 blur-3xl"></div>
-        <div class="pointer-events-none absolute -right-16 bottom-0 h-64 w-64 rounded-full bg-peach/35 blur-3xl"></div>
-        <div class="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div class="max-w-xl space-y-3">
-            <span class="inline-flex items-center gap-2 rounded-full bg-matcha/15 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-matcha">Order Lookup</span>
-            <h1 class="text-3xl font-extrabold leading-tight md:text-4xl">🔎 Cari Order</h1>
-            <p class="text-sm text-charcoal/65 md:text-base">Lacak pesanan hanya dengan memasukkan ID, nama customer, atau memilih status tertentu.</p>
+    <main class="relative mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-8 pt-28 pb-12">
+      <section class="relative overflow-hidden rounded-2xl bg-white/95 px-6 py-6 shadow-lg backdrop-blur-sm">
+        <div class="pointer-events-none absolute -left-20 -top-20 h-56 w-56 rounded-full bg-matcha/15 blur-3xl"></div>
+        <div class="pointer-events-none absolute -right-12 bottom-0 h-48 w-48 rounded-full bg-peach/20 blur-3xl"></div>
+        <div class="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex-1 space-y-3">
+            <div class="flex items-center gap-3">
+              <span class="inline-flex items-center gap-2 rounded-xl bg-matcha/15 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-matcha">
+                <span class="h-2 w-2 rounded-full bg-matcha animate-pulse"></span>
+                Order Lookup
+              </span>
+            </div>
+            <h1 class="text-2xl font-extrabold leading-tight text-charcoal md:text-3xl">🔎 Cari Order</h1>
+            <p class="text-sm text-charcoal/60 max-w-2xl">Lacak pesanan dengan ID, nama customer, atau filter berdasarkan status.</p>
           </div>
-          <div class="flex flex-col gap-3 sm:flex-row">
-            <button id="btn-search" class="inline-flex items-center gap-2 rounded-2xl bg-matcha px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-matcha/25 transition hover:-translate-y-0.5 hover:bg-matcha/90">Mulai Pencarian</button>
-            <button type="button" onclick="document.getElementById('search-input').focus()" class="inline-flex items-center gap-2 rounded-2xl border border-matcha/35 bg-white px-5 py-3 text-sm font-semibold text-matcha transition hover:-translate-y-0.5 hover:bg-matcha/10">⌨️ Fokus Input</button>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="btn-search" class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-matcha to-green-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-matcha/20 transition-all hover:-translate-y-0.5 hover:shadow-lg">Mulai Pencarian</button>
+            <button type="button" onclick="document.getElementById('search-input').focus()" class="inline-flex items-center gap-2 rounded-xl border-2 border-matcha/30 bg-white px-4 py-2.5 text-sm font-bold text-matcha transition-all hover:bg-matcha/10">⌨️ Fokus Input</button>
           </div>
         </div>
 
-        <div class="relative mt-8 rounded-2xl border border-white/60 bg-white/85 p-5 shadow-[0_25px_60px_-55px_rgba(51,51,51,0.45)]">
-          <div class="grid gap-4 sm:grid-cols-[1fr_auto]">
-            <input id="search-input" type="text" placeholder="Cari berdasarkan ID Pesanan atau Nama Customer..." class="w-full rounded-xl border border-charcoal/10 bg-white/95 px-4 py-3 text-sm outline-none ring-matcha/30 transition focus:ring-2" />
-            <select id="search-status" class="w-full rounded-xl border border-charcoal/10 bg-white/95 px-3 py-3 text-sm outline-none ring-matcha/30 transition focus:ring-2 sm:w-auto">
+        <div class="relative mt-6 rounded-xl border border-white/50 bg-white/90 p-4 shadow-md">
+          <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <div class="relative">
+              <div class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-charcoal/40">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </div>
+              <input id="search-input" type="text" placeholder="Cari berdasarkan ID Pesanan atau Nama Customer..." class="w-full rounded-xl border-2 border-charcoal/10 bg-white pl-11 pr-4 py-3 text-sm font-medium outline-none ring-matcha/20 transition-all focus:border-matcha/50 focus:ring-2" />
+            </div>
+            <select id="search-status" class="w-full rounded-xl border-2 border-charcoal/10 bg-white px-3 py-3 text-sm font-medium outline-none ring-matcha/20 transition-all focus:border-matcha/50 focus:ring-2 sm:w-auto">
               <option value="all">Semua Status</option>
               <option value="pending_cash">Menunggu Tunai</option>
               <option value="pending_payment">Pembayaran Pending (QRIS)</option>
@@ -64,8 +74,9 @@
 
         <div id="search-results" class="relative mt-6">
           <!-- Results will be injected here -->
-          <div id="placeholder" class="py-10 text-center text-charcoal/50">
-            <p>Masukkan kata kunci untuk memulai pencarian...</p>
+          <div id="placeholder" class="py-12 text-center text-charcoal/50">
+            <div class="text-5xl mb-3">🔍</div>
+            <p class="font-semibold">Masukkan kata kunci untuk memulai pencarian...</p>
           </div>
         </div>
       </section>

@@ -54,24 +54,24 @@
     <!-- Navbar will be injected here by navbar.js -->
     <div id="navbar-container"></div>
 
-    <main class="relative mx-auto flex w-full max-w-[1180px] flex-col gap-12 px-5 pt-40 pb-20">
+    <main class="relative mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-4 sm:px-6 lg:px-8 pt-28 pb-12">
       
       <!-- Header with Add Button -->
       <section class="relative">
-        <div class="relative overflow-hidden rounded-3xl bg-white/90 px-10 py-12 shadow-glow">
-          <div class="pointer-events-none absolute -left-16 -top-16 h-64 w-64 rounded-full bg-matcha/25 blur-3xl"></div>
-          <div class="pointer-events-none absolute -right-12 bottom-0 h-56 w-56 rounded-full bg-peach/40 blur-3xl"></div>
+        <div class="relative overflow-hidden rounded-2xl bg-white/95 px-6 py-6 shadow-lg backdrop-blur-sm">
+          <div class="pointer-events-none absolute -left-20 -top-20 h-56 w-56 rounded-full bg-matcha/15 blur-3xl"></div>
+          <div class="pointer-events-none absolute -right-12 bottom-0 h-48 w-48 rounded-full bg-peach/20 blur-3xl"></div>
           
-          <div class="relative flex items-center justify-between gap-6 flex-wrap">
-            <div>
-              <h1 class="text-4xl font-bold text-charcoal mb  -3">Kelola Menu</h1>
-              <p class="text-charcoal/60 text-lg">Tambah, edit, atau hapus item menu coffee shop</p>
+          <div class="relative flex items-center justify-between gap-4 flex-wrap">
+            <div class="space-y-2">
+              <h1 class="text-2xl font-extrabold text-charcoal md:text-3xl">☕ Kelola Menu</h1>
+              <p class="text-sm text-charcoal/60">Tambah, edit, atau hapus item menu coffee shop</p>
             </div>
-            <div class="flex flex-wrap gap-3">
-              <button onclick="openAddonManagerModal()" class="px-5 py-3 bg-white text-matcha font-semibold rounded-full border-2 border-matcha/40 hover:bg-matcha/10 transition-all shadow-sm">
+            <div class="flex flex-wrap gap-2">
+              <button onclick="openAddonManagerModal()" class="px-4 py-2.5 bg-white text-matcha font-bold rounded-xl border-2 border-matcha/40 hover:bg-matcha/10 transition-all shadow-sm text-sm">
                 🎯 Kelola Add-on
               </button>
-              <button onclick="openAddItemModal()" class="px-6 py-3 bg-matcha text-white font-semibold rounded-full hover:bg-matcha/90 transition-all shadow-md hover:shadow-lg">
+              <button onclick="openAddItemModal()" class="px-5 py-2.5 bg-gradient-to-r from-matcha to-green-600 text-white font-bold rounded-xl hover:shadow-lg transition-all shadow-md text-sm">
                 + Tambah Item
               </button>
             </div>
@@ -82,17 +82,17 @@
 
       <!-- Category Tabs -->
       <section class="relative">
-        <div class="bg-white/60 backdrop-blur rounded-2xl border border-white/40 p-2 inline-flex gap-2 shadow-md">
-          <button onclick="filterCategory('all')" class="category-tab active px-6 py-3 rounded-xl text-sm font-semibold transition-all">
+        <div class="bg-white/90 backdrop-blur-sm rounded-xl border border-white/50 p-2 inline-flex gap-2 shadow-md">
+          <button onclick="filterCategory('all')" class="category-tab active px-5 py-2.5 rounded-lg text-sm font-bold transition-all">
             Semua
           </button>
-          <button onclick="filterCategory('coffee')" class="category-tab px-6 py-3 rounded-xl text-sm font-semibold transition-all">
+          <button onclick="filterCategory('coffee')" class="category-tab px-5 py-2.5 rounded-lg text-sm font-bold transition-all">
             ☕ Kopi
           </button>
-          <button onclick="filterCategory('nonCoffee')" class="category-tab px-6 py-3 rounded-xl text-sm font-semibold transition-all">
+          <button onclick="filterCategory('nonCoffee')" class="category-tab px-5 py-2.5 rounded-lg text-sm font-bold transition-all">
             🥤 Non-Kopi
           </button>
-          <button onclick="filterCategory('food')" class="category-tab px-6 py-3 rounded-xl text-sm font-semibold transition-all">
+          <button onclick="filterCategory('food')" class="category-tab px-5 py-2.5 rounded-lg text-sm font-bold transition-all">
             🍰 Makanan
           </button>
         </div>
